@@ -1,34 +1,20 @@
-import { createServiceClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default async function AdminDashboard() {
-  let supabase;
-  try {
-    supabase = await createServiceClient();
-  } catch (e) {
-    console.error("Failed to create supabase client:", e);
-    return <div>Configuration error. Please check environment variables.</div>;
-  }
+  const supabase = await createClient();
 
-  const { data: courses, error: coursesError } = await supabase
+  const { data: courses } = await supabase
     .from("courses")
     .select("*, lessons(count)")
     .order("created_at", { ascending: false });
 
-  if (coursesError) {
-    console.error("Courses error:", coursesError);
-  }
-
-  const { data: teachers, error: teachersError } = await supabase
+  const { data: teachers } = await supabase
     .from("profiles")
     .select("*")
     .eq("role", "teacher");
-
-  if (teachersError) {
-    console.error("Teachers error:", teachersError);
-  }
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
