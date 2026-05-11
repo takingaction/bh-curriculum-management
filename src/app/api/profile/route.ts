@@ -20,7 +20,9 @@ export async function GET() {
       .eq("id", user.id)
       .single();
 
-    console.log("GET /api/profile - query result:", JSON.stringify({ profile, error }));
+    console.log("GET /api/profile - profile from db:", profile);
+    console.log("GET /api/profile - profile full_name:", profile?.full_name);
+    console.log("GET /api/profile - profile role:", profile?.role);
 
     return NextResponse.json({
       profile: {
