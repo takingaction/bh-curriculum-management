@@ -77,14 +77,12 @@ export function UserMenu({ email, fullName, role, isAdmin, viewAs }: UserMenuPro
               </Link>
             )}
             <hr className="my-1 border-[#e5e5e0]" />
-            <form action="/auth/signout" method="post">
-              <button
-                type="submit"
-                className="w-full text-left px-4 py-2 text-sm text-[#e85d5d] hover:bg-[#f5f5f0]"
+            <Link
+                href="/auth/signout"
+                className="block px-4 py-2 text-sm text-[#e85d5d] hover:bg-[#f5f5f0]"
               >
                 Log Out
-              </button>
-            </form>
+              </Link>
           </div>
         </div>
       )}
