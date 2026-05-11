@@ -95,17 +95,10 @@ ALTER TABLE public.teacher_assignments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.adapted_lessons ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.ai_usage_counters ENABLE ROW LEVEL SECURITY;
 
--- Profiles policies
+-- Profiles policies - FIXED (no self-referencing)
 CREATE POLICY "Users can view own profile" ON public.profiles FOR SELECT USING (auth.uid() = id);
-CREATE POLICY "Admins can view all profiles" ON public.profiles FOR SELECT USING (
-  EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
-);
-CREATE POLICY "Admins can insert profiles" ON public.profiles FOR INSERT WITH CHECK (
-  EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
-);
-CREATE POLICY "Admins can update profiles" ON public.profiles FOR UPDATE USING (
-  EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
-);
+CREATE POLICY "Users can update own profile" ON public.profiles FOR UPDATE USING (auth.uid() = id);
+CREATE POLICY "Users can insert own profile" ON public.profiles FOR INSERT WITH CHECK (auth.uid() = id);
 
 -- Courses policies
 CREATE POLICY "Admins full access courses" ON public.courses FOR ALL USING (

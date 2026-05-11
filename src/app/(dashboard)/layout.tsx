@@ -2,6 +2,7 @@ import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { UserMenu } from "@/components/user-menu";
+import Link from "next/link";
 
 export default async function DashboardLayout({
   children,
@@ -35,11 +36,13 @@ export default async function DashboardLayout({
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-[100px]">
             <div className="relative h-[80px] w-auto">
-              <img
-                src="/images/performers-ready.png"
-                alt="Performers Ready!"
-                className="h-full w-auto"
-              />
+              <Link href={viewAs === "admin" ? "/admin" : "/teacher"} className="block">
+                <img
+                  src="/images/performers-ready.png"
+                  alt="Performers Ready!"
+                  className="h-full w-auto cursor-pointer"
+                />
+              </Link>
             </div>
             <div className="flex items-center">
               <UserMenu
