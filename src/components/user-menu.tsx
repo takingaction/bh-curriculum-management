@@ -59,28 +59,22 @@ export function UserMenu({ email, fullName, role, isAdmin, viewAs }: UserMenuPro
               Profile
             </Link>
             {isAdmin && viewAs === "admin" && (
-              <form action="/api/toggle-view" method="post">
-                <input type="hidden" name="view" value="teacher" />
-                <button
-                  type="submit"
-                  className="w-full text-left px-4 py-2 text-sm text-[#2d2d2d] hover:bg-[#f5f5f0]"
-                  onClick={() => setOpen(false)}
-                >
-                  View as Teacher
-                </button>
-              </form>
+              <Link
+                href="/api/toggle-view?view=teacher"
+                className="block px-4 py-2 text-sm text-[#2d2d2d] hover:bg-[#f5f5f0]"
+                onClick={() => setOpen(false)}
+              >
+                View as Teacher
+              </Link>
             )}
             {isAdmin && viewAs === "teacher" && (
-              <form action="/api/toggle-view" method="post">
-                <input type="hidden" name="view" value="admin" />
-                <button
-                  type="submit"
-                  className="w-full text-left px-4 py-2 text-sm text-[#2d2d2d] hover:bg-[#f5f5f0]"
-                  onClick={() => setOpen(false)}
-                >
-                  View as Admin
-                </button>
-              </form>
+              <Link
+                href="/api/toggle-view?view=admin"
+                className="block px-4 py-2 text-sm text-[#2d2d2d] hover:bg-[#f5f5f0]"
+                onClick={() => setOpen(false)}
+              >
+                View as Admin
+              </Link>
             )}
             <hr className="my-1 border-[#e5e5e0]" />
             <form action="/auth/signout" method="post">

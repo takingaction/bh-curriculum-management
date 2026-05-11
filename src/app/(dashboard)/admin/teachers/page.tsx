@@ -85,7 +85,7 @@ export default function TeachersPage() {
       </div>
 
       <Card className="border-[#e5e5e0] shadow-sm mb-8">
-        <CardHeader className="border-b border-[#e5e5e0] bg-[#f5f5f0]">
+        <CardHeader>
           <CardTitle className="text-[#2d2d2d]">Invite New Teacher</CardTitle>
         </CardHeader>
         <CardContent className="pt-6">
@@ -159,7 +159,7 @@ function TeacherList({ onPromote }: { onPromote: (id: string) => void }) {
 
   return (
     <Card className="border-[#e5e5e0] shadow-sm">
-      <CardHeader className="border-b border-[#e5e5e0] bg-[#f5f5f0]">
+      <CardHeader>
         <CardTitle className="text-[#2d2d2d]">All Teachers ({teachers.length})</CardTitle>
       </CardHeader>
       <CardContent className="pt-6">

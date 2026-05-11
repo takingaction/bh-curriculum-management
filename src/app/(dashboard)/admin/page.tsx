@@ -53,25 +53,7 @@ export default async function AdminDashboard() {
             <CardDescription>Manage curriculum courses</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
-              {courses?.slice(0, 5).map((course) => (
-                <div
-                  key={course.id}
-                  className="flex justify-between items-center p-3 bg-gray-50 rounded"
-                >
-                  <div>
-                    <p className="font-medium">{course.title}</p>
-                    <p className="text-sm text-gray-500">
-                      {course.discipline} · Grade {course.grade}
-                    </p>
-                  </div>
-                  <Link href={`/admin/courses/${course.id}`}>
-                    <Button variant="outline" size="sm">Manage</Button>
-                  </Link>
-                </div>
-              ))}
-            </div>
-            <div className="mt-4 flex gap-4">
+            <div className="flex gap-4">
               <Link href="/admin/courses">
                 <Button>All Courses</Button>
               </Link>

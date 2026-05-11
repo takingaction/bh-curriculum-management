@@ -45,13 +45,13 @@ export default async function TeacherDashboard() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <Card className="border-[#e5e5e0] shadow-sm">
-          <CardHeader className="bg-[#f5f5f0] rounded-t-lg">
+          <CardHeader>
             <CardTitle className="text-4xl font-bold text-[#0d7377]">{assignments?.length || 0}</CardTitle>
             <CardDescription className="text-[#666666]">Assigned Courses</CardDescription>
           </CardHeader>
         </Card>
         <Card className="border-[#e5e5e0] shadow-sm">
-          <CardHeader className="bg-[#f5f5f0] rounded-t-lg">
+          <CardHeader>
             <CardTitle className="text-4xl font-bold text-[#0d7377]">
               {allLessons?.length || 0}
             </CardTitle>
@@ -59,7 +59,7 @@ export default async function TeacherDashboard() {
           </CardHeader>
         </Card>
         <Card className="border-[#e5e5e0] shadow-sm">
-          <CardHeader className="bg-[#f5f5f0] rounded-t-lg">
+          <CardHeader>
             <CardTitle className="text-4xl font-bold text-[#0d7377]">{adaptedLessons?.length || 0}</CardTitle>
             <CardDescription className="text-[#666666]">AI Adaptations</CardDescription>
           </CardHeader>
@@ -67,7 +67,7 @@ export default async function TeacherDashboard() {
       </div>
 
       <Card className="border-[#e5e5e0] shadow-sm">
-        <CardHeader className="border-b border-[#e5e5e0]">
+        <CardHeader>
           <CardTitle className="text-[#2d2d2d]">Your Courses</CardTitle>
           <CardDescription className="text-[#666666]">Curriculum assigned to you</CardDescription>
         </CardHeader>

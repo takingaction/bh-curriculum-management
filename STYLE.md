@@ -1,10 +1,10 @@
-# Style Guidelines - Better Humans Education Platform
+# Style Guidelines - Performers Ready! Curriculum Platform
 
-This document outlines the design system and styling conventions for the Better Humans Education Curriculum Management Platform, inspired by the Better Humans Education brand.
+This document outlines the design system and styling conventions for the Performers Ready! Curriculum Management Platform.
 
 ## Brand Overview
 
-Better Humans Education represents a mission-driven arts education company with a clean, professional, and welcoming aesthetic. The design prioritizes clarity, warmth, and accessibility.
+Performers Ready! is an arts education curriculum platform with a clean, professional, and welcoming aesthetic. The design prioritizes clarity, warmth, and accessibility.
 
 ---
 
@@ -53,22 +53,24 @@ Better Humans Education represents a mission-driven arts education company with 
 
 ### Font Family
 
-**Inter** (via Google Fonts)
+**Montserrat** (via next/font/google)
 
 - Primary sans-serif font
 - Clean, modern, highly readable
+- Weights: 400, 500, 600, 700
 - Fallback: `-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`
 
 ### Type Scale
 
 | Element | Size | Weight |
 |---------|------|--------|
-| H1 | 2rem (32px) | Bold (700) |
-| H2 | 1.5rem (24px) | Bold (700) |
-| H3 | 1.25rem (20px) | Semibold (600) |
-| Body | 1rem (16px) | Regular (400) |
-| Small | 0.875rem (14px) | Regular (400) |
-| Caption | 0.75rem (12px) | Regular (400) |
+| Body | 18px | Regular (400) |
+| Headers (H1-H6) | 20px | Semibold (600) |
+| H1 | 24px (text-2xl) | Bold (700) |
+| H2 | 20px | Bold (700) |
+| H3 | 16px | Semibold (600) |
+| Small | 14px | Regular (400) |
+| Caption | 12px | Regular (400) |
 
 ### Text Colors
 
@@ -105,6 +107,21 @@ Better Humans Education represents a mission-driven arts education company with 
 
 ## Components
 
+### Header/Navigation
+
+```tsx
+<header className="bg-white border-b border-[#e5e5e0]">
+  <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="flex justify-between items-center h-20">
+      {/* Logo with inline styles for precise sizing */}
+      <div style={{ height: '72px', paddingTop: '6px', paddingBottom: '6px' }}>
+        <img src="/images/performers-ready.png" alt="Performers Ready!" style={{ height: '72px', width: 'auto' }} />
+      </div>
+    </div>
+  </div>
+</header>
+```
+
 ### Buttons
 
 **Primary Button**
@@ -133,9 +150,15 @@ className="border-2 border-[#0d7377] text-[#0d7377] hover:bg-[#0d7377] hover:tex
 className="bg-white border border-[#e5e5e0] rounded-xl shadow-sm"
 ```
 
-**Card Header**
+**Card Header** - Use simple CardHeader without bg or border classes:
 ```tsx
-className="border-b border-[#e5e5e0] bg-[#f5f5f0]"
+<CardHeader>
+  <CardTitle>Title</CardTitle>
+  <CardDescription>Description</CardDescription>
+</CardHeader>
+<CardContent>
+  {/* Content */}
+</CardContent>
 ```
 
 ### Form Inputs
@@ -176,21 +199,11 @@ Toggle dark mode using the `dark:` variant.
 </div>
 ```
 
-### Header
-
-```tsx
-<header className="bg-white border-b border-[#e5e5e0]">
-  <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-    {/* Header content */}
-  </div>
-</header>
-```
-
 ### Stat Card
 
 ```tsx
 <Card className="border-[#e5e5e0] shadow-sm">
-  <CardHeader className="bg-[#f5f5f0] rounded-t-lg">
+  <CardHeader>
     <CardTitle className="text-4xl font-bold text-[#0d7377]">42</CardTitle>
     <CardDescription className="text-[#666666]">Description</CardDescription>
   </CardHeader>
@@ -205,6 +218,19 @@ Toggle dark mode using the `dark:` variant.
   <p className="text-sm text-[#666666]">Grade 3 · Music</p>
   <p className="text-sm text-[#0d7377] font-medium mt-2">30 lessons →</p>
 </div>
+```
+
+### User Menu Dropdown
+
+```tsx
+{isAdmin && viewAs === "admin" && (
+  <Link
+    href="/api/toggle-view?view=teacher"
+    className="block px-4 py-2 text-sm text-[#2d2d2d] hover:bg-[#f5f5f0]"
+  >
+    View as Teacher
+  </Link>
+)}
 ```
 
 ---
@@ -271,5 +297,7 @@ Colors are defined as CSS custom properties in `src/app/globals.css`:
   /* ... */
 }
 ```
+
+Font is loaded in `src/app/layout.tsx` using next/font/google with Montserrat.
 
 Use Tailwind's arbitrary value syntax or CSS variables to apply these colors.
