@@ -1,10 +1,13 @@
-import { createClient } from "@/lib/supabase/server";
-import { notFound } from "next/navigation";
+import { createServiceClient } from "@/lib/supabase/server";
+import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { CourseImageUpload } from "@/components/course-image-upload";
+import { ManageImagesButton } from "@/components/manage-images-button";
+import { DeleteCourseButton } from "@/components/delete-course-button";
 
 export default async function CourseDetailPage({
   params,
@@ -12,7 +15,7 @@ export default async function CourseDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const supabase = await createClient();
+  const supabase = await createServiceClient();
 
   const { data: course } = await supabase
     .from("courses")
@@ -33,25 +36,19 @@ export default async function CourseDetailPage({
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="flex justify-between items-start mb-8">
-        <div>
-          <h2 className="text-2xl font-bold">{course.title}</h2>
-          <p className="text-gray-600">
-            {course.discipline} · Grade {course.grade}
-          </p>
+        <div className="flex gap-6">
+          <CourseImageUpload courseId={course.id} currentImageUrl={course.image_url} />
+          <div>
+            <h2 className="text-2xl font-bold">{course.title}</h2>
+            <p className="text-gray-600">
+              {course.discipline} · Grade {course.grade}
+            </p>
+          </div>
         </div>
         <div className="flex gap-2">
+          <ManageImagesButton courseId={course.id} />
           <CourseEditForm course={course} />
-          <Button
-            variant="destructive"
-            onClick={async () => {
-              "use server";
-              const supabase = await createClient();
-              await supabase.from("courses").delete().eq("id", id);
-              redirect("/admin/courses");
-            }}
-          >
-            Delete
-          </Button>
+          <DeleteCourseButton courseId={course.id} courseTitle={course.title} />
         </div>
       </div>
 
@@ -78,6 +75,9 @@ export default async function CourseDetailPage({
                     <TableCell>{lesson.total_time || "-"}</TableCell>
                     <TableCell>
                       <div className="flex gap-2">
+                        <Link href={`/lessons/${lesson.id}`}>
+                          <Button variant="outline" size="sm">View</Button>
+                        </Link>
                         <Link href={`/admin/courses/${id}/lessons/${lesson.id}`}>
                           <Button variant="outline" size="sm">Edit</Button>
                         </Link>
@@ -108,7 +108,7 @@ function CourseEditForm({ course }: { course: { id: string; title: string; disci
         <form
           action={async (formData) => {
             "use server";
-            const supabase = await createClient();
+            const supabase = await createServiceClient();
             await supabase
               .from("courses")
               .update({

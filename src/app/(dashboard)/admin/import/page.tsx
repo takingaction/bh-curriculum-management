@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { createClient } from "@/lib/supabase/client";
-import { htmlToMarkdown } from "@/lib/html-to-markdown";
+import Link from "next/link";
 import Papa from "papaparse";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,13 +20,26 @@ interface ParsedRow {
 }
 
 export default function ImportPage() {
-  const supabase = createClient();
   const [csvData, setCsvData] = useState<ParsedRow[]>([]);
   const [courseInfo, setCourseInfo] = useState({ title: "", discipline: "", grade: "" });
   const [importing, setImporting] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [results, setResults] = useState({ success: 0, errors: 0 });
-  const [step, setStep] = useState<"upload" | "preview" | "importing" | "done">("upload");
+  const [results, setResults] = useState({ success: 0, errors: 0, errorMessages: [] as string[] });
+  const [step, setStep] = useState<"upload" | "preview" | "confirm" | "importing" | "done">("upload");
+
+  const checkCourseExists = async (title: string, discipline: string, grade: string) => {
+    try {
+      const response = await fetch("/api/admin/courses/check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title, discipline, grade }),
+      });
+      const data = await response.json();
+      return data.exists ? data.courseId : null;
+    } catch {
+      return null;
+    }
+  };
 
   const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -36,19 +48,26 @@ export default function ImportPage() {
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
-      complete: (results) => {
+      complete: async (results) => {
         const data = results.data as ParsedRow[];
         setCsvData(data);
 
         if (data.length > 0) {
           const firstRow = data[0];
-          setCourseInfo({
+          const info = {
             title: firstRow["Course Title"] || "",
             discipline: firstRow.Discipline || "",
             grade: firstRow.Grade || "",
-          });
+          };
+          setCourseInfo(info);
+
+          const existingCourseId = await checkCourseExists(info.title, info.discipline, info.grade);
+          if (existingCourseId) {
+            setStep("confirm");
+          } else {
+            setStep("preview");
+          }
         }
-        setStep("preview");
       },
       error: (error) => {
         console.error("CSV parse error:", error);
@@ -59,7 +78,7 @@ export default function ImportPage() {
   const fieldMappings: Record<string, string> = {
     LessonName: "title",
     "Total Time": "total_time",
-    LessonOutline: "lesson_outline",
+    "Lesson Outline": "lesson_outline",
     "Learning Objectives": "learning_objectives",
     Vocabulary: "vocabulary",
     Materials: "materials",
@@ -80,79 +99,42 @@ export default function ImportPage() {
     setImporting(true);
     setStep("importing");
     setProgress(0);
-    setResults({ success: 0, errors: 0 });
+    setResults({ success: 0, errors: 0, errorMessages: [] });
 
-    let courseId: string | null = null;
+    try {
+      const response = await fetch("/api/admin/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ courseInfo, csvData, fieldMappings }),
+      });
 
-    const { data: existingCourse } = await supabase
-      .from("courses")
-      .select("id")
-      .eq("title", courseInfo.title)
-      .eq("discipline", courseInfo.discipline)
-      .eq("grade", courseInfo.grade)
-      .single();
+      const data = await response.json();
 
-    if (existingCourse) {
-      courseId = existingCourse.id;
-    } else {
-      const { data: newCourse, error } = await supabase
-        .from("courses")
-        .insert({
-          title: courseInfo.title,
-          discipline: courseInfo.discipline,
-          grade: courseInfo.grade,
-        })
-        .select()
-        .single();
-
-      if (error) {
-        console.error("Error creating course:", error);
+      if (!response.ok) {
+        console.error("Import error:", data.error);
         setImporting(false);
         return;
       }
-      courseId = newCourse.id;
+
+      setProgress(100);
+      setResults({
+        success: data.results.success,
+        errors: data.results.errors,
+        errorMessages: data.results.errorMessages || []
+      });
+      setImporting(false);
+      setStep("done");
+    } catch (error) {
+      console.error("Import failed:", error);
+      setImporting(false);
     }
-
-    let success = 0;
-    let errors = 0;
-
-    for (let i = 0; i < csvData.length; i++) {
-      const row = csvData[i];
-      const lessonData: Record<string, any> = {
-        course_id: courseId,
-        lesson_number: parseInt(row["Lesson Number"]) || i + 1,
-        title: row.LessonName || `Lesson ${i + 1}`,
-        total_time: row["Total Time"] || null,
-      };
-
-      for (const [csvField, dbField] of Object.entries(fieldMappings)) {
-        if (row[csvField]) {
-          lessonData[dbField] = htmlToMarkdown(row[csvField]);
-        }
-      }
-
-      const { error } = await supabase.from("lessons").insert(lessonData);
-
-      if (error) {
-        console.error(`Error importing lesson ${i + 1}:`, error);
-        errors++;
-      } else {
-        success++;
-      }
-
-      setProgress(Math.round(((i + 1) / csvData.length) * 100));
-      setResults({ success, errors });
-    }
-
-    setImporting(false);
-    setStep("done");
   };
 
   const resetImport = () => {
     setCsvData([]);
     setCourseInfo({ title: "", discipline: "", grade: "" });
     setProgress(0);
-    setResults({ success: 0, errors: 0 });
+    setResults({ success: 0, errors: 0, errorMessages: [] });
     setStep("upload");
   };
 
@@ -243,6 +225,78 @@ export default function ImportPage() {
         </>
       )}
 
+      {step === "confirm" && (
+        <>
+          <Card className="mb-6 border-2 border-yellow-400">
+            <CardHeader>
+              <CardTitle className="text-yellow-700">Re-import Warning</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="mb-4">
+                A course with the same name, discipline, and grade already exists:
+              </p>
+              <div className="grid grid-cols-3 gap-4 mb-4">
+                <div>
+                  <p className="text-sm text-gray-500">Title</p>
+                  <p className="font-medium">{courseInfo.title}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Discipline</p>
+                  <p className="font-medium">{courseInfo.discipline}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Grade</p>
+                  <p className="font-medium">{courseInfo.grade}</p>
+                </div>
+              </div>
+              <p className="text-yellow-700 font-medium">
+                Importing will replace existing lessons with the new CSV content.
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>New CSV Content ({csvData.length} lessons)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>#</TableHead>
+                    <TableHead>Lesson Name</TableHead>
+                    <TableHead>Duration</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {csvData.slice(0, 10).map((row, i) => (
+                    <TableRow key={i}>
+                      <TableCell>{row["Lesson Number"] || i + 1}</TableCell>
+                      <TableCell>{row.LessonName}</TableCell>
+                      <TableCell>{row["Total Time"] || "-"}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              {csvData.length > 10 && (
+                <p className="text-sm text-gray-500 mt-4">
+                  ...and {csvData.length - 10} more lessons
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
+          <div className="flex gap-4">
+            <Button onClick={handleImport} className="bg-yellow-600 hover:bg-yellow-700">
+              Replace Existing Lessons
+            </Button>
+            <Button variant="outline" onClick={resetImport}>
+              Cancel
+            </Button>
+          </div>
+        </>
+      )}
+
       {step === "importing" && (
         <Card>
           <CardHeader>
@@ -273,11 +327,21 @@ export default function ImportPage() {
                   <Badge variant="destructive">{results.errors} Errors</Badge>
                 )}
               </div>
+              {results.errorMessages.length > 0 && (
+                <div className="mt-4 p-4 bg-red-50 rounded text-sm text-red-800 max-h-40 overflow-y-auto">
+                  <p className="font-semibold mb-2">Error Details:</p>
+                  <ul className="list-disc pl-4">
+                    {results.errorMessages.map((msg, i) => (
+                      <li key={i}>{msg}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               <div className="flex gap-4">
                 <Button onClick={resetImport}>Import Another</Button>
-                <a href="/admin/courses">
+                <Link href="/admin/courses">
                   <Button variant="outline">View Courses</Button>
-                </a>
+                </Link>
               </div>
             </div>
           </CardContent>

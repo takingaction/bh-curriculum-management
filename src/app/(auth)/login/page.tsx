@@ -38,50 +38,51 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle>Sign In</CardTitle>
-          <CardDescription>Access the Curriculum Management Platform</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {error && (
-              <div className="p-3 text-sm text-red-600 bg-red-50 rounded-md">{error}</div>
-            )}
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </div>
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Signing in..." : "Sign In"}
-            </Button>
-          </form>
-          <p className="mt-4 text-center text-sm text-gray-600">
-            Don't have an account?{" "}
-            <Link href="/signup" className="text-blue-600 hover:underline">
-              Sign up
-            </Link>
-          </p>
-        </CardContent>
-      </Card>
+    <div className="min-h-screen flex items-center justify-center bg-[#f5f5f0]">
+      <div className="w-full max-w-md p-8 bg-white rounded-xl shadow-lg">
+        <div className="mb-8 text-center">
+          <h1 className="text-2xl font-bold text-[#0d7377] mb-2">Performers Ready!</h1>
+          <p className="text-[#666666]">Curriculum Management Platform</p>
+        </div>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {error && (
+            <div className="p-3 text-sm text-white bg-[#e85d5d] rounded-lg">{error}</div>
+          )}
+          <div className="space-y-2">
+            <Label htmlFor="email" className="text-[#2d2d2d] font-medium">Email</Label>
+            <Input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              required
+              className="border-[#e5e5e0] focus:border-[#0d7377] focus:ring-[#0d7377]"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="password" className="text-[#2d2d2d] font-medium">Password</Label>
+            <Input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              className="border-[#e5e5e0] focus:border-[#0d7377] focus:ring-[#0d7377]"
+            />
+          </div>
+          <Button
+            type="submit"
+            className="w-full bg-[#0d7377] hover:bg-[#0a5c5f] text-white font-medium py-2.5 rounded-lg transition-colors"
+            disabled={loading}
+          >
+            {loading ? "Signing in..." : "Sign In"}
+          </Button>
+        </form>
+        <p className="mt-6 text-center text-sm text-[#666666]">
+          Contact your administrator if you need access.
+        </p>
+      </div>
     </div>
   );
 }

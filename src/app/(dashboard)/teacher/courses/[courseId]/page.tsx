@@ -1,5 +1,5 @@
-import { createClient } from "@/lib/supabase/server";
-import { notFound } from "next/navigation";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,32 +13,40 @@ export default async function TeacherCoursePage({
 }) {
   const { courseId } = await params;
   const supabase = await createClient();
+  const supabaseAdmin = await createServiceClient();
 
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { data: assignment } = await supabase
-    .from("teacher_assignments")
-    .select("*, courses(*)")
-    .eq("teacher_id", user?.id)
-    .eq("course_id", courseId)
-    .single();
-
-  if (!assignment) {
-    notFound();
+  if (!user) {
+    redirect("/login");
   }
 
-  const { data: lessons } = await supabase
+  const { data: course } = await supabaseAdmin
+    .from("courses")
+    .select("*")
+    .eq("id", courseId)
+    .single();
+
+  console.log("DEBUG: courseId=", courseId, "course=", course, "userId=", user!.id);
+
+  if (!course) {
+    console.log("DEBUG: course is null, calling notFound()");
+    notFound();
+    return;
+  }
+
+  const { data: lessons } = await supabaseAdmin
     .from("lessons")
     .select("*")
     .eq("course_id", courseId)
     .order("lesson_number");
 
-  const { data: adaptedLessons } = await supabase
+  const { data: adaptedLessons } = await supabaseAdmin
     .from("adapted_lessons")
     .select("id, original_lesson_id")
-    .eq("teacher_id", user?.id)
+    .eq("teacher_id", user!.id)
     .in(
       "original_lesson_id",
       lessons?.map((l) => l.id) || []
@@ -49,9 +57,9 @@ export default async function TeacherCoursePage({
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-8">
-        <h2 className="text-2xl font-bold">{assignment.courses?.title}</h2>
+        <h2 className="text-2xl font-bold">{course?.title}</h2>
         <p className="text-gray-600">
-          {assignment.courses?.discipline} · Grade {assignment.courses?.grade}
+          {course?.discipline} · Grade {course?.grade}
         </p>
       </div>
 
@@ -85,7 +93,7 @@ export default async function TeacherCoursePage({
                       )}
                     </TableCell>
                     <TableCell>
-                      <Link href={`/teacher/courses/${courseId}/lessons/${lesson.id}`}>
+                      <Link href={`/lessons/${lesson.id}`}>
                         <Button variant="outline" size="sm">View</Button>
                       </Link>
                     </TableCell>
