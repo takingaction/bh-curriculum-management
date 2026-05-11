@@ -35,10 +35,8 @@ export async function middleware(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname;
 
-  // Auth routes - redirect to dashboard if already logged in
   if (pathname.startsWith("/login") || pathname.startsWith("/signup")) {
     if (user) {
-      // Check role and redirect accordingly
       const { data: profile } = await supabase
         .from("profiles")
         .select("role")
@@ -53,39 +51,19 @@ export async function middleware(request: NextRequest) {
     return supabaseResponse;
   }
 
-  // Admin routes - require admin role
   if (pathname.startsWith("/admin")) {
     if (!user) {
       return NextResponse.redirect(new URL("/login", request.url));
     }
+  }
 
-    // Use service role to bypass RLS for admin check
-    const supabaseAdmin = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return [];
-          },
-          setAll() {},
-        },
-      }
-    );
-
-    const { data: profile } = await supabaseAdmin
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-
-    if (profile?.role !== "admin") {
-      return NextResponse.redirect(new URL("/teacher", request.url));
+  if (pathname.startsWith("/teacher")) {
+    if (!user) {
+      return NextResponse.redirect(new URL("/login", request.url));
     }
   }
 
-  // Teacher routes - require authentication (any role)
-  if (pathname.startsWith("/teacher")) {
+  if (pathname.startsWith("/profile")) {
     if (!user) {
       return NextResponse.redirect(new URL("/login", request.url));
     }
