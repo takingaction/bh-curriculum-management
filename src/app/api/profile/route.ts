@@ -2,35 +2,22 @@ import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 
 export async function GET() {
-  try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+  const supabase = await createClient();
 
-    if (!user) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-    }
+  const { data: { user } } = await supabase.auth.getUser();
 
-    console.log("User ID from auth:", user.id);
-    console.log("User email from auth:", user.email);
-
-    const { data: profile, error } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", user.id)
-      .single();
-
-    console.log("Profile query result:", JSON.stringify({ profile, error }));
-
-    return NextResponse.json({
-      profile: {
-        ...profile,
-        email: user.email,
-      }
-    });
-  } catch (error: any) {
-    console.error("Error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  if (!user) {
+    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
+
+  const { data: profile, error } = await supabase
+    .from("profiles")
+    .select("id, email, full_name, role")
+    .eq("id", user.id)
+    .single();
+
+  return NextResponse.json({
+    profile: profile ? { ...profile, email: user.email } : null,
+    error: error?.message || null
+  });
 }
