@@ -9,35 +9,19 @@ export async function GET() {
     } = await supabase.auth.getUser();
 
     if (!user) {
-      return NextResponse.json({ profile: null }, { status: 401 });
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    let { data: profile, error } = await supabase
+    console.log("User ID from auth:", user.id);
+    console.log("User email from auth:", user.email);
+
+    const { data: profile, error } = await supabase
       .from("profiles")
       .select("*")
       .eq("id", user.id)
       .single();
 
-    if (error && error.code === "PGRST116") {
-      // Profile doesn't exist, create it
-      const { data: newProfile, createError } = await supabase
-        .from("profiles")
-        .insert({
-          id: user.id,
-          email: user.email,
-          role: "teacher",
-          full_name: null,
-        })
-        .select()
-        .single();
-
-      if (createError) {
-        console.error("Error creating profile:", createError);
-      }
-      profile = newProfile;
-    } else if (error) {
-      console.error("Profile fetch error:", error);
-    }
+    console.log("Profile query result:", JSON.stringify({ profile, error }));
 
     return NextResponse.json({
       profile: {
@@ -46,7 +30,7 @@ export async function GET() {
       }
     });
   } catch (error: any) {
-    console.error("GET /api/profile - error:", error);
-    return NextResponse.json({ profile: null }, { status: 500 });
+    console.error("Error:", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
