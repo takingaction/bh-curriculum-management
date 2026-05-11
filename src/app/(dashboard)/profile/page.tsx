@@ -26,17 +26,24 @@ export default function ProfilePage() {
 
   useEffect(() => {
     async function fetchProfile() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        router.push("/login");
-        return;
-      }
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          router.push("/login");
+          return;
+        }
 
-      const response = await fetch("/api/profile");
-      const data = await response.json();
-      if (data.profile) {
-        setProfile(data.profile);
-        setFullName(data.profile.full_name || "");
+        const response = await fetch("/api/profile");
+        const data = await response.json();
+        console.log("Profile API response:", data);
+        if (data.profile) {
+          setProfile(data.profile);
+          setFullName(data.profile.full_name || "");
+        } else if (data.error) {
+          console.error("Profile API error:", data.error);
+        }
+      } catch (err) {
+        console.error("Fetch profile error:", err);
       }
       setLoading(false);
     }
