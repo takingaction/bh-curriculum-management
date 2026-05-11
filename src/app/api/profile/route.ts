@@ -12,13 +12,30 @@ export async function GET() {
       return NextResponse.json({ profile: null }, { status: 401 });
     }
 
-    const { data: profile, error } = await supabase
+    let { data: profile, error } = await supabase
       .from("profiles")
       .select("*")
       .eq("id", user.id)
       .single();
 
-    if (error) {
+    if (error && error.code === "PGRST116") {
+      // Profile doesn't exist, create it
+      const { data: newProfile, createError } = await supabase
+        .from("profiles")
+        .insert({
+          id: user.id,
+          email: user.email,
+          role: "teacher",
+          full_name: null,
+        })
+        .select()
+        .single();
+
+      if (createError) {
+        console.error("Error creating profile:", createError);
+      }
+      profile = newProfile;
+    } else if (error) {
       console.error("Profile fetch error:", error);
     }
 
