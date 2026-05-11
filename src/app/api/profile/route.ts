@@ -1,25 +1,35 @@
-import { createServiceClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 
 export async function GET() {
   try {
-    const supabase = await createServiceClient();
+    const supabase = await createClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();
 
+    console.log("GET /api/profile - user:", user?.id, user?.email);
+
     if (!user) {
-      return NextResponse.json({ role: null }, { status: 401 });
+      return NextResponse.json({ profile: null }, { status: 401 });
     }
 
-    const { data: profile } = await supabase
+    const { data: profile, error } = await supabase
       .from("profiles")
-      .select("role")
+      .select("*")
       .eq("id", user.id)
       .single();
 
-    return NextResponse.json({ role: profile?.role || "teacher" });
+    console.log("GET /api/profile - query result:", JSON.stringify({ profile, error }));
+
+    return NextResponse.json({
+      profile: {
+        ...profile,
+        email: user.email,
+      }
+    });
   } catch (error: any) {
-    return NextResponse.json({ role: "teacher" }, { status: 500 });
+    console.error("GET /api/profile - error:", error);
+    return NextResponse.json({ profile: null }, { status: 500 });
   }
 }
