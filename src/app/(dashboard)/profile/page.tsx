@@ -34,7 +34,6 @@ export default function ProfilePage() {
 
       const response = await fetch("/api/profile");
       const data = await response.json();
-      console.log("Profile response:", JSON.stringify(data, null, 2));
       if (data.profile) {
         setProfile(data.profile);
         setFullName(data.profile.full_name || "");

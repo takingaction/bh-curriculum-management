@@ -8,8 +8,6 @@ export async function GET() {
       data: { user },
     } = await supabase.auth.getUser();
 
-    console.log("GET /api/profile - user:", user?.id, user?.email);
-
     if (!user) {
       return NextResponse.json({ profile: null }, { status: 401 });
     }
@@ -20,9 +18,9 @@ export async function GET() {
       .eq("id", user.id)
       .single();
 
-    console.log("GET /api/profile - profile from db:", profile);
-    console.log("GET /api/profile - profile full_name:", profile?.full_name);
-    console.log("GET /api/profile - profile role:", profile?.role);
+    if (error) {
+      console.error("Profile fetch error:", error);
+    }
 
     return NextResponse.json({
       profile: {
