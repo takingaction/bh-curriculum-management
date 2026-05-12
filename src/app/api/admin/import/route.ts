@@ -5,6 +5,10 @@ import { NextResponse } from "next/server";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 
+function stripHtml(html: string): string {
+  return html.replace(/<[^>]*>/g, "").trim();
+}
+
 function transformImageUrls(html: string, courseId: string): { html: string; missingImages: string[] } {
   const missingImages: string[] = [];
   const storageBase = `${SUPABASE_URL}/storage/v1/object/public/course-images/${courseId}/image`;
@@ -67,7 +71,7 @@ export async function POST(request: Request) {
       const lessonData: Record<string, any> = {
         course_id: courseId,
         lesson_number: parseInt(row["Lesson Number"]) || i + 1,
-        title: row.LessonName || `Lesson ${i + 1}`,
+        title: stripHtml(row.LessonName) || `Lesson ${i + 1}`,
         total_time: row["Total Time"] || null,
       };
 
