@@ -329,7 +329,7 @@ export default function EditLessonPage({
           {showPreview && (
             <div className="mt-6 border-t border-[#e5e5e0] pt-6">
               <h3 className="text-lg font-semibold text-[#2d2d2d] mb-4">Preview</h3>
-              <div className="border border-[#e5e5e0] rounded-lg overflow-hidden">
+              <div className="border border-[#e5e5e0] rounded-none overflow-hidden">
                 {/* Header */}
                 <div className="flex">
                   <div className="w-[35%] aspect-square bg-[#d7ffef] flex items-center justify-center min-h-[120px]">

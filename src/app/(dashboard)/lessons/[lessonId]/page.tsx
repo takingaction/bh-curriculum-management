@@ -138,7 +138,7 @@ export default function LessonContentPage({
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex gap-6">
             {/* Image */}
-            <div className="w-[35%] aspect-square bg-[#d7ffef] flex items-center justify-center rounded-lg overflow-hidden">
+            <div className="w-[35%] aspect-square bg-[#d7ffef] flex items-center justify-center rounded-none overflow-hidden">
               {course.image_url ? (
                 <img
                   src={course.image_url}
