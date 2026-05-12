@@ -43,7 +43,7 @@ export function CourseImageUpload({ courseId, currentImageUrl }: CourseImageUplo
 
   return (
     <div className="flex items-center gap-4">
-      <div className="w-20 h-20 bg-[#d7ffef] rounded-lg flex items-center justify-center overflow-hidden">
+      <div className="w-20 h-20 bg-[#d7ffef] rounded-none flex items-center justify-center overflow-hidden">
         {imageUrl ? (
           <img src={imageUrl} alt="Course" className="w-full h-full object-cover" />
         ) : (
