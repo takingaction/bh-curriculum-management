@@ -1,31 +1,6 @@
 import { createServiceClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 
-function flattenNestedTags(html: string): string {
-  return html
-    .replace(/<strong>\s*<strong>/g, "<strong>")
-    .replace(/<\/strong>\s*<\/strong>/g, "</strong>")
-    .replace(/<em>\s*<em>/g, "<em>")
-    .replace(/<\/em>\s*<\/em>/g, "</em>")
-    .replace(/>\s+</g, "><")
-    .replace(/\s{2,}/g, " ");
-}
-
-function transformContent(html: string): string {
-  let result = html;
-
-  // 1. Flatten nested strong/em tags
-  result = flattenNestedTags(result);
-
-  // 2. Convert all remaining bold headings to h3 (preserving style attributes)
-  result = result.replace(
-    /<p(\s+[^>]*)?><strong>(?!.* — )(.{1,60}?)<\/strong><\/p>/g,
-    '<h3$1>$2</h3>'
-  );
-
-  return result;
-}
-
 export async function POST() {
   try {
     const supabaseAdmin = await createServiceClient();
@@ -67,7 +42,33 @@ export async function POST() {
       for (const field of contentFields) {
         if (lesson[field]) {
           const original = lesson[field];
-          const transformed = transformContent(original);
+          let transformed = original;
+
+          // 1. Remove anchor-standard class from h3
+          transformed = transformed
+            .replace(/<h3 class="anchor-standard">/gi, '<h3>')
+            .replace(/<h3([^>]*)class="anchor-standard"([^>]*)>/gi, '<h3$1$2>');
+
+          // 2. Fix p>strong with h3 closing (malformed)
+          transformed = transformed.replace(
+            /<p[^>]*><strong>([^<]*)<\/h3>/gi,
+            '<p><strong>$1</strong></p>'
+          );
+
+          // 3. Fix h3 with stray </strong> inside (malformed)
+          transformed = transformed.replace(
+            /<h3[^>]*>([^<]*)<\/strong>([^<]*)<\/h3>/gi,
+            '<p><strong>$1$2</strong></p>'
+          );
+
+          // 4. Convert h3 with PK.MU:/PK:/MU: to p>strong
+          transformed = transformed.replace(
+            /<h3[^>]*>((?:PK\.MU|PK|MU)[^<]*)<\/h3>/gi,
+            '<p><strong>$1</strong></p>'
+          );
+
+          // 5. Clean orphaned </strong></p>
+          transformed = transformed.replace(/<\/strong><\/p>/g, '</p>');
 
           if (transformed !== original) {
             updateData[field] = transformed;
@@ -98,7 +99,7 @@ export async function POST() {
 
     return NextResponse.json({
       success: true,
-      message: `Transformed h3 and anchor standards in ${updates.length} lessons`,
+      message: `Cleaned HTML in ${updates.length} lessons`,
       cleaned: updates.length,
     });
   } catch (error: any) {
