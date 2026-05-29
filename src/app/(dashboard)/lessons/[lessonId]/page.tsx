@@ -224,6 +224,14 @@ export default function LessonContentPage({
               <Link href={isAdmin ? "/admin" : "/teacher"} className="block text-xs text-[#0d7377] hover:underline">
                 Back to Dashboard
               </Link>
+              {isAdmin && (
+                <Link
+                  href={`/admin/courses/${course.id}/lessons/${lesson.id}`}
+                  className="block text-xs text-[#e85d5d] hover:underline"
+                >
+                  Edit Lesson
+                </Link>
+              )}
             </div>
           </div>
 
