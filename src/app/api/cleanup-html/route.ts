@@ -61,6 +61,12 @@ export async function POST() {
             '<p><strong>$1$2</strong></p>'
           );
 
+          // 3. Fix h3 > strong > PK.MU:/PK:/MU: (extract from nested strong)
+          transformed = transformed.replace(
+            /<h3[^>]*><strong>((?:PK\.MU|PK|MU)[^<]*)<\/strong><\/h3>/gi,
+            '<p><strong>$1</strong></p>'
+          );
+
           // 4. Convert h3 with PK.MU:/PK:/MU: to p>strong
           transformed = transformed.replace(
             /<h3[^>]*>((?:PK\.MU|PK|MU)[^<]*)<\/h3>/gi,
