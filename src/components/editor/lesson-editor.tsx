@@ -9,9 +9,10 @@ import { TableHeader } from "@tiptap/extension-table-header";
 import Image from "@tiptap/extension-image";
 import { Paragraph } from "@tiptap/extension-paragraph";
 import { Button } from "@/components/ui/button";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { MediaLibrary } from "@/components/media-library";
-import { ImageIcon, CodeIcon } from "lucide-react";
+import { ImageIcon, CodeIcon, EyeIcon, EyeOffIcon } from "lucide-react";
+import { SpellCheckExtension } from "./extensions/spell-check";
 
 const ParagraphWithStyle = Paragraph.extend({
   addAttributes() {
@@ -45,6 +46,8 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
   const [showSource, setShowSource] = useState(false);
   const [sourceContent, setSourceContent] = useState(content);
   const [showTableGrid, setShowTableGrid] = useState(false);
+  const [showSpellCheck, setShowSpellCheck] = useState(true);
+  const [showInvisibles, setShowInvisibles] = useState(false);
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -63,6 +66,9 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
       TableCell,
       TableHeader,
       Image,
+      SpellCheckExtension.configure({
+        enabled: showSpellCheck,
+      }),
     ],
     content,
     onUpdate: ({ editor }) => {
@@ -71,11 +77,33 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
     editorProps: {
       attributes: {
         class:
-          `prose max-w-none min-h-[150px] px-4 py-3 focus:outline-none border border-[#e5e5e0] rounded-lg${showTableGrid ? " show-table-grid" : ""}`,
+          `prose max-w-none min-h-[150px] px-4 py-3 focus:outline-none border border-[#e5e5e0] rounded-lg${showTableGrid ? " show-table-grid" : ""}${showInvisibles ? " show-invisibles" : ""}`,
         spellcheck: "true",
       },
     },
   });
+
+  useEffect(() => {
+    if (editor) {
+      const editorEl = editor.view.dom;
+      if (showSpellCheck) {
+        editorEl.classList.remove("spellcheck-off");
+      } else {
+        editorEl.classList.add("spellcheck-off");
+      }
+    }
+  }, [editor, showSpellCheck]);
+
+  useEffect(() => {
+    if (editor) {
+      const editorEl = editor.view.dom;
+      if (showInvisibles) {
+        editorEl.classList.add("show-invisibles");
+      } else {
+        editorEl.classList.remove("show-invisibles");
+      }
+    }
+  }, [editor, showInvisibles]);
 
   const getCurrentMarginLeft = () => {
     if (!editor) return 0;
@@ -237,6 +265,28 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
           title="Toggle Table Grid"
         >
           Grid
+        </Button>
+
+        <Button
+          type="button"
+          variant={showSpellCheck ? "default" : "ghost"}
+          size="sm"
+          onClick={() => setShowSpellCheck(!showSpellCheck)}
+          className="h-8 px-2 text-xs"
+          title="Toggle Spell Check"
+        >
+          ABC
+        </Button>
+
+        <Button
+          type="button"
+          variant={showInvisibles ? "default" : "ghost"}
+          size="sm"
+          onClick={() => setShowInvisibles(!showInvisibles)}
+          className="h-8 px-2 text-xs"
+          title="Toggle Hidden Characters"
+        >
+          {showInvisibles ? <EyeOffIcon className="w-4 h-4" /> : <EyeIcon className="w-4 h-4" />}
         </Button>
 
         <div className="w-px h-6 bg-[#e5e5e0] mx-1 self-center" />

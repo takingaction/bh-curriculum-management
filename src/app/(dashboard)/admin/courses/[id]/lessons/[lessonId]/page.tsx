@@ -289,7 +289,7 @@ export default function EditLessonPage({
 
             {textFields.map((field) => (
               <div key={field.name} className="space-y-2">
-                <Label htmlFor={field.name} className="text-[#2d2d2d]">
+                <Label htmlFor={field.name} className="text-[#2d2d2d] font-bold text-base">
                   {field.label}
                 </Label>
                 <LessonEditor

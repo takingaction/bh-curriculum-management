@@ -235,3 +235,32 @@
     border: 1px solid black !important;
   }
 }
+
+/* ---- SPELL CHECK ---- */
+.ProseMirror .misspelled {
+  text-decoration: underline wavy red;
+  text-decoration-skip-ink: none;
+}
+
+.ProseMirror.spellcheck-off .misspelled {
+  text-decoration: none;
+}
+
+/* ---- SHOW INVISIBLES ---- */
+.ProseMirror.show-invisibles p::after {
+  content: "¶";
+  color: #999;
+  font-size: 12px;
+  float: right;
+  margin-right: 4px;
+}
+
+.ProseMirror.show-invisibles p:empty::after {
+  content: "¶";
+}
+
+.ProseMirror.show-invisibles br::before {
+  content: "↵";
+  color: #999;
+  font-size: 12px;
+}
