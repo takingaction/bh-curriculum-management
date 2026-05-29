@@ -11,6 +11,11 @@ function flattenNestedTags(html: string): string {
     .replace(/\s{2,}/g, " ");
 }
 
+function addAnchorStandardClass(html: string): string {
+  return html
+    .replace(/<p><strong>([A-Z\s]+)\s+—\s+/g, '<p><strong class="anchor-standard">$1 — ');
+}
+
 export async function POST() {
   try {
     const supabaseAdmin = await createServiceClient();
@@ -52,7 +57,8 @@ export async function POST() {
       for (const field of contentFields) {
         if (lesson[field]) {
           const original = lesson[field];
-          const flattened = flattenNestedTags(original);
+          // First flatten nested tags, then add anchor-standard class
+          const flattened = addAnchorStandardClass(flattenNestedTags(original));
 
           if (flattened !== original) {
             updateData[field] = flattened;

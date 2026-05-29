@@ -1,5 +1,5 @@
 export function transformHtml(html: string): string {
-  return html
+  let result = html
     .replace(/<p class="[^"]*[""]?H5[""]?"[^>]*>([\s\S]*?)<\/p>/g, "<p><strong>$1</strong></p>")
     .replace(/<p><strong>([A-Z\s]+)\s+—\s+/g, '<p><strong class="anchor-standard">$1 — ')
     .replace(/<strong>\s*<strong>/g, "<strong>")
@@ -8,6 +8,7 @@ export function transformHtml(html: string): string {
     .replace(/<\/em>\s*<\/em>/g, "</em>")
     .replace(/>\s+</g, "><")
     .replace(/\s{2,}/g, " ");
+  return result;
 }
 
 export function extractImagePaths(html: string): string[] {
