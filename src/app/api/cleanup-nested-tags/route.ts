@@ -44,6 +44,8 @@ export async function POST() {
     const updates: any[] = [];
 
     for (const lesson of (lessons || []) as any[]) {
+      if (!lesson.id) continue;
+
       let needsUpdate = false;
       const updateData: any = { id: lesson.id };
 
@@ -72,12 +74,11 @@ export async function POST() {
       });
     }
 
-    const { error: updateError } = await supabaseAdmin
-      .from("lessons")
-      .upsert(updates, { onConflict: "id" }) as { error: any };
-
-    if (updateError) {
-      return NextResponse.json({ error: updateError.message }, { status: 500 });
+    for (const update of updates) {
+      await supabaseAdmin
+        .from("lessons")
+        .update(update)
+        .eq("id", update.id);
     }
 
     return NextResponse.json({
