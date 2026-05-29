@@ -31,7 +31,7 @@ export default async function DashboardLayout({
   const isAdmin = profile?.role === "admin";
 
   return (
-    <div className="min-h-screen bg-[#f5f5f0]">
+    <div className="min-h-screen bg-white">
       <header className="bg-white border-b border-[#e5e5e0]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-20">
@@ -56,7 +56,7 @@ export default async function DashboardLayout({
           </div>
         </div>
       </header>
-      <main className="py-8">{children}</main>
+      <main className="py-2">{children}</main>
     </div>
   );
 }

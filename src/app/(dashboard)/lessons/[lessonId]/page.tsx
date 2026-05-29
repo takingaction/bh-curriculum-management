@@ -67,7 +67,6 @@ export default function LessonContentPage({
   const [course, setCourse] = useState<Course | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [activeSection, setActiveSection] = useState("overview");
   const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
@@ -131,14 +130,25 @@ export default function LessonContentPage({
     );
   };
 
+  const hasContent = (key: string): boolean => {
+    if (key === "overview") return true;
+    return !!(lesson as any)[key];
+  };
+
+  const contentSections = sections.filter(s => hasContent(s.key));
+
   return (
     <div className="min-h-screen bg-white">
+      <style jsx global>{`
+        html { scroll-behavior: smooth; }
+      `}</style>
+
       {/* Top Header */}
       <div className="border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex gap-6">
-            {/* Image */}
-            <div className="w-[35%] aspect-square bg-[#d7ffef] flex items-center justify-center rounded-none overflow-hidden">
+            {/* Image - Same width as nav buttons */}
+            <div className="w-[250px] aspect-square bg-[#d7ffef] flex items-center justify-center rounded-none overflow-hidden flex-shrink-0">
               {course.image_url ? (
                 <img
                   src={course.image_url}
@@ -162,6 +172,18 @@ export default function LessonContentPage({
                 <div className="text-sm text-black uppercase tracking-wide">
                   {course.title} | Grade {course.grade}
                 </div>
+
+                <div className="flex gap-4 mt-2">
+                  <Link
+                    href={isAdmin ? `/admin/courses/${course.id}` : `/teacher/courses/${course.id}`}
+                    className="text-[#0d7377] hover:underline text-sm"
+                  >
+                    ← Back to Course
+                  </Link>
+                  <Link href={isAdmin ? "/admin" : "/teacher"} className="text-[#0d7377] hover:underline text-sm">
+                    Back to Dashboard
+                  </Link>
+                </div>
               </div>
             </div>
           </div>
@@ -169,65 +191,60 @@ export default function LessonContentPage({
       </div>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 py-6">
-        <div className="flex gap-0 min-h-[600px]">
-          {/* Left Navigation */}
-          <div className="w-[250px] flex-shrink-0">
+      <div className="max-w-7xl mx-auto px-4 py-2">
+        <div className="flex gap-6">
+          {/* Left Navigation - Sticky */}
+          <div className="w-[250px] flex-shrink-0 sticky top-0 self-start">
             <div className="space-y-1">
-              {sections.map((section) => (
-                <button
+              {contentSections.map((section) => (
+                <a
                   key={section.key}
-                  onClick={() => setActiveSection(section.key)}
-                  className={`w-full text-left px-4 py-3 text-sm font-medium transition-colors ${
-                    activeSection === section.key
-                      ? "bg-[#ecb0a1] text-black"
-                      : "bg-[#d7ffef] text-black hover:bg-[#c7efe0]"
-                  }`}
+                  href={`#${section.key}`}
+                  className="block px-4 py-1 text-sm font-medium bg-[#d7ffef] text-black hover:bg-[#c7efe0] transition-colors"
                 >
                   {section.label}
-                </button>
+                </a>
               ))}
             </div>
-          </div>
-
-          {/* Right Content */}
-          <div className="flex-1 border-l border-gray-200">
-            <div className="p-6">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr>
-                    <th className="bg-[#e37c64] text-black text-left px-4 py-3 font-semibold uppercase">
-                      {sections.find((s) => s.key === activeSection)?.label}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td className="bg-white text-black px-4 py-4 align-top">
-                      {renderContent(getContent(activeSection))}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+            <div className="mt-4 pt-4 border-t border-gray-200 space-y-1">
+              <Link
+                href={isAdmin ? `/admin/courses/${course.id}` : `/teacher/courses/${course.id}`}
+                className="block text-xs text-[#0d7377] hover:underline"
+              >
+                ← Back to Course
+              </Link>
+              <Link href={isAdmin ? "/admin" : "/teacher"} className="block text-xs text-[#0d7377] hover:underline">
+                Back to Dashboard
+              </Link>
             </div>
           </div>
+
+          {/* Right Content - All sections stacked */}
+          <div className="flex-1">
+            {contentSections.map((section) => (
+              <div key={section.key} id={section.key} className="mb-6">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr>
+                      <th className="bg-[#e37c64] text-black text-left px-4 py-3 font-semibold uppercase">
+                        {section.label}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td className="bg-white text-black px-4 py-4 align-top">
+                        {renderContent(getContent(section.key))}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* Footer */}
-      <div className="border-t border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex gap-4">
-          <Link
-            href={isAdmin ? `/admin/courses/${course.id}` : `/teacher/courses/${course.id}`}
-            className="text-[#0d7377] hover:underline text-sm"
-          >
-            ← Back to Course
-          </Link>
-          <Link href={isAdmin ? "/admin" : "/teacher"} className="text-[#0d7377] hover:underline text-sm">
-            Back to Dashboard
-          </Link>
-        </div>
-      </div>
     </div>
   );
 }
