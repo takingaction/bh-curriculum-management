@@ -35,15 +35,15 @@ export async function POST() {
 
     const { data: lessons, error: fetchError } = await supabaseAdmin
       .from("lessons")
-      .select("id, " + contentFields.join(", "));
+      .select("id, " + contentFields.join(", ")) as { data: any[], error: any };
 
     if (fetchError) {
       return NextResponse.json({ error: fetchError.message }, { status: 500 });
     }
 
-    const updates: { id: string; [key: string]: any }[] = [];
+    const updates: any[] = [];
 
-    for (const lesson of lessons || []) {
+    for (const lesson of (lessons || []) as any[]) {
       let needsUpdate = false;
       const updateData: any = { id: lesson.id };
 
@@ -51,7 +51,7 @@ export async function POST() {
         if (lesson[field]) {
           const original = lesson[field];
           const flattened = flattenNestedTags(original);
-          
+
           if (flattened !== original) {
             updateData[field] = flattened;
             needsUpdate = true;
@@ -74,7 +74,7 @@ export async function POST() {
 
     const { error: updateError } = await supabaseAdmin
       .from("lessons")
-      .upsert(updates, { onConflict: "id" });
+      .upsert(updates, { onConflict: "id" }) as { error: any };
 
     if (updateError) {
       return NextResponse.json({ error: updateError.message }, { status: 500 });
