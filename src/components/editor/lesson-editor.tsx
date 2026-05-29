@@ -9,7 +9,7 @@ import { TableHeader } from "@tiptap/extension-table-header";
 import Image from "@tiptap/extension-image";
 import { Paragraph } from "@tiptap/extension-paragraph";
 import { Button } from "@/components/ui/button";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { MediaLibrary } from "@/components/media-library";
 import { ImageIcon, CodeIcon } from "lucide-react";
 
@@ -76,13 +76,6 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
       },
     },
   });
-
-  useEffect(() => {
-    if (editor) {
-      editor.commands.focus();
-      editor.commands.blur();
-    }
-  }, [editor]);
 
   const getCurrentMarginLeft = () => {
     if (!editor) return 0;
