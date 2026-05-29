@@ -7,7 +7,7 @@ let dictionary: Typo | null = null;
 
 try {
   dictionary = new Typo("en_US", null, null, {
-    dictionaryPath: "typo/dictionaries",
+    dictionaryPath: "typo",
   });
 } catch (e) {
   console.warn("SpellCheck: Could not load dictionary", e);
