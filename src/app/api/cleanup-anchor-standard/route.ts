@@ -43,8 +43,11 @@ export async function POST() {
         if (lesson[field]) {
           const original = lesson[field];
           const transformed = original
+            // Remove anchor-standard class from h3
             .replace(/<h3 class="anchor-standard">/gi, '<h3>')
-            .replace(/<h3([^>]*)class="anchor-standard"([^>]*)>/gi, '<h3$1$2>');
+            .replace(/<h3([^>]*)class="anchor-standard"([^>]*)>/gi, '<h3$1$2>')
+            // Convert h3 starting with PK: or MU: back to p > strong
+            .replace(/<h3((?:PK|MU)\:[^<]*)<\/h3>/gi, '<p><strong$1</strong></p>');
 
           if (transformed !== original) {
             updateData[field] = transformed;
