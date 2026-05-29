@@ -175,19 +175,15 @@
 
 /* First anchor standard in section - NO extra top margin (handles p > h3 structure) */
 #vapa_text_block td .lesson-content > p:first-child > h3.anchor-standard,
-#ncas_text_block td .lesson-content > p:first-child > h3.anchor-standard,
-#vapa_text_block td .lesson-content > h3.anchor-standard:first-of-type,
-#ncas_text_block td .lesson-content > h3.anchor-standard:first-of-type {
+#ncas_text_block td .lesson-content > p:first-child > h3.anchor-standard {
   margin-top: 0rem !important;
   margin-bottom: 0.5rem;
   border: 3px solid red !important;
 }
 
 /* Second and subsequent anchor standards - extra top margin */
-#vapa_text_block td .lesson-content > p:nth-child(n+2) > h3.anchor-standard,
-#ncas_text_block td .lesson-content > p:nth-child(n+2) > h3.anchor-standard,
-#vapa_text_block td .lesson-content > h3.anchor-standard:nth-child(n+2),
-#ncas_text_block td .lesson-content > h3.anchor-standard:nth-child(n+2) {
+#vapa_text_block td .lesson-content > p:not(:first-child) > h3.anchor-standard,
+#ncas_text_block td .lesson-content > p:not(:first-child) > h3.anchor-standard {
   margin-top: 3rem !important;
   margin-bottom: 0.5rem;
   border: 3px solid blue !important;
