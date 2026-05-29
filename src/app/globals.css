@@ -172,22 +172,19 @@
 }
 
 /* ---- VAPA AND NCAS ANCHOR STANDARDS ---- */
-#vapa_text_block h3.anchor-standard,
-#ncas_text_block h3.anchor-standard {
-  margin-top: 1.5rem;
-  margin-bottom: 0.5rem;
-}
 
 /* First anchor standard in section - NO extra top margin */
 #vapa_text_block td > h3.anchor-standard:first-of-type,
 #ncas_text_block td > h3.anchor-standard:first-of-type {
   margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
 }
 
 /* Second and subsequent anchor standards - extra top margin */
 #vapa_text_block td > h3.anchor-standard:nth-child(n+2),
 #ncas_text_block td > h3.anchor-standard:nth-child(n+2) {
   margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
 }
 
 /* ---- H3 INSIDE VAPA/NCAS ---- */
