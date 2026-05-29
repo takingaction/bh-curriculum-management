@@ -18,10 +18,16 @@ function transformContent(html: string): string {
   result = flattenNestedTags(result);
 
   // 2. Convert VAPA/NCAS anchor standards to h3 with anchor-standard class
-  // Matches headings containing "Anchor Standard" (case insensitive)
+  // Handle bare strong.anchor-standard (no p wrapper)
   result = result.replace(
-    /<p(\s+[^>]*)?><strong>([^<]*Anchor Standard[^<]*)<\/strong><\/p>/gi,
-    '<h3$1 class="anchor-standard">$2</h3>'
+    /<strong class="anchor-standard">([^<]*)<\/strong>/gi,
+    '<h3 class="anchor-standard">$1</h3>'
+  );
+
+  // Handle p > strong.anchor-standard
+  result = result.replace(
+    /<p[^>]*><strong class="anchor-standard">([^<]*)<\/strong><\/p>/gi,
+    '<h3 class="anchor-standard">$1</h3>'
   );
 
   // 3. Convert all remaining bold headings to h3 (preserving style attributes)
