@@ -11,19 +11,25 @@ function flattenNestedTags(html: string): string {
     .replace(/\s{2,}/g, " ");
 }
 
-function addAnchorStandardClass(html: string): string {
-  return html
-    .replace(/<p><strong>([A-Z\s]+)\s+—\s+/g, '<p><strong class="anchor-standard">$1 — ');
-}
-
-function convertToH3(html: string): string {
-  return html.replace(/<p(\s+[^>]*)?><strong>(?!.* — )(.{1,60}?)<\/strong><\/p>/g, '<h3$1>$2</h3>');
-}
-
 function transformContent(html: string): string {
-  let result = flattenNestedTags(html);
-  result = addAnchorStandardClass(result);
-  result = convertToH3(result);
+  let result = html;
+
+  // 1. Flatten nested strong/em tags
+  result = flattenNestedTags(result);
+
+  // 2. Convert VAPA/NCAS anchor standards to h3 with anchor-standard class
+  // Matches headings containing "Anchor Standard" (case insensitive)
+  result = result.replace(
+    /<p(\s+[^>]*)?><strong>([^<]*Anchor Standard[^<]*)<\/strong><\/p>/gi,
+    '<h3$1 class="anchor-standard">$2</h3>'
+  );
+
+  // 3. Convert all remaining bold headings to h3 (preserving style attributes)
+  result = result.replace(
+    /<p(\s+[^>]*)?><strong>(?!.* — )(.{1,60}?)<\/strong><\/p>/g,
+    '<h3$1>$2</h3>'
+  );
+
   return result;
 }
 
