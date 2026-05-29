@@ -172,21 +172,21 @@
 }
 
 /* ---- VAPA AND NCAS ANCHOR STANDARDS ---- */
-#vapa_text_block strong.anchor-standard,
-#ncas_text_block strong.anchor-standard {
+#vapa_text_block h3.anchor-standard,
+#ncas_text_block h3.anchor-standard {
   margin-top: 1.5rem;
   margin-bottom: 0.5rem;
 }
 
 /* First anchor standard in section - NO extra top margin */
-#vapa_text_block td > p:first-child > strong.anchor-standard,
-#ncas_text_block td > p:first-child > strong.anchor-standard {
+#vapa_text_block td > h3.anchor-standard:first-child,
+#ncas_text_block td > h3.anchor-standard:first-child {
   margin-top: 0.5rem;
 }
 
 /* Second and subsequent anchor standards - extra top margin */
-#vapa_text_block td > p:nth-child(n+2) > strong.anchor-standard,
-#ncas_text_block td > p:nth-child(n+2) > strong.anchor-standard {
+#vapa_text_block td > h3.anchor-standard:nth-child(n+2),
+#ncas_text_block td > h3.anchor-standard:nth-child(n+2) {
   margin-top: 1.5rem;
 }
 
@@ -215,7 +215,7 @@
   margin-top: 0.5rem;
 }
 
-.ProseMirror strong.anchor-standard {
+.ProseMirror h3.anchor-standard {
   margin-top: 1.5rem;
   margin-bottom: 0.5rem;
 }
