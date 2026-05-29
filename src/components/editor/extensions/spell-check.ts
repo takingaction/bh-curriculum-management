@@ -4,13 +4,15 @@ import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import Typo from "typo-js";
 
 let dictionary: Typo | null = null;
+let dictionaryLoadAttempts = 0;
 
 try {
   dictionary = new Typo("en_US", null, null, {
     dictionaryPath: "typo",
   });
+  console.log("SpellCheck: Typo instance created, loaded:", dictionary.loaded);
 } catch (e) {
-  console.warn("SpellCheck: Could not load dictionary", e);
+  console.warn("SpellCheck: Could not create Typo instance", e);
 }
 
 export const SpellCheckExtension = Extension.create({
@@ -29,7 +31,15 @@ export const SpellCheckExtension = Extension.create({
       new Plugin({
         props: {
           decorations(state) {
-            if (!extension.storage.enabled || !dictionary) return null;
+            if (!extension.storage.enabled) return null;
+            if (!dictionary) {
+              console.log("SpellCheck: No dictionary available");
+              return null;
+            }
+            if (!dictionary.loaded) {
+              console.log("SpellCheck: Dictionary not yet loaded");
+              return null;
+            }
 
             const decorations: Decoration[] = [];
             const doc = state.doc;
@@ -46,12 +56,15 @@ export const SpellCheckExtension = Extension.create({
                   }
 
                   const cleanWord = word.replace(/[.,!?;:'"()[\]{}]/g, "");
-                  if (cleanWord.length > 1 && !dictionary.check(cleanWord)) {
-                    decorations.push(
-                      Decoration.inline(pos + offset, pos + offset + word.length, {
-                        class: "misspelled",
-                      })
-                    );
+                  if (cleanWord.length > 1) {
+                    const isCorrect = dictionary.check(cleanWord);
+                    if (!isCorrect) {
+                      decorations.push(
+                        Decoration.inline(pos + offset, pos + offset + word.length, {
+                          class: "misspelled",
+                        })
+                      );
+                    }
                   }
                   offset += word.length;
                 });
