@@ -176,28 +176,15 @@
 /* First anchor standard in section - NO extra top margin */
 #vapa_text_block td .lesson-content > h3.anchor-standard:first-of-type,
 #ncas_text_block td .lesson-content > h3.anchor-standard:first-of-type {
-  margin-top: 0.5rem;
+  margin-top: 0.5rem !important;
   margin-bottom: 0.5rem;
 }
 
 /* Second and subsequent anchor standards - extra top margin */
 #vapa_text_block td .lesson-content > h3.anchor-standard:nth-child(n+2),
 #ncas_text_block td .lesson-content > h3.anchor-standard:nth-child(n+2) {
-  margin-top: 1.5rem;
+  margin-top: 1.5rem !important;
   margin-bottom: 0.5rem;
-}
-
-/* ---- H3 INSIDE VAPA/NCAS ---- */
-#vapa_text_block td h3,
-#ncas_text_block td h3 {
-  margin-top: 1.5rem;
-  margin-bottom: 0.5rem;
-}
-
-/* First h3 in VAPA/NCAS section */
-#vapa_text_block td > h3:first-child,
-#ncas_text_block td > h3:first-child {
-  margin-top: 0.5rem;
 }
 
 /* ---- PROSE MIRROR (TipTap editor) ---- */
