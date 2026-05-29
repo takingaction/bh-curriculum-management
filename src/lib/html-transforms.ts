@@ -2,6 +2,7 @@ export function transformHtml(html: string): string {
   let result = html
     .replace(/<p class="[^"]*[""]?H5[""]?"[^>]*>([\s\S]*?)<\/p>/g, "<p><strong>$1</strong></p>")
     .replace(/<p><strong>([A-Z\s]+)\s+—\s+/g, '<p><strong class="anchor-standard">$1 — ')
+    .replace(/<p(\s+[^>]*)?><strong>(?!.* — )(.{1,60}?)<\/strong><\/p>/g, '<h3$1>$2</h3>')
     .replace(/<strong>\s*<strong>/g, "<strong>")
     .replace(/<\/strong>\s*<\/strong>/g, "</strong>")
     .replace(/<em>\s*<em>/g, "<em>")

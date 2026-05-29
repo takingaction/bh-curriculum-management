@@ -16,6 +16,17 @@ function addAnchorStandardClass(html: string): string {
     .replace(/<p><strong>([A-Z\s]+)\s+—\s+/g, '<p><strong class="anchor-standard">$1 — ');
 }
 
+function convertToH3(html: string): string {
+  return html.replace(/<p(\s+[^>]*)?><strong>(?!.* — )(.{1,60}?)<\/strong><\/p>/g, '<h3$1>$2</h3>');
+}
+
+function transformContent(html: string): string {
+  let result = flattenNestedTags(html);
+  result = addAnchorStandardClass(result);
+  result = convertToH3(result);
+  return result;
+}
+
 export async function POST() {
   try {
     const supabaseAdmin = await createServiceClient();
@@ -57,11 +68,10 @@ export async function POST() {
       for (const field of contentFields) {
         if (lesson[field]) {
           const original = lesson[field];
-          // First flatten nested tags, then add anchor-standard class
-          const flattened = addAnchorStandardClass(flattenNestedTags(original));
+          const transformed = transformContent(original);
 
-          if (flattened !== original) {
-            updateData[field] = flattened;
+          if (transformed !== original) {
+            updateData[field] = transformed;
             needsUpdate = true;
           }
         }
@@ -75,7 +85,7 @@ export async function POST() {
     if (updates.length === 0) {
       return NextResponse.json({
         success: true,
-        message: "No nested tags found",
+        message: "No changes needed",
         cleaned: 0,
       });
     }
@@ -89,7 +99,7 @@ export async function POST() {
 
     return NextResponse.json({
       success: true,
-      message: `Cleaned nested tags in ${updates.length} lessons`,
+      message: `Transformed h3 and anchor standards in ${updates.length} lessons`,
       cleaned: updates.length,
     });
   } catch (error: any) {

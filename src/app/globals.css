@@ -153,55 +153,76 @@
   }
 
   /* ===========================================
-   BOLD HEADING SPACING - Clean CSS Approach
-   Higher specificity rules win without !important
+   HEADING AND ANCHOR STANDARD SPACING
    =========================================== */
 
-/* BASE RULE: All bold headings in lesson content */
-.lesson-content strong {
+/* ---- GENERAL H3 STYLING (all sections) ---- */
+.lesson-content h3 {
+  font-weight: 600;
   margin-top: 1.5rem;
   margin-bottom: 0.5rem;
   display: block;
 }
 
-/* CHILD SELECTOR: <p><strong>...</strong></p> pattern */
-.lesson-content p > strong,
-.lesson-content td > p > strong {
-  margin-top: 1.5rem;
-  margin-bottom: 0.5rem;
-  display: block;
+/* First h3 in any section - reduced top margin */
+.lesson-content td > h3:first-child,
+.lesson-content td > p:first-child > h3,
+.lesson-content h3:first-of-type {
+  margin-top: 0.5rem;
 }
 
-/* PROSE MIRROR: TipTap editor preview */
-.ProseMirror strong {
-  margin-top: 1.5rem;
-  margin-bottom: 0.5rem;
-  display: block;
-}
-
-.ProseMirror p > strong,
-.ProseMirror td > p > strong {
-  margin-top: 1.5rem;
-  margin-bottom: 0.5rem;
-  display: block;
-}
-
-/* VAPA AND NCAS ANCHOR STANDARDS - Higher specificity wins */
+/* ---- VAPA AND NCAS ANCHOR STANDARDS ---- */
 #vapa_text_block strong.anchor-standard,
 #ncas_text_block strong.anchor-standard {
-  margin-top: 2rem;
+  margin-top: 1.5rem;
   margin-bottom: 0.5rem;
 }
 
-#vapa_text_block td p:has(strong.anchor-standard),
-#ncas_text_block td p:has(strong.anchor-standard) {
-  margin-top: 2rem;
+/* First anchor standard in section - NO extra top margin */
+#vapa_text_block td > p:first-child > strong.anchor-standard,
+#ncas_text_block td > p:first-child > strong.anchor-standard {
+  margin-top: 0.5rem;
 }
 
-#vapa_text_block td p strong.anchor-standard,
-#ncas_text_block td p strong.anchor-standard {
+/* Second and subsequent anchor standards - extra top margin */
+#vapa_text_block td > p:nth-child(n+2) > strong.anchor-standard,
+#ncas_text_block td > p:nth-child(n+2) > strong.anchor-standard {
+  margin-top: 1.5rem;
+}
+
+/* ---- H3 INSIDE VAPA/NCAS ---- */
+#vapa_text_block td h3,
+#ncas_text_block td h3 {
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+/* First h3 in VAPA/NCAS section */
+#vapa_text_block td > h3:first-child,
+#ncas_text_block td > h3:first-child {
+  margin-top: 0.5rem;
+}
+
+/* ---- PROSE MIRROR (TipTap editor) ---- */
+.ProseMirror h3 {
+  font-weight: 600;
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
   display: block;
-  margin-bottom: 0.25rem;
+}
+
+.ProseMirror td > h3:first-child {
+  margin-top: 0.5rem;
+}
+
+.ProseMirror strong.anchor-standard {
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+/* ---- INDENTED H3 (preserve margin-left) ---- */
+.lesson-content h3[style*="margin-left"] {
+  margin-left: inherit;
 }
 
 .lesson-content em {
