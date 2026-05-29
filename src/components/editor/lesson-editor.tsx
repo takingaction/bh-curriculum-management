@@ -72,6 +72,7 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
       attributes: {
         class:
           `prose max-w-none min-h-[150px] px-4 py-3 focus:outline-none border border-[#e5e5e0] rounded-lg${showTableGrid ? " show-table-grid" : ""}`,
+        spellcheck: "true",
       },
     },
   });
