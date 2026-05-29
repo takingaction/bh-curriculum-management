@@ -152,73 +152,59 @@
     @apply list-disc;
   }
 
-  .lesson-content li {
-    @apply mb-1;
-  }
+  /* ===========================================
+   BOLD HEADING SPACING - Clean CSS Approach
+   Higher specificity rules win without !important
+   =========================================== */
 
-  .lesson-content p + strong {
-    margin-top: 1.5rem !important;
-    margin-bottom: 0.5rem !important;
-    display: block;
-  }
-
-  .lesson-content p:first-child + strong {
-    margin-top: 1rem !important;
-  }
-
-  .lesson-content td > strong:first-child,
-  .lesson-content td p:first-child strong {
-    margin-top: 0.5rem !important;
-  }
-
-  .lesson-content td strong {
-    margin-bottom: 0.5rem !important;
-    display: block;
-  }
-
-  .lesson-content p strong {
-    display: block;
-  }
-
-  /* ProseMirror (TipTap editor) */
-  .ProseMirror p + strong {
-    margin-top: 1.5rem !important;
-    margin-bottom: 0.5rem !important;
-    display: block;
-  }
-
-  .ProseMirror p:first-child + strong {
-    margin-top: 1rem !important;
-  }
-
-  .ProseMirror td > strong:first-child,
-  .ProseMirror td p:first-child strong {
-    margin-top: 0.5rem !important;
-  }
-
-  .ProseMirror td strong {
-    margin-bottom: 0.5rem !important;
-    display: block;
-  }
-
-  .ProseMirror p strong {
-    display: block;
-  }
-
-  /* VAPA and NCAS anchor standards - extra top margin before each standard */
-#vapa_text_block td p:has(strong.anchor-standard),
-#ncas_text_block td p:has(strong.anchor-standard) {
-  margin-top: 2rem !important;
+/* BASE RULE: All bold headings in lesson content */
+.lesson-content strong {
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+  display: block;
 }
 
-/* Anchor standard strong elements */
+/* CHILD SELECTOR: <p><strong>...</strong></p> pattern */
+.lesson-content p > strong,
+.lesson-content td > p > strong {
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+  display: block;
+}
+
+/* PROSE MIRROR: TipTap editor preview */
+.ProseMirror strong {
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+  display: block;
+}
+
+.ProseMirror p > strong,
+.ProseMirror td > p > strong {
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+  display: block;
+}
+
+/* VAPA AND NCAS ANCHOR STANDARDS - Higher specificity wins */
+#vapa_text_block strong.anchor-standard,
+#ncas_text_block strong.anchor-standard {
+  margin-top: 2rem;
+  margin-bottom: 0.5rem;
+}
+
+#vapa_text_block td p:has(strong.anchor-standard),
+#ncas_text_block td p:has(strong.anchor-standard) {
+  margin-top: 2rem;
+}
+
 #vapa_text_block td p strong.anchor-standard,
 #ncas_text_block td p strong.anchor-standard {
   display: block;
-  margin-bottom: 0.25rem !important;
+  margin-bottom: 0.25rem;
 }
 
-  .lesson-content em {
+.lesson-content em {
     @apply italic;
   }
 
