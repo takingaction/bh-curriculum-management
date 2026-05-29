@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -220,6 +221,20 @@ export default function EditLessonPage({
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-8">
+        <div className="flex gap-4 mb-2">
+          <Link
+            href={`/lessons/${lesson?.id}`}
+            className="text-[#0d7377] hover:underline text-sm"
+          >
+            View Lesson
+          </Link>
+          <Link
+            href={`/admin/courses/${lesson?.course_id}`}
+            className="text-[#0d7377] hover:underline text-sm"
+          >
+            ← Back to Course
+          </Link>
+        </div>
         <h2 className="text-2xl font-bold text-[#2d2d2d]">Edit Lesson</h2>
         <p className="text-[#666666]">{fields.title}</p>
       </div>

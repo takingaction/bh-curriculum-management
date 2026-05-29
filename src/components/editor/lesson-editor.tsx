@@ -354,7 +354,7 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
                 setShowSource(false);
               }}
             >
-              SAVE CHANGES
+              Apply Changes
             </Button>
             <Button
               variant="outline"
