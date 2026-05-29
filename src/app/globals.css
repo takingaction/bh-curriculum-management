@@ -179,8 +179,8 @@
 }
 
 /* First anchor standard in section - NO extra top margin */
-#vapa_text_block td > h3.anchor-standard:first-child,
-#ncas_text_block td > h3.anchor-standard:first-child {
+#vapa_text_block td > h3.anchor-standard:first-of-type,
+#ncas_text_block td > h3.anchor-standard:first-of-type {
   margin-top: 0.5rem;
 }
 
