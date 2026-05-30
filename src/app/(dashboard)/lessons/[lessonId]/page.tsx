@@ -37,7 +37,6 @@ interface Course {
 }
 
 const sections = [
-  { key: "overview", label: "Overview" },
   { key: "lesson_outline", label: "Lesson Outline" },
   { key: "learning_objectives", label: "Learning Objectives" },
   { key: "vocabulary", label: "Vocabulary" },
@@ -112,10 +111,6 @@ export default function LessonContentPage({
   }
 
   const getContent = (key: string): string => {
-    if (key === "overview") {
-      const duration = lesson.total_time ? `${lesson.total_time} minutes` : "Not specified";
-      return `**Lesson ${lesson.lesson_number}: ${lesson.title}**\n\nDuration: ${duration}`;
-    }
     return (lesson as any)[key] || "";
   };
 
@@ -130,7 +125,6 @@ export default function LessonContentPage({
   };
 
   const hasContent = (key: string): boolean => {
-    if (key === "overview") return true;
     return !!(lesson as any)[key];
   };
 
@@ -147,7 +141,7 @@ export default function LessonContentPage({
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex gap-6">
             {/* Image - Same width as nav buttons */}
-            <div className="w-[250px] aspect-square bg-[#d7ffef] flex items-center justify-center rounded-none overflow-hidden flex-shrink-0">
+            <div className="w-[250px] h-[250px] bg-[#d7ffef] flex items-center justify-center rounded-none overflow-hidden flex-shrink-0">
               {course.image_url ? (
                 <img
                   src={course.image_url}
@@ -160,14 +154,17 @@ export default function LessonContentPage({
             </div>
 
             {/* Title Info */}
-            <div className="flex-1 flex flex-col justify-between py-2">
+            <div className="flex-1 flex flex-col justify-start py-2 -mt-2">
               <div>
-                <h1 className="text-3xl font-bold text-black">{lesson.title}</h1>
-                <div className="bg-[#e37c64] text-black px-3 py-2 text-sm font-medium mt-2">
-                  LESSON PLAN: CLASS {lesson.lesson_number}
-                </div>
-                <div className="text-sm text-black uppercase tracking-wide mt-2">
+                <div className="text-sm text-black uppercase tracking-wide">
                   {course.title} | Grade {course.grade}
+                </div>
+                <div className="text-base font-bold text-black uppercase tracking-wide mt-2">
+                  Lesson Plan: Class {lesson.lesson_number}
+                </div>
+                <h1 className="text-3xl font-bold text-black">{lesson.title}</h1>
+                <div className="text-sm text-black normal-case tracking-normal mt-1">
+                  {lesson.total_time ? `Duration: ${lesson.total_time} minutes` : ""}
                 </div>
               </div>
 
@@ -243,7 +240,7 @@ export default function LessonContentPage({
                 <table className="w-full border-collapse">
                   <thead>
                     <tr>
-                      <th className="bg-[#e37c64] text-black text-left px-4 py-3 font-semibold uppercase">
+                      <th className="bg-[#e37c64] text-white text-left px-4 py-3 font-semibold uppercase">
                         {section.label}
                       </th>
                     </tr>

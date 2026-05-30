@@ -196,8 +196,7 @@ export function LessonAssetsPanel({ lessonId, canEdit = false }: LessonAssetsPan
       <AssetLibraryModal
         open={showLibrary}
         onClose={() => setShowLibrary(false)}
-        selectMode
-        onAssetSelect={handleAddAsset}
+        onAssetSelect={lessonId ? undefined : handleAddAsset}
         lessonId={lessonId}
       />
 

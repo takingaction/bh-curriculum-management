@@ -94,9 +94,11 @@ export function AssetLibraryModal({
   const [newCategoryName, setNewCategoryName] = useState("");
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
-  const [uploadFile, setUploadFile] = useState<File | null>(null);
-  const [uploadDisplayName, setUploadDisplayName] = useState("");
+  const [uploadFiles, setUploadFiles] = useState<File[]>([]);
+  const [uploadDisplayNames, setUploadDisplayNames] = useState<Record<string, string>>({});
   const [uploadCategoryId, setUploadCategoryId] = useState<string | null>(null);
+  const [editingAssetId, setEditingAssetId] = useState<string | null>(null);
+  const [editingAssetName, setEditingAssetName] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
 
@@ -196,92 +198,102 @@ export function AssetLibraryModal({
       return;
     }
     setUploadCategoryId(selectedCategory);
-    setUploadFile(null);
-    setUploadDisplayName("");
+    setUploadFiles([]);
+    setUploadDisplayNames({});
     setShowUploadModal(true);
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setUploadFile(file);
-      setUploadDisplayName(file.name.replace(/\.[^/.]+$/, ""));
+    const files = Array.from(e.target.files || []);
+    if (files.length > 0) {
+      setUploadFiles(files);
+      const names: Record<string, string> = {};
+      files.forEach((f) => {
+        names[f.name] = f.name.replace(/\.[^/.]+$/, "");
+      });
+      setUploadDisplayNames(names);
     }
   };
 
   const handleUpload = async () => {
-    if (!uploadFile || !uploadCategoryId) return;
+    if (uploadFiles.length === 0 || !uploadCategoryId) return;
 
     setUploading(true);
+    let successCount = 0;
+    let failCount = 0;
+
     try {
-      // Get file extension
-      const ext = uploadFile.name.split(".").pop()?.toLowerCase() || "";
-      const fileType = ext;
+      for (const uploadFile of uploadFiles) {
+        const ext = uploadFile.name.split(".").pop()?.toLowerCase() || "";
+        const fileType = ext;
+        const displayName = uploadDisplayNames[uploadFile.name] || uploadFile.name;
 
-      // Generate upload URL from Supabase Storage
-      const urlRes = await fetch("/api/assets/upload-url", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          filename: uploadFile.name,
-          fileType,
-          fileSize: uploadFile.size,
-          categoryId: uploadCategoryId,
-        }),
-      });
+        const urlRes = await fetch("/api/assets/upload-url", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            filename: uploadFile.name,
+            fileType,
+            fileSize: uploadFile.size,
+            categoryId: uploadCategoryId,
+          }),
+        });
 
-      const urlData = await urlRes.json();
-      if (!urlRes.ok) {
-        alert(urlData.error || "Failed to get upload URL");
-        setUploading(false);
-        return;
+        const urlData = await urlRes.json();
+        if (!urlRes.ok) {
+          console.error("Failed to get upload URL for", uploadFile.name);
+          failCount++;
+          continue;
+        }
+
+        const uploadRes = await fetch(urlData.uploadUrl, {
+          method: "PUT",
+          headers: {
+            "Content-Type": uploadFile.type,
+          },
+          body: uploadFile,
+        });
+
+        if (!uploadRes.ok) {
+          console.error("Upload failed for", uploadFile.name);
+          failCount++;
+          continue;
+        }
+
+        const publicUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/curriculum-assets/${urlData.storagePath}`;
+
+        const confirmRes = await fetch("/api/assets/confirm", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            filename: uploadFile.name,
+            displayName: displayName,
+            storagePath: urlData.storagePath,
+            publicUrl: publicUrl,
+            fileType,
+            fileSize: uploadFile.size,
+            categoryId: uploadCategoryId,
+          }),
+        });
+
+        if (confirmRes.ok) {
+          successCount++;
+        } else {
+          failCount++;
+        }
       }
 
-      console.log("Got upload URL:", urlData.uploadUrl);
-
-      // Client-side upload directly to Supabase Storage via signed URL
-      const uploadRes = await fetch(urlData.uploadUrl, {
-        method: "PUT",
-        headers: {
-          "Content-Type": uploadFile.type,
-        },
-        body: uploadFile,
-      });
-
-      console.log("Upload response status:", uploadRes.status);
-
-      if (!uploadRes.ok) {
-        const errorText = await uploadRes.text();
-        console.error("Upload failed:", errorText);
-        alert("Failed to upload file to storage");
-        setUploading(false);
-        return;
-      }
-
-      // Get the public URL for the uploaded file
-      const publicUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${urlData.storagePath}`;
-
-      // Confirm the upload in our database
-      const confirmRes = await fetch("/api/assets/confirm", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          filename: uploadFile.name,
-          displayName: uploadDisplayName || uploadFile.name,
-          storagePath: urlData.storagePath,
-          publicUrl: publicUrl,
-          fileType,
-          fileSize: uploadFile.size,
-          categoryId: uploadCategoryId,
-        }),
-      });
-
-      const confirmData = await confirmRes.json();
-      if (confirmRes.ok && confirmData.asset) {
+      if (successCount > 0) {
         setShowUploadModal(false);
+        setUploadFiles([]);
+        setUploadDisplayNames({});
         fetchAssets();
-      } else {
-        alert(confirmData.error || "Failed to confirm upload");
+      }
+
+      if (failCount > 0) {
+        alert(`Uploaded ${successCount} file(s), failed ${failCount}`);
+      } else if (successCount > 0) {
+        alert(`Uploaded ${successCount} file(s) successfully`);
       }
     } catch (error) {
       console.error("Upload failed:", error);
@@ -304,8 +316,34 @@ export function AssetLibraryModal({
     }
   };
 
+  const handleRenameAsset = async (asset: Asset) => {
+    if (!editingAssetName.trim()) return;
+    try {
+      const res = await fetch(`/api/assets/${asset.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ display_name: editingAssetName.trim() }),
+      });
+      if (res.ok) {
+        setAssets(assets.map(a => a.id === asset.id ? { ...a, display_name: editingAssetName.trim() } : a));
+        setPreviewAsset({ ...previewAsset!, display_name: editingAssetName.trim() } as Asset);
+        setEditingAssetId(null);
+        setEditingAssetName("");
+      }
+    } catch (error) {
+      console.error("Failed to rename asset:", error);
+    }
+  };
+
+  const startRename = (asset: Asset) => {
+    setEditingAssetId(asset.id);
+    setEditingAssetName(asset.display_name);
+  };
+
   const handleAssetClick = (asset: Asset) => {
-    if (selectMode && onAssetSelect) {
+    if (lessonId) {
+      setPreviewAsset(asset);
+    } else if (selectMode && onAssetSelect) {
       onAssetSelect(asset);
       onClose();
     } else {
@@ -318,7 +356,28 @@ export function AssetLibraryModal({
   };
 
   const handlePreview = (asset: Asset) => {
-    setPreviewAsset(asset);
+    window.open(asset.public_url, "_blank");
+  };
+
+  const handleAddToLesson = async (asset: Asset) => {
+    if (!lessonId) return;
+    try {
+      const res = await fetch(`/api/lessons/${lessonId}/assets`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ assetId: asset.id }),
+      });
+      if (res.ok) {
+        alert(`"${asset.display_name}" added to lesson`);
+        setPreviewAsset(null);
+      } else {
+        const data = await res.json();
+        alert(data.error || "Failed to add asset to lesson");
+      }
+    } catch (error) {
+      console.error("Failed to add asset:", error);
+      alert("Failed to add asset to lesson");
+    }
   };
 
   const toggleFileType = (type: string) => {
@@ -375,10 +434,9 @@ export function AssetLibraryModal({
                       </button>
                     </div>
                   ) : (
-                    <button
-                      type="button"
+                    <div
                       onClick={() => setSelectedCategory(cat.id)}
-                      className={`w-full text-left px-3 py-2 rounded-lg text-sm flex items-center justify-between ${
+                      className={`w-full px-3 py-2 rounded-lg text-sm flex items-center justify-between cursor-pointer ${
                         selectedCategory === cat.id
                           ? "bg-[#0d7377] text-white"
                           : "hover:bg-gray-100"
@@ -387,30 +445,28 @@ export function AssetLibraryModal({
                       <span className="truncate">{cat.name}</span>
                       {!selectMode && (
                         <span className="hidden group-hover:flex items-center gap-1">
-                          <button
-                            type="button"
+                          <span
                             onClick={(e) => {
                               e.stopPropagation();
                               setEditingCategory(cat.id);
                               setEditingCategoryName(cat.name);
                             }}
-                            className="p-1 hover:bg-gray-200 rounded"
+                            className="p-1 hover:bg-gray-200 rounded cursor-pointer"
                           >
                             <EditIcon className="w-3 h-3" />
-                          </button>
-                          <button
-                            type="button"
+                          </span>
+                          <span
                             onClick={(e) => {
                               e.stopPropagation();
                               handleDeleteCategory(cat.id);
                             }}
-                            className="p-1 hover:bg-red-100 text-red-600 rounded"
+                            className="p-1 hover:bg-red-100 text-red-600 rounded cursor-pointer"
                           >
                             <TrashIcon className="w-3 h-3" />
-                          </button>
+                          </span>
                         </span>
                       )}
-                    </button>
+                    </div>
                   )}
                 </div>
               ))}
@@ -454,7 +510,7 @@ export function AssetLibraryModal({
             </div>
           </div>
 
-          {/* Main Content - Assets */}
+{/* Main Content - Assets */}
           <div className="flex-1 flex flex-col overflow-hidden">
             {/* Search and Filters */}
             <div className="flex items-center gap-4 mb-4">
@@ -487,8 +543,125 @@ export function AssetLibraryModal({
               <Button onClick={handleUploadClick} disabled={!selectedCategory}>
                   <UploadIcon className="w-4 h-4 mr-1" />
                   Upload Resource
-                </Button>
+              </Button>
             </div>
+
+            {/* Preview Panel */}
+            {previewAsset && (
+              <div className="mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-medium text-sm">Selected Resource</h3>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewAsset(null)}
+                    className="p-1 hover:bg-gray-200 rounded"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-white rounded">
+                    {(() => {
+                      const Icon = getFileIcon(previewAsset.file_type);
+                      return <Icon className="w-8 h-8 text-gray-600" />;
+                    })()}
+                  </div>
+                  <div className="flex-1">
+                    {editingAssetId === previewAsset.id ? (
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="text"
+                          value={editingAssetName}
+                          onChange={(e) => setEditingAssetName(e.target.value)}
+                          className="flex-1"
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") handleRenameAsset(previewAsset);
+                            if (e.key === "Escape") {
+                              setEditingAssetId(null);
+                              setEditingAssetName("");
+                            }
+                          }}
+                        />
+                        <Button
+                          size="sm"
+                          onClick={() => handleRenameAsset(previewAsset)}
+                        >
+                          Save
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setEditingAssetId(null);
+                            setEditingAssetName("");
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium">{previewAsset.display_name}</p>
+                        {!selectMode && (
+                          <button
+                            type="button"
+                            onClick={() => startRename(previewAsset)}
+                            className="p-1 hover:bg-gray-200 rounded"
+                            title="Rename"
+                          >
+                            <EditIcon className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+                    )}
+                    <p className="text-xs text-gray-500 mt-1">
+                      {previewAsset.file_type.toUpperCase()} • {formatFileSize(previewAsset.file_size)}
+                    </p>
+                    {previewAsset.asset_categories && (
+                      <p className="text-xs text-[#0d7377] mt-1">
+                        {previewAsset.asset_categories.name}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    {lessonId && (
+                      <Button
+                        onClick={() => handleAddToLesson(previewAsset)}
+                        size="sm"
+                      >
+                        <PlusIcon className="w-4 h-4 mr-1" />
+                        Add to Lesson
+                      </Button>
+                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePreview(previewAsset)}
+                    >
+                      <EyeIcon className="w-4 h-4 mr-1" />
+                      Preview
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDownload(previewAsset)}
+                    >
+                      <DownloadIcon className="w-4 h-4 mr-1" />
+                      Download
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDeleteAsset(previewAsset)}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                    >
+                      <TrashIcon className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Asset Grid */}
             <div className="flex-1 overflow-y-auto">
@@ -502,13 +675,18 @@ export function AssetLibraryModal({
                   <p>No resources found</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 gap-3">
                   {assets.map((asset) => {
                     const Icon = getFileIcon(asset.file_type);
+                    const isSelected = previewAsset?.id === asset.id;
                     return (
                       <div
                         key={asset.id}
-                        className="p-4 border rounded-lg hover:border-[#0d7377] cursor-pointer group"
+                        className={`p-4 border rounded-lg cursor-pointer transition-colors ${
+                          isSelected
+                            ? "border-[#0d7377] bg-[#f0fdfa]"
+                            : "hover:border-[#0d7377]"
+                        }`}
                         onClick={() => handleAssetClick(asset)}
                       >
                         <div className="flex items-start gap-3">
@@ -528,43 +706,6 @@ export function AssetLibraryModal({
                               </p>
                             )}
                           </div>
-                          {!selectMode && (
-                            <div className="hidden group-hover:flex items-center gap-1">
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handlePreview(asset);
-                                }}
-                                className="p-1 hover:bg-gray-100 rounded"
-                                title="Preview"
-                              >
-                                <EyeIcon className="w-4 h-4" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDownload(asset);
-                                }}
-                                className="p-1 hover:bg-gray-100 rounded"
-                                title="Download"
-                              >
-                                <DownloadIcon className="w-4 h-4" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteAsset(asset);
-                                }}
-                                className="p-1 hover:bg-red-100 text-red-600 rounded"
-                                title="Delete"
-                              >
-                                <TrashIcon className="w-4 h-4" />
-                              </button>
-                            </div>
-                          )}
                         </div>
                       </div>
                     );
@@ -574,53 +715,6 @@ export function AssetLibraryModal({
             </div>
           </div>
         </div>
-
-        {/* Preview Modal */}
-        {previewAsset && (
-          <div className="fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-8">
-            <div className="absolute top-4 right-4 flex gap-2">
-              <button
-                type="button"
-                onClick={() => handleDownload(previewAsset)}
-                className="p-2 bg-white rounded-full hover:bg-gray-100"
-              >
-                <DownloadIcon className="w-5 h-5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setPreviewAsset(null)}
-                className="p-2 bg-white rounded-full hover:bg-gray-100"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            {previewAsset.file_type === "pdf" ? (
-              <iframe
-                src={previewAsset.public_url}
-                className="w-full h-full max-w-4xl max-h-full bg-white"
-                title={previewAsset.display_name}
-              />
-            ) : ["mp4", "mov", "m4a"].includes(previewAsset.file_type) ? (
-              <video
-                src={previewAsset.public_url}
-                controls
-                autoPlay
-                className="max-w-full max-h-full"
-              />
-            ) : ["mp3"].includes(previewAsset.file_type) ? (
-              <div className="bg-white rounded-lg p-8 flex flex-col items-center gap-4">
-                <MusicIcon className="w-16 h-16 text-gray-400" />
-                <p className="text-lg font-medium">{previewAsset.display_name}</p>
-                <audio
-                  src={previewAsset.public_url}
-                  controls
-                  autoPlay
-                  className="w-64"
-                />
-              </div>
-            ) : null}
-          </div>
-        )}
 
         {/* Upload Modal */}
         {showUploadModal && (
@@ -643,6 +737,7 @@ export function AssetLibraryModal({
                 ref={uploadInputRef}
                 type="file"
                 accept=".pdf,.mp4,.mov,.m4a,.mp3"
+                multiple
                 onChange={handleFileSelect}
                 className="hidden"
               />
@@ -650,19 +745,24 @@ export function AssetLibraryModal({
                 className="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer hover:border-gray-400 mb-4"
                 onClick={() => uploadInputRef.current?.click()}
               >
-                {uploadFile ? (
-                  <div className="flex items-center justify-center gap-2">
-                    {(() => {
-                      const Icon = getFileIcon(uploadFile.name.split(".").pop() || "");
-                      return <Icon className="w-6 h-6 text-gray-400" />;
-                    })()}
-                    <span className="text-sm">{uploadFile.name}</span>
+                {uploadFiles.length > 0 ? (
+                  <div className="space-y-2">
+                    {uploadFiles.map((f, i) => (
+                      <div key={i} className="flex items-center justify-center gap-2">
+                        {(() => {
+                          const Icon = getFileIcon(f.name.split(".").pop() || "");
+                          return <Icon className="w-5 h-5 text-gray-400" />;
+                        })()}
+                        <span className="text-sm">{f.name}</span>
+                        <span className="text-xs text-gray-400">({formatFileSize(f.size)})</span>
+                      </div>
+                    ))}
                   </div>
                 ) : (
                   <>
                     <UploadIcon className="w-8 h-8 mx-auto mb-2 text-gray-400" />
                     <p className="text-sm text-gray-600">
-                      Click to select a file
+                      Click to select files
                     </p>
                     <p className="text-xs text-gray-400 mt-1">
                       PDF, MP4, MOV, M4A, MP3
@@ -670,17 +770,23 @@ export function AssetLibraryModal({
                   </>
                 )}
               </div>
-              {uploadFile && (
-                <div className="mb-4">
+              {uploadFiles.length > 0 && (
+                <div className="mb-4 space-y-3">
                   <label className="text-sm text-gray-600 mb-1 block">
-                    Display Name
+                    Display Names (optional)
                   </label>
-                  <Input
-                    type="text"
-                    value={uploadDisplayName}
-                    onChange={(e) => setUploadDisplayName(e.target.value)}
-                    placeholder="Enter display name"
-                  />
+                  {uploadFiles.map((f, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <span className="text-xs text-gray-500 w-32 truncate">{f.name}</span>
+                      <Input
+                        type="text"
+                        value={uploadDisplayNames[f.name] || ""}
+                        onChange={(e) => setUploadDisplayNames(prev => ({ ...prev, [f.name]: e.target.value }))}
+                        placeholder="Display name"
+                        className="flex-1"
+                      />
+                    </div>
+                  ))}
                 </div>
               )}
               <div className="flex gap-2 justify-end">
@@ -690,8 +796,8 @@ export function AssetLibraryModal({
                 >
                   Cancel
                 </Button>
-                <Button onClick={handleUpload} disabled={!uploadFile || uploading}>
-                  {uploading ? "Uploading..." : "Upload Resource"}
+                <Button onClick={handleUpload} disabled={uploadFiles.length === 0 || uploading}>
+                  {uploading ? "Uploading..." : "Upload Resources"}
                 </Button>
               </div>
             </div>
