@@ -206,54 +206,130 @@ export const SpellCheckExtension = Extension.create({
             const decorations: Decoration[] = [];
             const doc = state.doc;
 
-            if (doc.childCount === 0) return null;
+            if (doc.childCount === 0) return DecorationSet.empty;
 
-            doc.descendants((node, pos) => {
+            // First pass: collect all text nodes with their positions and parent info
+            const textNodes: Array<{ node: any; pos: number; parent: any }> = [];
+            doc.descendants((node: any, pos: any) => {
               if (node.isText && node.text) {
-                const words = node.text.split(/(\s+)/);
-                let offset = 0;
-
-                words.forEach((word) => {
-                  if (/^\s+$/.test(word)) {
-                    offset += word.length;
-                    return;
-                  }
-
-                  // Preserve apostrophes in possessive/contraction patterns before stripping other punctuation
-                  let processedWord = word;
-                  // Check if word ends with 's or s' (possessive) or 've, 're, 'll, 'm, n't (contractions)
-                  // Handle both straight (') and curly (\u2019, \u2018) apostrophes
-                  if (/.*['\u2019]s$/i.test(word) || /.*s['\u2019]$/i.test(word) ||
-                      /.*['\u2019]ve$/i.test(word) || /.*['\u2019]re$/i.test(word) ||
-                      /.*['\u2019]ll$/i.test(word) || /.*['\u2019]m$/i.test(word) ||
-                      /.*n['\u2019]t$/i.test(word)) {
-                    // Replace apostrophes with placeholder to preserve them
-                    processedWord = word.replace(/['\u2019\u2018]/g, '\x00');
-                  }
-
-                  let cleanWord = processedWord.replace(/[.!?,;:"()\[\]{}\u201C\u201D\x00]/g, "");
-                  // Handle possessives and contractions: strip 's, s', 've, 're, 'll, 'm, n't from end
-                  let baseWord = cleanWord
-                    .replace(/'s$/i, '')      // today's → today
-                    .replace(/s'$/i, '')      // boys' → boys
-                    .replace(/'ve$/i, '')     // we've → we
-                    .replace(/'re$/i, '')     // we're → we
-                    .replace(/'ll$/i, '')     // we'll → we
-                    .replace(/'m$/i, '')      // I'm → I
-                    .replace(/n't$/i, '');    // won't → won, don't → don
-                  if (cleanWord.length > 2 && !isSpelledCorrectly(cleanWord) && !isSpelledCorrectly(baseWord) && !customWords.has(cleanWord.toLowerCase()) && !customWords.has(baseWord.toLowerCase())) {
-                    decorations.push(
-                      Decoration.inline(pos + offset, pos + offset + word.length, {
-                        class: "misspelled",
-                      })
-                    );
-                  }
-                  offset += word.length;
-                });
+                textNodes.push({ node, pos, parent: node.parent });
               }
+              return true;
             });
 
-            if (decorations.length === 0) return null;
+            // Helper to check if apostrophe is part of valid contraction
+            const isValidContraction = (word: string): boolean => {
+              if (/.*['\u2019\u0027]s$/i.test(word) || /.*s['\u2019\u0027]$/i.test(word) ||
+                  /.*['\u2019\u0027]ve$/i.test(word) || /.*['\u2019\u0027]re$/i.test(word) ||
+                  /.*['\u2019\u0027]ll$/i.test(word) || /.*['\u2019\u0027]m$/i.test(word) ||
+                  /.*n['\u2019\u0027]t$/i.test(word)) {
+                return true;
+              }
+              return false;
+            };
+
+            
+
+            // Check each text node
+            for (let i = 0; i < textNodes.length; i++) {
+              const { node, pos, parent } = textNodes[i];
+              const fullText = node.text;
+              const words = fullText.split(/(\s+)/);
+              let offset = 0;
+
+              for (let w = 0; w < words.length; w++) {
+                const word = words[w];
+
+                if (/^\s+$/.test(word)) {
+                  offset += word.length;
+                  continue;
+                }
+
+                // Check for space BEFORE punctuation (space followed immediately by punctuation at word start)
+                if (w > 0 && /^\s$/.test(words[w - 1]) && /^[,:.'\u2019\u0027]/.test(word) && !isValidContraction(word)) {
+                  // Space before punctuation - flag it
+                  decorations.push(
+                    Decoration.inline(pos + offset, pos + offset + word.length, {
+                      class: "misspelled",
+                    })
+                  );
+                  offset += word.length;
+                  continue;
+                }
+
+                let processedWord = word;
+                if (isValidContraction(word)) {
+                  processedWord = word.replace(/['\u2019\u2018\u0027]/g, '\x00');
+                }
+
+                let baseWord = processedWord
+                  .replace(/\x00s$/i, '')
+                  .replace(/s\x00$/i, '')
+                  .replace(/\x00ve$/i, '')
+                  .replace(/\x00re$/i, '')
+                  .replace(/\x00ll$/i, '')
+                  .replace(/\x00m$/i, '')
+                  .replace(/n\x00t$/i, '');
+                baseWord = baseWord.replace(/[.!?,;:"()\[\]{}\u201C\u201D\x00]/g, "");
+                let cleanWord = processedWord.replace(/[.!?,;:"()\[\]{}\u201C\u201D\x00]/g, "");
+
+                // Check for missing space within same text node: "word:Nextword" or "word,nextword"
+                // Only flag if punctuation is directly followed by letters with NO space
+                if (/:[A-Za-z]/.test(word) || /,[A-Za-z]/.test(word) || /\.[A-Za-z]/.test(word)) {
+                  const match = word.match(/^([^:,.]+)([,.:])([A-Za-z]+)$/);
+                  if (match) {
+                    const [, prefix, punctuation, suffix] = match;
+                    const combined = prefix + suffix;
+                    if (!isSpelledCorrectly(combined) && !customWords.has(combined.toLowerCase())) {
+                      decorations.push(
+                        Decoration.inline(pos + offset, pos + offset + word.length, {
+                          class: "misspelled",
+                        })
+                      );
+                      offset += word.length;
+                      continue;
+                    }
+                  }
+                }
+
+                
+
+                
+
+                // Check for invalid apostrophe (not a contraction)
+                if (/['\u2019\u0027]/.test(word) && !isValidContraction(word)) {
+                  // Check if it's a "word'nextword" pattern
+                  const apostropheMatch = word.match(/^([a-zA-Z]+)['\u2019\u0027]([a-zA-Z]+)$/i);
+                  if (apostropheMatch) {
+                    const [, first, second] = apostropheMatch;
+                    const combined = first + second;
+                    if (!isSpelledCorrectly(combined) && !customWords.has(combined.toLowerCase())) {
+                      decorations.push(
+                        Decoration.inline(pos + offset, pos + offset + word.length, {
+                          class: "misspelled",
+                        })
+                      );
+                      offset += word.length;
+                      continue;
+                    }
+                  }
+                }
+
+                // Standard misspelled word check
+                if (cleanWord.length > 2 && !isSpelledCorrectly(cleanWord) && !isSpelledCorrectly(baseWord) && !customWords.has(cleanWord.toLowerCase()) && !customWords.has(baseWord.toLowerCase())) {
+                  decorations.push(
+                    Decoration.inline(pos + offset, pos + offset + word.length, {
+                      class: "misspelled",
+                    })
+                  );
+                }
+                offset += word.length;
+              }
+            }
+
+            if (decorations.length === 0) {
+              return DecorationSet.create(state.doc, []);
+            }
 
             return DecorationSet.create(state.doc, decorations);
           },

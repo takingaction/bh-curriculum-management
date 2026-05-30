@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { LessonAssetsPanel } from "@/components/lesson-assets-panel";
 
 interface Lesson {
   id: string;
@@ -160,36 +161,38 @@ export default function LessonContentPage({
 
             {/* Title Info */}
             <div className="flex-1 flex flex-col justify-between py-2">
-              <h1 className="text-3xl font-bold text-black">{lesson.title}</h1>
-
               <div>
-                <div className="bg-[#e37c64] text-black px-3 py-2 text-sm font-medium">
+                <h1 className="text-3xl font-bold text-black">{lesson.title}</h1>
+                <div className="bg-[#e37c64] text-black px-3 py-2 text-sm font-medium mt-2">
                   LESSON PLAN: CLASS {lesson.lesson_number}
                 </div>
-
-                <div className="text-sm text-black uppercase tracking-wide">
+                <div className="text-sm text-black uppercase tracking-wide mt-2">
                   {course.title} | Grade {course.grade}
                 </div>
+              </div>
 
-                <div className="flex gap-4 mt-2">
+              <div className="mt-4 pt-4 border-t border-gray-200">
+                <LessonAssetsPanel lessonId={lesson.id} canEdit={false} />
+              </div>
+
+              <div className="flex gap-4 mt-2">
+                <Link
+                  href={isAdmin ? `/admin/courses/${course.id}` : `/teacher/courses/${course.id}`}
+                  className="text-[#0d7377] hover:underline text-sm"
+                >
+                  ← Back to Course
+                </Link>
+                <Link href={isAdmin ? "/admin" : "/teacher"} className="text-[#0d7377] hover:underline text-sm">
+                  Back to Dashboard
+                </Link>
+                {isAdmin && (
                   <Link
-                    href={isAdmin ? `/admin/courses/${course.id}` : `/teacher/courses/${course.id}`}
-                    className="text-[#0d7377] hover:underline text-sm"
+                    href={`/admin/courses/${course.id}/lessons/${lesson.id}`}
+                    className="text-[#e85d5d] hover:underline text-sm font-medium"
                   >
-                    ← Back to Course
+                    Edit Lesson
                   </Link>
-                  <Link href={isAdmin ? "/admin" : "/teacher"} className="text-[#0d7377] hover:underline text-sm">
-                    Back to Dashboard
-                  </Link>
-                  {isAdmin && (
-                    <Link
-                      href={`/admin/courses/${course.id}/lessons/${lesson.id}`}
-                      className="text-[#e85d5d] hover:underline text-sm font-medium"
-                    >
-                      Edit Lesson
-                    </Link>
-                  )}
-                </div>
+                )}
               </div>
             </div>
           </div>

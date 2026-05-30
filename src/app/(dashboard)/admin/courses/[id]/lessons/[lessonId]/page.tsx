@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { LessonEditor } from "@/components/editor/lesson-editor";
+import { LessonAssetsPanel } from "@/components/lesson-assets-panel";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
@@ -84,6 +85,7 @@ export default function EditLessonPage({
   const [fetching, setFetching] = useState(true);
   const [error, setError] = useState("");
   const [showPreview, setShowPreview] = useState(false);
+  const [saved, setSaved] = useState(false);
   const [lesson, setLesson] = useState<Lesson | null>(null);
   const [course, setCourse] = useState<{ title: string; discipline: string; grade: string; image_url: string | null } | null>(null);
   const [fields, setFields] = useState<Fields>({
@@ -170,7 +172,9 @@ export default function EditLessonPage({
         throw new Error(data.error || "Failed to update");
       }
 
-      router.push(`/admin/courses/${lesson.course_id}`);
+      setSaved(true);
+      setLoading(false);
+      setTimeout(() => setSaved(false), 3000);
     } catch (err: any) {
       setError(err.message);
       setLoading(false);
@@ -287,6 +291,10 @@ export default function EditLessonPage({
               />
             </div>
 
+            <div className="space-y-2 pt-4 border-t border-[#e5e5e0]">
+              <LessonAssetsPanel lessonId={lesson.id} canEdit={true} />
+            </div>
+
             {textFields.map((field) => (
               <div key={field.name} className="space-y-2">
                 <Label htmlFor={field.name} className="text-[#2d2d2d] font-bold text-base">
@@ -308,8 +316,9 @@ export default function EditLessonPage({
                 disabled={loading}
                 className="bg-[#0d7377] hover:bg-[#0a5c5f] text-white"
               >
-                {loading ? "Saving..." : "Save Changes"}
+                {loading ? "Saving..." : saved ? "Saved!" : "Save Changes"}
               </Button>
+              {/*
               <Button
                 type="button"
                 variant="outline"
@@ -318,6 +327,7 @@ export default function EditLessonPage({
               >
                 {showPreview ? "Hide Preview" : "Show Preview"}
               </Button>
+              */}
               <Button
                 type="button"
                 variant="outline"
@@ -337,91 +347,10 @@ export default function EditLessonPage({
                 }}
               >
                 Delete
-              </Button>
+</Button>
             </div>
           </form>
 
-          {showPreview && (
-            <div className="mt-6 border-t border-[#e5e5e0] pt-6">
-              <h3 className="text-lg font-semibold text-[#2d2d2d] mb-4">Preview</h3>
-              <div className="border border-[#e5e5e0] rounded-none overflow-hidden">
-                {/* Header */}
-                <div className="flex">
-                  <div className="w-[35%] aspect-square bg-[#d7ffef] flex items-center justify-center min-h-[120px]">
-                    {course?.image_url ? (
-                      <img src={course.image_url} alt={course.title} className="w-full h-full object-cover" />
-                    ) : (
-                      <span className="text-[#666666] text-sm">No Image</span>
-                    )}
-                  </div>
-                  <div className="flex-1 p-4">
-                    <h1 className="text-2xl font-bold text-black">{fields.title}</h1>
-                    <div className="bg-[#e37c64] text-black px-3 py-2 text-sm font-medium mt-2">
-                      LESSON PLAN: CLASS {fields.lesson_number}
-                    </div>
-                    <div className="text-sm text-black uppercase mt-2">
-                      {course?.title || "Course"} | Grade {course?.grade || "?"}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Content */}
-                <div className="p-4">
-                    <div className="flex gap-0">
-                      <div className="w-[200px] space-y-1">
-                        {[
-                          { key: "overview", label: "Overview" },
-                          { key: "lesson_outline", label: "Lesson Outline" },
-                          { key: "learning_objectives", label: "Learning Objectives" },
-                          { key: "vocabulary", label: "Vocabulary" },
-                          { key: "materials", label: "Materials" },
-                          { key: "vapa_text_block", label: "VAPA Standards" },
-                          { key: "ncas_text_block", label: "NCAS Standards" },
-                          { key: "welcome_opening", label: "Welcome and Opening Check-In" },
-                          { key: "lesson_hook", label: 'Lesson "Hook"' },
-                          { key: "actual_class_expectations", label: "Class Expectations and Procedures" },
-                          { key: "warm_up", label: "Warm Up" },
-                          { key: "main_activity", label: "Main Activity" },
-                          { key: "instrument_expectations", label: "Instrument Expectations" },
-                          { key: "assessment", label: "Assessment" },
-                          { key: "reflection", label: "Reflection" },
-                          { key: "closing_ceremony", label: "Closing Ceremony" },
-                        ].map((section) => (
-                        <button
-                          key={section.key}
-                          className="w-full text-left px-3 py-2 text-sm font-medium bg-[#d7ffef] text-black hover:bg-[#c7efe0]"
-                        >
-                          {section.label}
-                        </button>
-                      ))}
-                    </div>
-                    <div className="flex-1 border-l border-gray-200 p-4">
-                      <table className="w-full">
-                        <thead>
-                          <tr>
-                            <th className="bg-[#e37c64] text-black text-left px-4 py-2 font-semibold">
-                              {fields.title}
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr>
-                            <td className="bg-white text-black px-4 py-4 align-top">
-                              <div className="prose prose-sm max-w-none">
-                                <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
-                                  {(fields.main_activity || fields.lesson_outline || "No content")}
-                                </ReactMarkdown>
-                              </div>
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
         </CardContent>
       </Card>
     </div>

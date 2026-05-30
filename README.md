@@ -1,36 +1,81 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Performers Ready! Curriculum Management Platform
+
+A Next.js-based curriculum management system for music education, built with Supabase for database and storage.
+
+## Features
+
+### Curriculum Management
+- **Courses**: Create and manage courses with discipline and grade levels
+- **Lessons**: Rich text lesson plans with 16 content sections (Overview, Lesson Outline, Learning Objectives, Vocabulary, Materials, VAPA Standards, NCAS Standards, Welcome and Opening Check-In, Lesson Hook, Class Expectations and Procedures, Warm Up, Main Activity, Instrument Expectations, Assessment, Reflection, Closing Ceremony)
+- **Rich Text Editor**: TipTap-based editor with custom spellcheck, formatting toolbar, and table support
+
+### Curriculum Resources
+- **Asset Library**: Upload and manage PDF, video (MP4, MOV), and audio (MP3, M4A) files
+- **Categories**: 7 pre-configured categories (Drumming Materials, General Dance, General Music, General Theatre, Recorder Materials, Ukulele Materials, Voice Materials)
+- **Large File Support**: Direct client-side uploads to Supabase Storage (bypasses serverless 4.5MB limit)
+- **Lesson Attachments**: Attach resources to lessons for student access
+
+### Spellcheck System
+- Custom spellcheck extension with 107K word dictionary
+- Contraction handling (can't, don't, won't, etc.)
+- Possessive handling (musician's, teacher's, etc.)
+- Custom word additions via localStorage
+- Flags missing spaces (e.g., `Content:Students` → detected as error)
+
+### Admin & Teacher Workflows
+- **Admin Dashboard**: Full course and lesson management
+- **Teacher Dashboard**: View assigned courses and lessons
+- **Role-based Access**: Admin and teacher roles with Supabase auth
+
+## Tech Stack
+
+- **Framework**: Next.js 16 with Turbopack
+- **Database/Auth**: Supabase (PostgreSQL)
+- **Rich Text Editor**: TipTap
+- **Styling**: Tailwind CSS with shadcn/ui components
+- **Storage**: Supabase Storage (direct client-side uploads)
+- **Font**: Montserrat
 
 ## Getting Started
 
-First, run the development server:
-
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Database Setup
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Run migrations in `supabase/migrations/` to set up:
+- Schema (tables, RLS policies)
+- Asset storage tables
+- Course images table
 
-## Learn More
+## Environment Variables
 
-To learn more about Next.js, take a look at the following resources:
+```env
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## API Routes
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Asset Management
+- `GET /api/asset-categories` - List categories
+- `POST /api/asset-categories` - Create category
+- `PUT /api/asset-categories/[id]` - Update category
+- `DELETE /api/asset-categories/[id]` - Delete category
+- `GET /api/assets` - List assets (with filters)
+- `POST /api/assets/upload-url` - Get signed upload URL
+- `POST /api/assets/confirm` - Confirm upload
+- `DELETE /api/assets/[id]` - Delete asset
+
+### Lesson Assets
+- `GET /api/lessons/[id]/assets` - Get lesson's assets
+- `POST /api/lessons/[id]/assets` - Attach asset to lesson
+- `DELETE /api/lessons/[id]/assets/[assetId]` - Detach asset
 
 ## Deploy on Vercel
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+The app is designed for Vercel deployment with Supabase integration.
