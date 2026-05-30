@@ -3,9 +3,6 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import rehypeRaw from "rehype-raw";
 
 interface Lesson {
   id: string;
@@ -124,9 +121,10 @@ export default function LessonContentPage({
   const renderContent = (content: string) => {
     if (!content) return <p className="text-[#666666] italic">No content available</p>;
     return (
-      <div className="prose prose-sm max-w-none lesson-content">
-        <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{content}</ReactMarkdown>
-      </div>
+      <div
+        className="prose prose-sm max-w-none lesson-content"
+        dangerouslySetInnerHTML={{ __html: content }}
+      />
     );
   };
 

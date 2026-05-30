@@ -144,6 +144,20 @@
     @apply mb-2;
   }
 
+  /* Ensure empty paragraphs have height to show hard return gaps */
+  .lesson-content p:empty {
+    min-height: 0.5rem;
+    display: block;
+  }
+
+  /* Ensure empty paragraphs show their margin-bottom */
+  .lesson-content p:empty::before {
+    content: "";
+    display: block;
+    height: 0;
+    visibility: hidden;
+  }
+
   .lesson-content ul {
     @apply list-disc pl-6 mb-2;
   }
@@ -181,6 +195,29 @@
 
 .ProseMirror td > h3:first-child {
   margin-top: 0.5rem;
+}
+
+/* ---- PROSE MIRROR PARAGRAPH AND LIST SPACING ---- */
+.ProseMirror p {
+  margin-bottom: 0.5rem;
+}
+
+/* Remove margin-bottom from last paragraph to prevent double spacing */
+.ProseMirror > p:last-child {
+  margin-bottom: 0;
+}
+
+/* Unordered and ordered lists */
+.ProseMirror ul,
+.ProseMirror ol {
+  margin-bottom: 0.5rem;
+  padding-left: 1.5rem;
+}
+
+/* Nested lists inherit margin-bottom (same as lesson-content) */
+.ProseMirror ul ul,
+.ProseMirror ol ol {
+  margin-bottom: inherit;
 }
 
 /* ---- INDENTED H3 (preserve margin-left) ---- */

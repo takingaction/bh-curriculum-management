@@ -26,6 +26,12 @@ Vercel deployment with Supabase for admin/teacher workflow. Manages music educat
 - `.lesson-content` wrapper needed for CSS selectors: `#vapa_text_block td .lesson-content > h3`
 - First h3 in any section gets 0.5rem top margin (first-of-type rule)
 - Subsequent h3s get 1.5rem top margin
+- **Empty paragraphs**: Use `min-height: 0.5rem` and `display: block` to ensure hard return gaps render correctly
+
+#### Lesson Content Rendering
+- Uses `dangerouslySetInnerHTML` instead of ReactMarkdown to preserve empty HTML tags
+- Content is sanitized on save, so no XSS risk
+- Empty `<p>` tags need CSS fix to render properly: `.lesson-content p:empty { min-height: 0.5rem; display: block; }`
 
 #### TipTap Editor Extensions
 Located in `src/components/editor/extensions/`:
