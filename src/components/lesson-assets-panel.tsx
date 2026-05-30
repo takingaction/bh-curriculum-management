@@ -197,6 +197,7 @@ export function LessonAssetsPanel({ lessonId, canEdit = false }: LessonAssetsPan
         open={showLibrary}
         onClose={() => setShowLibrary(false)}
         onAssetSelect={lessonId ? undefined : handleAddAsset}
+        onAddSuccess={fetchAssets}
         lessonId={lessonId}
       />
 

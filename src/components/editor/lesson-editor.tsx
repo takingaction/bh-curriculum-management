@@ -7,6 +7,7 @@ import { TableRow } from "@tiptap/extension-table-row";
 import { TableCell } from "@tiptap/extension-table-cell";
 import { TableHeader } from "@tiptap/extension-table-header";
 import Image from "@tiptap/extension-image";
+import Link from "@tiptap/extension-link";
 import { Paragraph } from "@tiptap/extension-paragraph";
 import InvisibleCharacters, { HardBreakNode, ParagraphNode } from "@tiptap/extension-invisible-characters";
 import { Button } from "@/components/ui/button";
@@ -20,7 +21,7 @@ import {
 } from "@/components/ui/dialog";
 import { useEffect, useRef, useState } from "react";
 import { MediaLibrary } from "@/components/media-library";
-import { ImageIcon, CodeIcon, EyeIcon, EyeOffIcon } from "lucide-react";
+import { ImageIcon, CodeIcon, EyeIcon, EyeOffIcon, LinkIcon } from "lucide-react";
 import { SpellCheckExtension } from "./extensions/spell-check";
 
 const ParagraphWithStyle = Paragraph.extend({
@@ -60,6 +61,9 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
   const [removeWordModalOpen, setRemoveWordModalOpen] = useState(false);
   const [cannotRemoveModalOpen, setCannotRemoveModalOpen] = useState(false);
   const [wordUnderCursor, setWordUnderCursor] = useState("");
+  const [linkModalOpen, setLinkModalOpen] = useState(false);
+  const [linkUrl, setLinkUrl] = useState("");
+  const [linkNewWindow, setLinkNewWindow] = useState(false);
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -78,6 +82,12 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
       TableCell,
       TableHeader,
       Image,
+      Link.configure({
+        openOnClick: false,
+        HTMLAttributes: {
+          rel: "noopener noreferrer",
+        },
+      }),
       SpellCheckExtension,
       InvisibleCharacters.configure({
         visible: false,
@@ -231,6 +241,25 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
           className={`h-8 px-2 ${editor.isActive("strike") ? "bg-[#f5f5f0]" : ""}`}
         >
           <span className="line-through">S</span>
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            setLinkUrl("");
+            setLinkNewWindow(false);
+            if (editor.isActive("link")) {
+              const attrs = editor.getAttributes("link");
+              setLinkUrl(attrs.href || "");
+              setLinkNewWindow(attrs.target === "_blank");
+            }
+            setLinkModalOpen(true);
+          }}
+          className={`h-8 px-2 ${editor.isActive("link") ? "bg-[#f5f5f0]" : ""}`}
+          title="Insert Link"
+        >
+          <LinkIcon className="w-4 h-4" />
         </Button>
 
         <div className="w-px h-6 bg-[#e5e5e0] mx-1 self-center" />
@@ -542,6 +571,61 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
           <DialogFooter>
             <Button onClick={() => setCannotRemoveModalOpen(false)}>
               OK
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={linkModalOpen} onOpenChange={setLinkModalOpen}>
+        <DialogContent showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle>Insert Link</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <label className="text-sm font-medium mb-1 block">URL</label>
+              <input
+                type="text"
+                value={linkUrl}
+                onChange={(e) => setLinkUrl(e.target.value)}
+                placeholder="https://example.com"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                autoFocus
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="linkNewWindow"
+                checked={linkNewWindow}
+                onChange={(e) => setLinkNewWindow(e.target.checked)}
+                className="w-4 h-4"
+              />
+              <label htmlFor="linkNewWindow" className="text-sm">Open in New Window</label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLinkModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (linkUrl.trim()) {
+                  const attrs: { href: string; target?: string } = {
+                    href: linkUrl.trim(),
+                  };
+                  if (linkNewWindow) {
+                    attrs.target = "_blank";
+                  }
+                  editor?.chain().focus().extendMarkRange("link").setLink(attrs).run();
+                }
+                setLinkModalOpen(false);
+                setLinkUrl("");
+                setLinkNewWindow(false);
+              }}
+              disabled={!linkUrl.trim()}
+            >
+              Insert Link
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -49,6 +49,7 @@ interface AssetLibraryModalProps {
   open: boolean;
   onClose: () => void;
   onAssetSelect?: (asset: Asset) => void;
+  onAddSuccess?: () => void;
   selectMode?: boolean;
   lessonId?: string;
 }
@@ -78,6 +79,7 @@ export function AssetLibraryModal({
   open,
   onClose,
   onAssetSelect,
+  onAddSuccess,
   selectMode = false,
   lessonId,
 }: AssetLibraryModalProps) {
@@ -99,6 +101,7 @@ export function AssetLibraryModal({
   const [uploadCategoryId, setUploadCategoryId] = useState<string | null>(null);
   const [editingAssetId, setEditingAssetId] = useState<string | null>(null);
   const [editingAssetName, setEditingAssetName] = useState("");
+  const [attachedAssetIds, setAttachedAssetIds] = useState<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
 
@@ -136,12 +139,29 @@ export function AssetLibraryModal({
     }
   }, [selectedCategory, search, selectedFileTypes]);
 
+  const fetchAttachedAssets = useCallback(async () => {
+    if (!lessonId) return;
+    try {
+      const res = await fetch(`/api/lessons/${lessonId}/assets`);
+      const data = await res.json() as { assets?: { id: string }[] };
+      if (data.assets && Array.isArray(data.assets)) {
+        const ids = new Set(data.assets.map((a) => a.id));
+        setAttachedAssetIds(ids);
+      }
+    } catch (error) {
+      console.error("Failed to fetch attached assets:", error);
+    }
+  }, [lessonId]);
+
   useEffect(() => {
     if (open) {
       fetchCategories();
       fetchAssets();
+      if (lessonId) {
+        fetchAttachedAssets();
+      }
     }
-  }, [open, fetchCategories, fetchAssets]);
+  }, [open, fetchCategories, fetchAssets, fetchAttachedAssets, lessonId]);
 
   const handleAddCategory = async () => {
     if (!newCategoryName.trim()) return;
@@ -361,6 +381,13 @@ export function AssetLibraryModal({
 
   const handleAddToLesson = async (asset: Asset) => {
     if (!lessonId) return;
+
+    // Check if already attached
+    if (attachedAssetIds.has(asset.id)) {
+      alert("This resource is already in this lesson");
+      return;
+    }
+
     try {
       const res = await fetch(`/api/lessons/${lessonId}/assets`, {
         method: "POST",
@@ -368,6 +395,8 @@ export function AssetLibraryModal({
         body: JSON.stringify({ assetId: asset.id }),
       });
       if (res.ok) {
+        setAttachedAssetIds(prev => new Set([...prev, asset.id]));
+        onAddSuccess?.();
         alert(`"${asset.display_name}" added to lesson`);
         setPreviewAsset(null);
       } else {
@@ -626,13 +655,25 @@ export function AssetLibraryModal({
                   </div>
                   <div className="flex gap-2">
                     {lessonId && (
-                      <Button
-                        onClick={() => handleAddToLesson(previewAsset)}
-                        size="sm"
-                      >
-                        <PlusIcon className="w-4 h-4 mr-1" />
-                        Add to Lesson
-                      </Button>
+                      attachedAssetIds.has(previewAsset.id) ? (
+                        <Button
+                          size="sm"
+                          disabled
+                          variant="outline"
+                          className="text-green-600 border-green-200 bg-green-50"
+                        >
+                          <CheckIcon className="w-4 h-4 mr-1" />
+                          Already Added
+                        </Button>
+                      ) : (
+                        <Button
+                          onClick={() => handleAddToLesson(previewAsset)}
+                          size="sm"
+                        >
+                          <PlusIcon className="w-4 h-4 mr-1" />
+                          Add to Lesson
+                        </Button>
+                      )
                     )}
                     <Button
                       variant="outline"
@@ -679,6 +720,7 @@ export function AssetLibraryModal({
                   {assets.map((asset) => {
                     const Icon = getFileIcon(asset.file_type);
                     const isSelected = previewAsset?.id === asset.id;
+                    const isAttached = attachedAssetIds.has(asset.id);
                     return (
                       <div
                         key={asset.id}
@@ -686,12 +728,19 @@ export function AssetLibraryModal({
                           isSelected
                             ? "border-[#0d7377] bg-[#f0fdfa]"
                             : "hover:border-[#0d7377]"
-                        }`}
+                        } ${isAttached ? "border-green-300 bg-green-50/50" : ""}`}
                         onClick={() => handleAssetClick(asset)}
                       >
                         <div className="flex items-start gap-3">
-                          <div className="p-2 bg-gray-100 rounded">
-                            <Icon className="w-6 h-6 text-gray-600" />
+                          <div className="relative">
+                            <div className="p-2 bg-gray-100 rounded">
+                              <Icon className="w-6 h-6 text-gray-600" />
+                            </div>
+                            {isAttached && (
+                              <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full flex items-center justify-center">
+                                <CheckIcon className="w-3 h-3 text-white" />
+                              </div>
+                            )}
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="font-medium text-sm truncate">
@@ -703,6 +752,11 @@ export function AssetLibraryModal({
                             {asset.asset_categories && (
                               <p className="text-xs text-[#0d7377]">
                                 {asset.asset_categories.name}
+                              </p>
+                            )}
+                            {isAttached && (
+                              <p className="text-xs text-green-600 mt-1 font-medium">
+                                Already in lesson
                               </p>
                             )}
                           </div>
@@ -719,8 +773,8 @@ export function AssetLibraryModal({
         {/* Upload Modal */}
         {showUploadModal && (
           <div className="fixed inset-0 z-[60] bg-black/50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-lg p-6 w-full max-w-md">
-              <div className="flex items-center justify-between mb-4">
+            <div className="bg-white rounded-lg p-4 w-full max-w-md max-h-[90vh] flex flex-col">
+              <div className="flex items-center justify-between mb-3 shrink-0">
                 <h3 className="text-lg font-medium">
                   Upload to{" "}
                   {categories.find((c) => c.id === uploadCategoryId)?.name || "Category"}
@@ -742,54 +796,37 @@ export function AssetLibraryModal({
                 className="hidden"
               />
               <div
-                className="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer hover:border-gray-400 mb-4"
+                className="border-2 border-dashed rounded-lg p-3 text-center cursor-pointer hover:border-gray-400 mb-3 shrink-0 overflow-y-auto"
                 onClick={() => uploadInputRef.current?.click()}
               >
                 {uploadFiles.length > 0 ? (
-                  <div className="space-y-2">
-                    {uploadFiles.map((f, i) => (
-                      <div key={i} className="flex items-center justify-center gap-2">
-                        {(() => {
-                          const Icon = getFileIcon(f.name.split(".").pop() || "");
-                          return <Icon className="w-5 h-5 text-gray-400" />;
-                        })()}
-                        <span className="text-sm">{f.name}</span>
-                        <span className="text-xs text-gray-400">({formatFileSize(f.size)})</span>
-                      </div>
-                    ))}
+                  <div className="text-sm text-gray-600">
+                    <span className="font-medium">{uploadFiles.length}</span> files selected
+                    <span className="text-xs text-gray-400 block mt-1">
+                      ({uploadFiles.length > 0 ? (uploadFiles.reduce((sum, f) => sum + f.size, 0) / 1024 / 1024).toFixed(1) : "0"} MB total)
+                    </span>
+                    <span className="text-xs text-[#0d7377] mt-2 block">Click to change selection</span>
                   </div>
                 ) : (
                   <>
-                    <UploadIcon className="w-8 h-8 mx-auto mb-2 text-gray-400" />
-                    <p className="text-sm text-gray-600">
+                    <UploadIcon className="w-6 h-6 mx-auto mb-1 text-gray-400" />
+                    <p className="text-xs text-gray-600">
                       Click to select files
                     </p>
-                    <p className="text-xs text-gray-400 mt-1">
+                    <p className="text-xs text-gray-400">
                       PDF, MP4, MOV, M4A, MP3
                     </p>
                   </>
                 )}
               </div>
-              {uploadFiles.length > 0 && (
-                <div className="mb-4 space-y-3">
-                  <label className="text-sm text-gray-600 mb-1 block">
-                    Display Names (optional)
-                  </label>
-                  {uploadFiles.map((f, i) => (
-                    <div key={i} className="flex items-center gap-2">
-                      <span className="text-xs text-gray-500 w-32 truncate">{f.name}</span>
-                      <Input
-                        type="text"
-                        value={uploadDisplayNames[f.name] || ""}
-                        onChange={(e) => setUploadDisplayNames(prev => ({ ...prev, [f.name]: e.target.value }))}
-                        placeholder="Display name"
-                        className="flex-1"
-                      />
-                    </div>
-                  ))}
-                </div>
-              )}
-              <div className="flex gap-2 justify-end">
+              <div className="flex-1 overflow-y-auto mb-3 min-h-0">
+                {uploadFiles.length > 0 && (
+                  <div className="text-xs text-gray-400">
+                    {uploadFiles.length} files ready to upload
+                  </div>
+                )}
+              </div>
+              <div className="flex gap-2 justify-end shrink-0">
                 <Button
                   variant="outline"
                   onClick={() => setShowUploadModal(false)}
@@ -797,7 +834,7 @@ export function AssetLibraryModal({
                   Cancel
                 </Button>
                 <Button onClick={handleUpload} disabled={uploadFiles.length === 0 || uploading}>
-                  {uploading ? "Uploading..." : "Upload Resources"}
+                  {uploading ? "Uploading..." : `Upload ${uploadFiles.length} Resource${uploadFiles.length !== 1 ? "s" : ""}`}
                 </Button>
               </div>
             </div>

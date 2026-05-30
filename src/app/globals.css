@@ -273,6 +273,18 @@
   }
 }
 
+/* ---- LINKS ---- */
+.ProseMirror a,
+.lesson-content a {
+  color: #0d7377;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.ProseMirror a:hover,
+.lesson-content a:hover {
+  color: #0a5c5f;
+}
+
 /* ---- SPELL CHECK ---- */
 .ProseMirror .misspelled {
   text-decoration: underline wavy red;

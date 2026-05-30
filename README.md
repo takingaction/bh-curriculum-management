@@ -6,14 +6,19 @@ A Next.js-based curriculum management system for music education, built with Sup
 
 ### Curriculum Management
 - **Courses**: Create and manage courses with discipline and grade levels
-- **Lessons**: Rich text lesson plans with 16 content sections (Overview, Lesson Outline, Learning Objectives, Vocabulary, Materials, VAPA Standards, NCAS Standards, Welcome and Opening Check-In, Lesson Hook, Class Expectations and Procedures, Warm Up, Main Activity, Instrument Expectations, Assessment, Reflection, Closing Ceremony)
-- **Rich Text Editor**: TipTap-based editor with custom spellcheck, formatting toolbar, and table support
+- **Lessons**: Rich text lesson plans with 15 content sections (Lesson Outline, Learning Objectives, Vocabulary, Materials, VAPA Standards, NCAS Standards, Welcome and Opening Check-In, Lesson Hook, Class Expectations and Procedures, Warm Up, Main Activity, Instrument Expectations, Assessment, Reflection, Closing Ceremony)
+- **Rich Text Editor**: TipTap-based editor with custom spellcheck, formatting toolbar, table support, and hyperlink insertion
+- **Hyperlinks**: Insert links with URL and "Open in New Window" option; links styled in teal with underline
 
 ### Curriculum Resources
 - **Asset Library**: Upload and manage PDF, video (MP4, MOV), and audio (MP3, M4A) files
 - **Categories**: 7 pre-configured categories (Drumming Materials, General Dance, General Music, General Theatre, Recorder Materials, Ukulele Materials, Voice Materials)
 - **Large File Support**: Direct client-side uploads to Supabase Storage (bypasses serverless 4.5MB limit)
+- **Multi-file Upload**: Upload multiple files at once with summary display
 - **Lesson Attachments**: Attach resources to lessons for student access
+- **Rename Resources**: Click edit icon in preview panel to rename assets
+- **Attached Status**: Assets already added to lesson show checkmark badge and "Already Added" state
+- **Duplicate Prevention**: Cannot add same resource twice; friendly message shown
 
 ### Spellcheck System
 - Custom spellcheck extension with 107K word dictionary
@@ -26,6 +31,14 @@ A Next.js-based curriculum management system for music education, built with Sup
 - **Admin Dashboard**: Full course and lesson management
 - **Teacher Dashboard**: View assigned courses and lessons
 - **Role-based Access**: Admin and teacher roles with Supabase auth
+- **View As**: Toggle between admin and teacher views in header
+
+### Student Lesson View
+- Course title and grade displayed above lesson name
+- Duration shown below lesson title
+- Resources displayed below lesson content
+- Links styled in teal (#0d7377) with underline
+- White text on coral (#e37c64) header backgrounds
 
 ## Tech Stack
 
@@ -48,7 +61,7 @@ Open [http://localhost:3000](http://localhost:3000)
 
 Run migrations in `supabase/migrations/` to set up:
 - Schema (tables, RLS policies)
-- Asset storage tables
+- Asset storage tables and bucket
 - Course images table
 
 ## Environment Variables
@@ -69,12 +82,32 @@ SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 - `GET /api/assets` - List assets (with filters)
 - `POST /api/assets/upload-url` - Get signed upload URL
 - `POST /api/assets/confirm` - Confirm upload
+- `PUT /api/assets/[id]` - Update asset (rename)
 - `DELETE /api/assets/[id]` - Delete asset
+- `POST /api/assets/fix-urls` - Fix legacy asset URLs (missing bucket name)
 
 ### Lesson Assets
 - `GET /api/lessons/[id]/assets` - Get lesson's assets
 - `POST /api/lessons/[id]/assets` - Attach asset to lesson
 - `DELETE /api/lessons/[id]/assets/[assetId]` - Detach asset
+
+## Editor Features
+
+### Toolbar Buttons
+- **Text**: Bold, Italic, Strikethrough, Link (chain icon)
+- **Headings**: H2, H3
+- **Lists**: Bullet, Ordered
+- **Table**: Insert table, Toggle grid
+- **View**: Show invisibles, Undo/Redo
+- **Media**: Media library, Upload image
+- **Indent**: Decrease, Increase
+- **Source**: Toggle source code view
+
+### Link Insertion
+Click link button (chain icon) to insert hyperlink:
+- URL field (required)
+- Open in New Window checkbox
+- Links styled teal (#0d7377) with underline
 
 ## Deploy on Vercel
 
