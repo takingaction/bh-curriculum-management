@@ -19,7 +19,7 @@ export default async function AssignAllCoursesPage() {
     .select("id");
 
   let assignedCount = 0;
-  let error = "";
+  const error = "";
 
   if (courses && courses.length > 0) {
     for (const course of courses) {

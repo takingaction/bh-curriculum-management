@@ -1,85 +1,174 @@
 import { Extension } from "@tiptap/core";
 import { Plugin } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
+import enWords from "./words-en.json";
 
+const englishWords = new Set<string>(enWords.words);
+const STORAGE_KEY = 'spellcheck-custom-words';
+
+function loadCustomWords(): Set<string> {
+  if (typeof window === 'undefined') return new Set();
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      return new Set(JSON.parse(stored));
+    }
+  } catch (e) {
+    console.error('Failed to load custom words:', e);
+  }
+  return new Set();
+}
+
+function saveCustomWords(words: Set<string>): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify([...words]));
+  } catch (e) {
+    console.error('Failed to save custom words:', e);
+  }
+}
+
+const customWords = loadCustomWords();
 const commonWords = new Set([
-  "the", "be", "to", "of", "and", "a", "in", "that", "have", "i",
-  "it", "for", "not", "on", "with", "he", "as", "you", "do", "at",
-  "this", "but", "his", "by", "from", "they", "we", "say", "her", "she",
-  "or", "an", "will", "my", "one", "all", "would", "there", "their", "what",
-  "so", "up", "out", "if", "about", "who", "get", "which", "go", "me",
-  "when", "make", "can", "like", "time", "no", "just", "him", "know", "take",
-  "people", "into", "year", "your", "good", "some", "could", "them", "see", "other",
-  "than", "then", "now", "look", "only", "come", "its", "over", "think", "also",
-  "back", "after", "use", "two", "how", "our", "work", "first", "well", "way",
-  "even", "new", "want", "because", "any", "these", "give", "day", "most", "us",
-  "is", "are", "was", "were", "been", "has", "had", "does", "did", "should",
-  "lesson", "students", "music", "song", "learn", "teacher", "class", "sing", "singers",
-  "perform", "performance", "art", "dance", "moving", "movement", "rhythm", "beat",
-  "melody", "harmony", "note", "sound", "listen", "voice", "vocal", "instrument",
-  "piano", "guitar", "drum", "violin", "orchestra", "band", "choral", "chord",
-  "scale", "tempo", "dynamics", "loud", "soft", "fast", "slow", "high", "low",
-  "warm", "up", "down", "body", "hands", "feet", "feel", "feelings", "expression",
-  "creative", "create", "create", "imagine", "explore", "discover", "share", "together",
-  "practice", "prepare", "ready", "begin", "start", "continue", "finish", "end",
-  "different", "same", "together", "alone", "group", "partner", "individual",
-  "teacher", "student", "friend", "family", "everyone", "each", "every", "all",
-  "some", "many", "few", "most", "much", "little", "big", "small", "large", "tiny",
-  "short", "long", "tall", "thick", "thin", "light", "dark", "bright", "dull",
-  "happy", "sad", "excited", "calm", "angry", "peaceful", "energetic", "gentle", "strong",
-  "weak", "smooth", "rough", "hard", "soft", "wet", "dry", "hot", "cold", "warm",
-  "cool", "nice", "kind", "mean", "fair", "unfair", "right", "wrong", "good", "bad",
-  "best", "worst", "great", "terrible", "wonderful", "amazing", "fantastic", "super",
-  "okay", "fine", "alright", "yes", "no", "maybe", "perhaps", "probably", "certainly",
-  "absolutely", "definitely", "exactly", "really", "very", "quite", "rather", "somewhat",
-  "too", "enough", "much", "many", "few", "little", "lots", "bunch", "plenty",
-  "walk", "run", "jump", "skip", "hop", "stand", "sit", "lie", "sleep", "wake",
-  "eat", "drink", "play", "work", "rest", "dance", "move", "stop", "go", "come",
-  "laugh", "cry", "smile", "frown", "scream", "whisper", "shout", "call", "respond",
-  "answer", "ask", "question", "wonder", "think", "feel", "believe", "know", "understand",
-  "remember", "forget", "learn", "teach", "show", "tell", "explain", "describe",
-  "hear", "see", "watch", "look", "smell", "taste", "touch", "feel", "sense",
-  "hold", "grab", "reach", "stretch", "bend", "twist", "turn", "spin", "sway",
-  "rock", "roll", "slide", "glide", "float", "fly", "jump", "land", "fall", "rise",
-  "grow", "shrink", "increase", "decrease", "change", "transform", "become", "appear",
-  "seem", "look", "sound", "smell", "taste", "feel", "seem", "become", "remain",
-  "stay", "keep", "leave", "leave", "exit", "enter", "arrive", "depart", "reach",
-  "achieve", "accomplish", "complete", "finish", "end", "stop", "halt", "pause",
-  "continue", "resume", "repeat", "again", "once", "twice", "first", "second", "third",
-  "next", "last", "final", "initial", "beginning", "middle", "center", "outside", "inside",
-  "in", "out", "on", "off", "up", "down", "over", "under", "above", "below",
-  "between", "among", "through", "across", "around", "behind", "front", "beside", "next",
-  "near", "far", "close", "away", "distant", "local", "global", "world", "earth",
-  "sky", "sun", "moon", "star", "planet", "space", "nature", "animal", "plant", "tree",
-  "flower", "grass", "leaf", "root", "branch", "seed", "fruit", "vegetable", "food",
-  "water", "air", "fire", "earth", "element", "weather", "rain", "snow", "sun", "wind",
-  "cloud", "storm", "thunder", "lightning", "rainbow", "season", "spring", "summer",
-  "fall", "autumn", "winter", "day", "night", "morning", "evening", "afternoon", "midnight",
-  "today", "tomorrow", "yesterday", "now", "later", "soon", "before", "after", "during",
-  "while", "when", "where", "why", "how", "who", "whom", "whose", "which", "that",
-  "this", "these", "those", "here", "there", "everywhere", "somewhere", "nowhere",
-  "always", "never", "sometimes", "often", "rarely", "usually", "normally", "generally",
-  "usually", "perhaps", "maybe", "possibly", "probably", "certainly", "definitely",
-  "absolutely", "exactly", "precisely", "just", "still", "already", "yet", "already",
-  "still", "yet", "soon", "just", "only", "even", "also", "too", "very", "really",
-  "quite", "rather", "somewhat", "pretty", "fairly", "rather", "quite", "pretty",
-  "much", "many", "lots", "bunch", "plenty", "lots", "several", "various", "different",
-  "various", "multiple", "single", "one", "two", "three", "four", "five", "six",
-  "seven", "eight", "nine", "ten", "hundred", "thousand", "million", "billion",
-  "number", "count", "count", "number", "amount", "quantity", "total", "sum", "plus",
-  "minus", "add", "subtract", "multiply", "divide", "equal", "same", "different",
-  "like", "unlike", "similar", "same", "equal", "equivalent", "compare", "contrast",
-  "more", "less", "most", "least", "greater", "smaller", "bigger", "larger", "smaller",
-  "higher", "lower", "taller", "shorter", "longer", "wider", "narrower", "thicker",
-  "thinner", "heavier", "lighter", "darker", "lighter", "brighter", "duller", "stronger",
-  "weaker", "faster", "slower", "quieter", "louder", "softer", "harder", "easier",
-  "harder", "simple", "complex", "complicated", "difficult", "easy", "simple", "basic",
-  "advanced", "beginner", "intermediate", "advanced", "expert", "professional", "amateur",
-  "trained", "untrained", "skilled", "unskilled", "experienced", "inexperienced", "new",
-  "old", "young", "ancient", "modern", "classic", "traditional", "contemporary", "current",
-  "present", "past", "future", "history", "future", "present", "past", "old", "new",
-  "recent", "latest", "recent", "modern", "ancient", "historical", "traditional", "classic",
+  // Contractions with straight apostrophe
+  "i'll", "you'll", "he'll", "she'll", "we'll", "they'll",
+  "i'm", "you're", "he's", "she's", "it's", "we're", "they're",
+  "i've", "you've", "we've", "they've",
+  "i'd", "you'd", "he'd", "she'd", "we'd", "they'd",
+  "isn't", "aren't", "wasn't", "weren't",
+  "hasn't", "haven't", "hadn't",
+  "doesn't", "don't", "didn't",
+  "won't", "wouldn't", "can't", "couldn't", "shouldn't", "mustn't",
+  "let's", "that's", "who's", "what's", "here's", "there's", "where's", "when's", "how's",
+  "o'clock", "e'en", "e'er", "tis", "twas",
+  // Possessives with straight apostrophe
+  "musician's", "teacher's", "student's", "performer's", "singer's", "player's", "conductor's",
+  "composer's", "author's", "reader's", "listener's", "creator's", "instructor's", "director's",
+  " everyone's", "someone's", "anyone's", "no one's", "everyone's",
+  // Common words
+  "form", "sticker", "stickers", "bows", "bow", "song", "songs", "sing", "singer", "singers",
+  "lesson", "lessons", "class", "classes", "student", "students", "teacher", "teachers",
+  "music", "musical", "note", "notes", "sound", "sounds", "listen", "listening",
+  "learn", "learning", "learned", "teach", "teaching", "taught",
+  "perform", "performing", "performance", "performances", "performer", "performers",
+  "practice", "practicing", "practiced",
+  "start", "started", "starting", "stop", "stopped", "stopping",
+  "continue", "continued", "continuing", "finish", "finished", "finishing",
+  "begin", "began", "beginning", "end", "ended", "ending",
+  "like", "liked", "likes", "liking",
+  "want", "wanted", "wanting", "wants",
+  "need", "needed", "needing", "needs",
+  "make", "made", "making", "makes",
+  "take", "took", "taking", "takes",
+  "come", "came", "coming", "comes",
+  "go", "went", "going", "goes",
+  "get", "got", "getting", "gets",
+  "know", "knew", "known", "knowing",
+  "think", "thought", "thinking", "thinks",
+  "see", "saw", "seeing", "seen", "sees",
+  "look", "looked", "looking", "looks",
+  "use", "used", "using", "uses",
+  "find", "found", "finding", "finds",
+  "give", "gave", "giving", "gives",
+  "tell", "told", "telling", "tells",
+  "ask", "asked", "asking", "asks",
+  "work", "worked", "working", "works",
+  "seem", "seemed", "seeming", "seems",
+  "feel", "felt", "feeling", "feels",
+  "try", "tried", "trying", "tries",
+  "leave", "left", "leaving", "leaves",
+  "call", "called", "calling", "calls",
+  "keep", "kept", "keeping", "keeps",
+  "let", "letting", "lets",
+  "show", "showed", "showing", "shows",
+  "hear", "heard", "hearing", "hears",
+  "play", "played", "playing", "plays",
+  "run", "ran", "running", "runs",
+  "move", "moved", "moving", "moves",
+  "live", "lived", "living", "lives",
+  "believe", "believed", "believing", "believes",
+  "hold", "held", "holding", "holds",
+  "bring", "brought", "bringing", "brings",
+  "happen", "happened", "happening", "happens",
+  "write", "wrote", "writing", "writes",
+  "provide", "provided", "providing", "provides",
+  "sit", "sat", "sitting", "sits",
+  "stand", "stood", "standing", "stands",
+  "lose", "lost", "losing", "loses",
+  "pay", "paid", "paying", "pays",
+  "meet", "met", "meeting", "meets",
+  "include", "included", "including", "includes",
+  "set", "setting", "settings",
+  "change", "changed", "changing", "changes",
+  "lead", "led", "leading", "leads",
+  "understand", "understood", "understanding",
+  "watch", "watched", "watching", "watches",
+  "follow", "followed", "following", "follows",
+  "create", "created", "creating", "creates",
+  "speak", "spoke", "speaking", "speaks", "spoken",
+  "read", "reading", "reads",
+  "allow", "allowed", "allowing", "allows",
+  "add", "added", "adding", "adds",
+  "spend", "spent", "spending", "spends",
+  "grow", "grew", "growing", "grown", "grows",
+  "open", "opened", "opening", "opens",
+  "walk", "walked", "walking", "walks",
+  "win", "won", "winning", "wins",
+  "offer", "offered", "offering", "offers",
+  "remember", "remembered", "remembering", "remembers",
+  "love", "loved", "loving", "loves",
+  "consider", "considered", "considering", "considers",
+  "appear", "appeared", "appearing", "appears",
+  "buy", "bought", "buying", "buys",
+  "wait", "waited", "waiting", "waits",
+  "serve", "served", "serving", "serves",
+  "die", "died", "dying", "dies",
+  "send", "sent", "sending", "sends",
+  "expect", "expected", "expecting", "expects",
+  "build", "built", "building", "builds",
+  "stay", "stayed", "staying", "stays",
+  "fall", "fell", "falling", "fallen", "falls",
+  "cut", "cutting", "cuts",
+  "reach", "reached", "reaching", "reaches",
+  "kill", "killed", "killing", "kills",
+  "remain", "remained", "remaining", "remains",
+  "suggest", "suggested", "suggesting", "suggests",
+  "raise", "raised", "raising", "raises",
+  "pass", "passed", "passing", "passes",
+  "sell", "sold", "selling", "sells",
+  "require", "required", "requiring", "requires",
+  "report", "reported", "reporting", "reports",
+  "decide", "decided", "deciding", "decides",
+  "pull", "pulled", "pulling", "pulls",
+  "develop", "developed", "developing", "develops",
+  "hope", "hoped", "hoping", "hopes",
+  "carry", "carried", "carrying", "carries",
+  "break", "broke", "broken", "breaking", "breaks",
+  "receive", "received", "receiving", "receives",
+  "agree", "agreed", "agreeing", "agrees",
+  "support", "supported", "supporting", "supports",
+  "hit", "hitting", "hits",
+  "produce", "produced", "producing", "produces",
+  "eat", "ate", "eating", "eats", "eaten",
+  "cover", "covered", "covering", "covers",
+  "catch", "caught", "catching", "catches",
+  "draw", "drew", "drawing", "draws", "drawn",
+  "choose", "chose", "choosing", "chooses", "chosen",
+  "analyze", "analyzing", "analyzed", "analyse", "analysing", "analysed",
+  // Hyphenated and accented words
+  "cross-legged", "tiger-lily", "solfège", "naïve", "café", "résumé",
+  "flambé", "protégé", "cliché", "déjà vu", "raison d'être", "cause célèbre",
+  "cul-de-sac", "double entendre", "ennui", "faux pas", "genre",
+  "nom de plume", "pirouette", "poseur", "purveyor", "rendezvous",
+  "risotto", "sanguine", "savoir faire", "soigné", "tête-à-tête", "voilà",
 ]);
+
+function isSpelledCorrectly(word: string): boolean {
+  const lower = word.toLowerCase();
+  if (commonWords.has(lower)) return true;
+  if (englishWords.has(lower)) return true;
+  return false;
+}
 
 export const SpellCheckExtension = Extension.create({
   name: "spellCheck",
@@ -87,20 +176,37 @@ export const SpellCheckExtension = Extension.create({
   addStorage() {
     return {
       enabled: true,
+      customWords,
+      addWord: (word: string) => {
+        const cleanWord = word.replace(/[.!?,;:"()\[\]{}\u201C\u201D\u2018\u2019]/g, "").toLowerCase();
+        if (cleanWord.length > 2) {
+          customWords.add(cleanWord);
+          saveCustomWords(customWords);
+        }
+      },
+      removeWord: (word: string) => {
+        const cleanWord = word.replace(/[.!?,;:"()\[\]{}\u201C\u201D\u2018\u2019]/g, "").toLowerCase();
+        customWords.delete(cleanWord);
+        saveCustomWords(customWords);
+      },
+      isCustomWord: (word: string) => {
+        const cleanWord = word.replace(/[.!?,;:"()\[\]{}\u201C\u201D\u2018\u2019]/g, "").toLowerCase();
+        return customWords.has(cleanWord);
+      },
     };
   },
 
   addProseMirrorPlugins() {
-    const extension = this;
-
     return [
       new Plugin({
         props: {
-          decorations(state) {
-            if (!extension.storage.enabled) return null;
+          decorations: (state) => {
+            if (!this.storage.enabled) return null;
 
             const decorations: Decoration[] = [];
             const doc = state.doc;
+
+            if (doc.childCount === 0) return null;
 
             doc.descendants((node, pos) => {
               if (node.isText && node.text) {
@@ -113,8 +219,29 @@ export const SpellCheckExtension = Extension.create({
                     return;
                   }
 
-                  const cleanWord = word.replace(/[.,!?;:'"()[\]{}]/g, "").toLowerCase();
-                  if (cleanWord.length > 2 && !commonWords.has(cleanWord)) {
+                  // Preserve apostrophes in possessive/contraction patterns before stripping other punctuation
+                  let processedWord = word;
+                  // Check if word ends with 's or s' (possessive) or 've, 're, 'll, 'm, n't (contractions)
+                  // Handle both straight (') and curly (\u2019, \u2018) apostrophes
+                  if (/.*['\u2019]s$/i.test(word) || /.*s['\u2019]$/i.test(word) ||
+                      /.*['\u2019]ve$/i.test(word) || /.*['\u2019]re$/i.test(word) ||
+                      /.*['\u2019]ll$/i.test(word) || /.*['\u2019]m$/i.test(word) ||
+                      /.*n['\u2019]t$/i.test(word)) {
+                    // Replace apostrophes with placeholder to preserve them
+                    processedWord = word.replace(/['\u2019\u2018]/g, '\x00');
+                  }
+
+                  let cleanWord = processedWord.replace(/[.!?,;:"()\[\]{}\u201C\u201D\x00]/g, "");
+                  // Handle possessives and contractions: strip 's, s', 've, 're, 'll, 'm, n't from end
+                  let baseWord = cleanWord
+                    .replace(/'s$/i, '')      // today's → today
+                    .replace(/s'$/i, '')      // boys' → boys
+                    .replace(/'ve$/i, '')     // we've → we
+                    .replace(/'re$/i, '')     // we're → we
+                    .replace(/'ll$/i, '')     // we'll → we
+                    .replace(/'m$/i, '')      // I'm → I
+                    .replace(/n't$/i, '');    // won't → won, don't → don
+                  if (cleanWord.length > 2 && !isSpelledCorrectly(cleanWord) && !isSpelledCorrectly(baseWord) && !customWords.has(cleanWord.toLowerCase()) && !customWords.has(baseWord.toLowerCase())) {
                     decorations.push(
                       Decoration.inline(pos + offset, pos + offset + word.length, {
                         class: "misspelled",
@@ -133,5 +260,9 @@ export const SpellCheckExtension = Extension.create({
         },
       }),
     ];
+  },
+
+  addKeyboardShortcuts() {
+    return {};
   },
 });

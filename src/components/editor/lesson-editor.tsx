@@ -8,7 +8,16 @@ import { TableCell } from "@tiptap/extension-table-cell";
 import { TableHeader } from "@tiptap/extension-table-header";
 import Image from "@tiptap/extension-image";
 import { Paragraph } from "@tiptap/extension-paragraph";
+import InvisibleCharacters, { HardBreakNode, ParagraphNode } from "@tiptap/extension-invisible-characters";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useEffect, useRef, useState } from "react";
 import { MediaLibrary } from "@/components/media-library";
 import { ImageIcon, CodeIcon, EyeIcon, EyeOffIcon } from "lucide-react";
@@ -46,8 +55,11 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
   const [showSource, setShowSource] = useState(false);
   const [sourceContent, setSourceContent] = useState(content);
   const [showTableGrid, setShowTableGrid] = useState(false);
-  const [showSpellCheck, setShowSpellCheck] = useState(true);
   const [showInvisibles, setShowInvisibles] = useState(false);
+  const [addWordModalOpen, setAddWordModalOpen] = useState(false);
+  const [removeWordModalOpen, setRemoveWordModalOpen] = useState(false);
+  const [cannotRemoveModalOpen, setCannotRemoveModalOpen] = useState(false);
+  const [wordUnderCursor, setWordUnderCursor] = useState("");
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -66,8 +78,11 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
       TableCell,
       TableHeader,
       Image,
-      SpellCheckExtension.configure({
-        enabled: showSpellCheck,
+      SpellCheckExtension,
+      InvisibleCharacters.configure({
+        visible: false,
+        builders: [new HardBreakNode(), new ParagraphNode()],
+        injectCSS: true,
       }),
     ],
     content,
@@ -77,33 +92,11 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
     editorProps: {
       attributes: {
         class:
-          `prose max-w-none min-h-[150px] px-4 py-3 focus:outline-none border border-[#e5e5e0] rounded-lg${showTableGrid ? " show-table-grid" : ""}${showInvisibles ? " show-invisibles" : ""}`,
+          `prose max-w-none min-h-[150px] px-4 py-3 focus:outline-none border border-[#e5e5e0] rounded-lg${showTableGrid ? " show-table-grid" : ""}`,
         spellcheck: "true",
       },
     },
   });
-
-  useEffect(() => {
-    if (editor) {
-      const editorEl = editor.view.dom;
-      if (showSpellCheck) {
-        editorEl.classList.remove("spellcheck-off");
-      } else {
-        editorEl.classList.add("spellcheck-off");
-      }
-    }
-  }, [editor, showSpellCheck]);
-
-  useEffect(() => {
-    if (editor) {
-      const editorEl = editor.view.dom;
-      if (showInvisibles) {
-        editorEl.classList.add("show-invisibles");
-      } else {
-        editorEl.classList.remove("show-invisibles");
-      }
-    }
-  }, [editor, showInvisibles]);
 
   const getCurrentMarginLeft = () => {
     if (!editor) return 0;
@@ -133,6 +126,44 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
     const current = getCurrentMarginLeft();
     if (current > 0) {
       setMarginLeft(current - 10);
+    }
+  };
+
+  const getWordAtCursor = () => {
+    if (!editor) return "";
+    const { selection } = editor.state;
+    const { $from, to } = selection;
+    const text = $from.parent.textContent;
+    if (!text) return "";
+
+    const relativePos = $from.parentOffset;
+    const textBefore = text.slice(0, relativePos);
+    const textAfter = text.slice(relativePos);
+
+    const wordBeforeMatch = textBefore.match(/[\p{L}\p{M}'-]+$/u);
+    const wordAfterMatch = textAfter.match(/^[\p{L}\p{M}'-]+/u);
+
+    const wordBefore = wordBeforeMatch ? wordBeforeMatch[0] : "";
+    const wordAfter = wordAfterMatch ? wordAfterMatch[0] : "";
+
+    return wordBefore + wordAfter;
+  };
+
+  const handleAddWordClick = () => {
+    const word = getWordAtCursor();
+    setWordUnderCursor(word);
+    setAddWordModalOpen(true);
+  };
+
+  const handleRemoveWordClick = () => {
+    const word = getWordAtCursor();
+    setWordUnderCursor(word);
+    const spellCheckStorage = editor?.storage as { spellCheck?: { isCustomWord: (word: string) => boolean } };
+    const isCustom = spellCheckStorage?.spellCheck?.isCustomWord(word);
+    if (isCustom) {
+      setRemoveWordModalOpen(true);
+    } else {
+      setCannotRemoveModalOpen(true);
     }
   };
 
@@ -269,24 +300,37 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
 
         <Button
           type="button"
-          variant={showSpellCheck ? "default" : "ghost"}
-          size="sm"
-          onClick={() => setShowSpellCheck(!showSpellCheck)}
-          className="h-8 px-2 text-xs"
-          title="Toggle Spell Check"
-        >
-          ABC
-        </Button>
-
-        <Button
-          type="button"
           variant={showInvisibles ? "default" : "ghost"}
           size="sm"
-          onClick={() => setShowInvisibles(!showInvisibles)}
+          onClick={() => {
+            setShowInvisibles(!showInvisibles);
+            editor?.commands.toggleInvisibleCharacters();
+          }}
           className="h-8 px-2 text-xs"
           title="Toggle Hidden Characters"
         >
           {showInvisibles ? <EyeOffIcon className="w-4 h-4" /> : <EyeIcon className="w-4 h-4" />}
+        </Button>
+
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={handleAddWordClick}
+          className="h-8 px-2 text-xs font-bold"
+          title="Add Word to Dictionary"
+        >
+          +
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={handleRemoveWordClick}
+          className="h-8 px-2 text-xs font-bold"
+          title="Remove Word from Dictionary"
+        >
+          −
         </Button>
 
         <div className="w-px h-6 bg-[#e5e5e0] mx-1 self-center" />
@@ -432,6 +476,76 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
           }}
         />
       )}
+
+      <Dialog open={addWordModalOpen} onOpenChange={setAddWordModalOpen}>
+        <DialogContent showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle>Add to library?</DialogTitle>
+            <DialogDescription>
+              Add &ldquo;{wordUnderCursor}&rdquo; to the dictionary.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddWordModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (wordUnderCursor) {
+                  const spellCheckStorage = editor?.storage as { spellCheck?: { addWord: (word: string) => void } };
+                  spellCheckStorage?.spellCheck?.addWord(wordUnderCursor);
+                }
+                setAddWordModalOpen(false);
+              }}
+            >
+              Confirm
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={removeWordModalOpen} onOpenChange={setRemoveWordModalOpen}>
+        <DialogContent showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle>Remove from library?</DialogTitle>
+            <DialogDescription>
+              Remove &ldquo;{wordUnderCursor}&rdquo; from the dictionary.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRemoveWordModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (wordUnderCursor) {
+                  const spellCheckStorage = editor?.storage as { spellCheck?: { removeWord: (word: string) => void } };
+                  spellCheckStorage?.spellCheck?.removeWord(wordUnderCursor);
+                }
+                setRemoveWordModalOpen(false);
+              }}
+            >
+              Confirm
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={cannotRemoveModalOpen} onOpenChange={setCannotRemoveModalOpen}>
+        <DialogContent showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle>Cannot remove existing words</DialogTitle>
+            <DialogDescription>
+              &ldquo;{wordUnderCursor}&rdquo; is a base dictionary word and cannot be removed.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button onClick={() => setCannotRemoveModalOpen(false)}>
+              OK
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
