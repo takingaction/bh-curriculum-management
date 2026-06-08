@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/dialog";
 import { useEffect, useRef, useState } from "react";
 import { MediaLibrary } from "@/components/media-library";
-import { ImageIcon, CodeIcon, EyeIcon, EyeOffIcon, LinkIcon, ChevronLeft, ChevronRight, Plus, Minus } from "lucide-react";
+import { ImageIcon, CodeIcon, EyeIcon, EyeOffIcon, LinkIcon, ChevronLeft, ChevronRight, Plus, Minus, AlignLeft, AlignCenter, AlignRight } from "lucide-react";
 import { TableInsertDialog } from "@/components/ui/table-insert-dialog";
 import { SpellCheckExtension } from "./extensions/spell-check";
 
@@ -111,6 +111,49 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
       },
     },
   });
+
+  const isInsideTable = () => {
+    if (!editor) return false;
+    const { selection } = editor.state;
+    const { $from } = selection;
+    for (let d = $from.depth; d > 0; d--) {
+      const node = $from.node(d);
+      if (node.type.name === "table") return true;
+    }
+    return false;
+  };
+
+  const syncTableState = () => {
+    if (!editor) return;
+    const tableEl = editor.view.dom.querySelector("table");
+    if (tableEl) {
+      const width = (tableEl as HTMLElement).style.width;
+      const marginLeft = (tableEl as HTMLElement).style.marginLeft;
+      if (width) {
+        const numWidth = parseInt(width.replace("%", ""));
+        if (!isNaN(numWidth)) setTableWidth(numWidth);
+      }
+      if (marginLeft === "0") {
+        setTableAlignment("left");
+      } else if (marginLeft === "auto") {
+        const marginRight = (tableEl as HTMLElement).style.marginRight;
+        setTableAlignment(marginRight === "0" ? "right" : "center");
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (!editor) return;
+    const handleSelectionUpdate = () => {
+      if (isInsideTable()) {
+        syncTableState();
+      }
+    };
+    editor.on("selectionUpdate", handleSelectionUpdate);
+    return () => {
+      editor.off("selectionUpdate", handleSelectionUpdate);
+    };
+  }, [editor]);
 
   const getCurrentMarginLeft = () => {
     if (!editor) return 0;
@@ -532,7 +575,7 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
         </Button>
       </div>
 
-      {editor?.isActive("table") && (
+      {isInsideTable() && (
         <div className="flex items-center gap-1 py-2 px-3 bg-gray-50 border-t border-[#e5e5e0]">
           <span className="text-xs text-gray-500 mr-2">Table:</span>
           <Button
@@ -615,26 +658,26 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
           <button
             type="button"
             onClick={() => updateTableAlignment("left")}
-            className={`h-7 px-2 text-xs rounded ${tableAlignment === "left" ? "bg-gray-200" : ""}`}
+            className={`h-7 px-1.5 rounded ${tableAlignment === "left" ? "bg-gray-200" : ""}`}
             title="Align Left"
           >
-            ≡L
+            <AlignLeft className="w-4 h-4" />
           </button>
           <button
             type="button"
             onClick={() => updateTableAlignment("center")}
-            className={`h-7 px-2 text-xs rounded ${tableAlignment === "center" ? "bg-gray-200" : ""}`}
+            className={`h-7 px-1.5 rounded ${tableAlignment === "center" ? "bg-gray-200" : ""}`}
             title="Align Center"
           >
-            ≡C
+            <AlignCenter className="w-4 h-4" />
           </button>
           <button
             type="button"
             onClick={() => updateTableAlignment("right")}
-            className={`h-7 px-2 text-xs rounded ${tableAlignment === "right" ? "bg-gray-200" : ""}`}
+            className={`h-7 px-1.5 rounded ${tableAlignment === "right" ? "bg-gray-200" : ""}`}
             title="Align Right"
           >
-            ≡R
+            <AlignRight className="w-4 h-4" />
           </button>
         </div>
       )}
