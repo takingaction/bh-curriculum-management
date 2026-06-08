@@ -125,11 +125,19 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
   };
 
   const syncTableState = () => {
-    if (!editor) return;
-    const tableEl = editor.view.dom.querySelector("table");
-    if (tableEl && editor.isActive("table")) {
-      const width = (tableEl as HTMLElement).style.width;
-      const marginLeft = (tableEl as HTMLElement).style.marginLeft;
+    if (!editor || !editor.isActive("table")) return;
+    const domSelection = window.getSelection();
+    let tableEl: HTMLElement | null = null;
+    if (domSelection && domSelection.rangeCount > 0) {
+      const range = domSelection.getRangeAt(0);
+      tableEl = range.startContainer.parentElement?.closest("table") as HTMLElement;
+    }
+    if (!tableEl) {
+      tableEl = editor.view.dom.querySelector("table");
+    }
+    if (tableEl) {
+      const width = tableEl.style.width;
+      const marginLeft = tableEl.style.marginLeft;
       if (width && width !== "0px") {
         const numWidth = parseInt(width.replace("%", ""));
         if (!isNaN(numWidth) && numWidth >= 10 && numWidth <= 100) {
@@ -139,7 +147,7 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
       if (marginLeft === "0") {
         setTableAlignment("left");
       } else if (marginLeft === "auto") {
-        const marginRight = (tableEl as HTMLElement).style.marginRight;
+        const marginRight = tableEl.style.marginRight;
         setTableAlignment(marginRight === "0" ? "right" : "center");
       }
     }
@@ -220,7 +228,20 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
 
   const updateTableWidth = (width: number) => {
     if (!editor) return;
-    const tableEl = editor.view.dom.querySelector("table");
+    const { view } = editor;
+    const { selection } = editor.state;
+    const domSelection = window.getSelection();
+    if (domSelection && domSelection.rangeCount > 0) {
+      const range = domSelection.getRangeAt(0);
+      const tableEl = range.startContainer.parentElement?.closest("table");
+      if (tableEl) {
+        (tableEl as HTMLElement).style.width = `${width}%`;
+        setTableWidth(width);
+        onChange(editor.getHTML());
+        return;
+      }
+    }
+    const tableEl = view.dom.querySelector("table");
     if (tableEl) {
       (tableEl as HTMLElement).style.width = `${width}%`;
       setTableWidth(width);
@@ -230,6 +251,18 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
 
   const updateTableAlignment = (alignment: string) => {
     if (!editor) return;
+    const domSelection = window.getSelection();
+    if (domSelection && domSelection.rangeCount > 0) {
+      const range = domSelection.getRangeAt(0);
+      const tableEl = range.startContainer.parentElement?.closest("table");
+      if (tableEl) {
+        (tableEl as HTMLElement).style.marginLeft = alignment === "left" ? "0" : "auto";
+        (tableEl as HTMLElement).style.marginRight = alignment === "right" ? "0" : "auto";
+        setTableAlignment(alignment);
+        onChange(editor.getHTML());
+        return;
+      }
+    }
     const tableEl = editor.view.dom.querySelector("table");
     if (tableEl) {
       (tableEl as HTMLElement).style.marginLeft = alignment === "left" ? "0" : "auto";
