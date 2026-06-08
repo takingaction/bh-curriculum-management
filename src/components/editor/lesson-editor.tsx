@@ -70,6 +70,7 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
   const [tableAlignment, setTableAlignment] = useState("center");
   const [tableContextKey, setTableContextKey] = useState(0);
   const [widthInputFocused, setWidthInputFocused] = useState(false);
+  const tableElementRef = useRef<HTMLElement | null>(null);
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -127,29 +128,26 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
 
   const syncTableState = () => {
     if (!editor || !editor.isActive("table") || widthInputFocused) return;
-    const domSelection = window.getSelection();
-    let tableEl: HTMLElement | null = null;
-    if (domSelection && domSelection.rangeCount > 0) {
-      const range = domSelection.getRangeAt(0);
-      tableEl = range.startContainer.parentElement?.closest("table") as HTMLElement;
-    }
-    if (!tableEl) {
-      tableEl = editor.view.dom.querySelector("table");
-    }
+    const tableEl = getTableElementFromSelection();
     if (tableEl) {
-      const width = tableEl.style.width;
-      const marginLeft = tableEl.style.marginLeft;
-      if (width && width !== "0px") {
-        const numWidth = parseInt(width.replace("%", ""));
-        if (!isNaN(numWidth) && numWidth >= 10 && numWidth <= 100) {
+      const style = tableEl.getAttribute("style") || "";
+      const widthMatch = style.match(/width:\s*(\d+)%/);
+      const marginLeftMatch = style.match(/margin-left:\s*(0|auto)/);
+      const marginRightMatch = style.match(/margin-right:\s*(0|auto)/);
+      if (widthMatch) {
+        const numWidth = parseInt(widthMatch[1]);
+        if (numWidth >= 10 && numWidth <= 100) {
           setTableWidth(numWidth);
         }
       }
-      if (marginLeft === "0") {
-        setTableAlignment("left");
-      } else if (marginLeft === "auto") {
-        const marginRight = tableEl.style.marginRight;
-        setTableAlignment(marginRight === "0" ? "right" : "center");
+      if (marginLeftMatch) {
+        if (marginLeftMatch[1] === "0") {
+          setTableAlignment("left");
+        } else if (marginRightMatch && marginRightMatch[1] === "0") {
+          setTableAlignment("right");
+        } else {
+          setTableAlignment("center");
+        }
       }
     }
   };
@@ -217,9 +215,8 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
         const colgroup = tableEl.querySelector("colgroup");
         if (colgroup) colgroup.remove();
         const widthValue = width.includes("%") ? width : `${width}%`;
-        (tableEl as HTMLElement).style.width = widthValue;
-        (tableEl as HTMLElement).style.marginLeft = alignment === "left" ? "0" : "auto";
-        (tableEl as HTMLElement).style.marginRight = alignment === "right" ? "0" : "auto";
+        const style = `width: ${widthValue}; margin-left: ${alignment === "left" ? "0" : alignment === "center" ? "auto" : "auto"}; margin-right: ${alignment === "right" ? "0" : "auto"};`;
+        (tableEl as HTMLElement).setAttribute("style", style);
         setTableWidth(parseInt(widthValue) || 75);
         setTableAlignment(alignment);
         onChange(editor.getHTML());
@@ -257,7 +254,9 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
     if (!editor) return;
     const tableEl = getTableElementFromSelection();
     if (tableEl) {
-      tableEl.style.width = `${width}%`;
+      const currentStyle = tableEl.getAttribute("style") || "";
+      const newStyle = currentStyle.replace(/width:\s*\d+%;?/, "") + ` width: ${width}%;`;
+      tableEl.setAttribute("style", newStyle);
       setTableWidth(width);
       onChange(editor.getHTML());
     }
@@ -267,8 +266,12 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
     if (!editor) return;
     const tableEl = getTableElementFromSelection();
     if (tableEl) {
-      tableEl.style.marginLeft = alignment === "left" ? "0" : "auto";
-      tableEl.style.marginRight = alignment === "right" ? "0" : "auto";
+      const currentStyle = tableEl.getAttribute("style") || "";
+      let newStyle = currentStyle
+        .replace(/margin-left:\s*(0|auto);?/g, "")
+        .replace(/margin-right:\s*(0|auto);?/g, "");
+      newStyle += ` margin-left: ${alignment === "left" ? "0" : "auto"}; margin-right: ${alignment === "right" ? "0" : "auto"};`;
+      tableEl.setAttribute("style", newStyle);
       setTableAlignment(alignment);
       onChange(editor.getHTML());
     }
