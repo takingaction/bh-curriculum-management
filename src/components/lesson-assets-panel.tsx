@@ -126,9 +126,6 @@ function SortableAssetItem({
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium truncate">{asset.display_name}</p>
-        {asset.asset_categories && (
-          <p className="text-xs text-gray-500">{asset.asset_categories.name}</p>
-        )}
       </div>
       <div className="flex items-center gap-1">
         <button
@@ -157,6 +154,42 @@ function SortableAssetItem({
             <TrashIcon className="w-4 h-4" />
           </button>
         )}
+      </div>
+    </div>
+  );
+}
+
+interface CompactAssetItemProps {
+  asset: Asset;
+  onPreview: (asset: Asset) => void;
+  onDownload: (asset: Asset) => void;
+}
+
+function CompactAssetItem({ asset, onPreview, onDownload }: CompactAssetItemProps) {
+  const Icon = getFileIcon(asset.file_type);
+  return (
+    <div className="flex items-center gap-2 py-0.5">
+      <Icon className="w-3 h-3 text-gray-500 flex-shrink-0" />
+      <span className="text-xs text-black truncate" title={asset.display_name}>
+        {asset.display_name}
+      </span>
+      <div className="flex items-center gap-0.5 ml-auto">
+        <button
+          type="button"
+          onClick={() => onPreview(asset)}
+          className="p-1 hover:bg-gray-200 rounded text-gray-500"
+          title="Preview"
+        >
+          <EyeIcon className="w-3 h-3" />
+        </button>
+        <button
+          type="button"
+          onClick={() => onDownload(asset)}
+          className="p-1 hover:bg-gray-200 rounded text-gray-500"
+          title="Download"
+        >
+          <DownloadIcon className="w-3 h-3" />
+        </button>
       </div>
     </div>
   );
@@ -374,5 +407,119 @@ export function LessonAssetsPanel({ lessonId, canEdit = false }: LessonAssetsPan
         </div>
       )}
     </div>
+  );
+}
+
+interface CompactLessonAssetsProps {
+  lessonId: string;
+  maxItems?: number;
+}
+
+export function CompactLessonAssets({ lessonId, maxItems = 6 }: CompactLessonAssetsProps) {
+  const [assets, setAssets] = useState<Asset[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [previewAsset, setPreviewAsset] = useState<Asset | null>(null);
+
+  useEffect(() => {
+    async function fetchAssets() {
+      setLoading(true);
+      try {
+        const res = await fetch(`/api/lessons/${lessonId}/assets`);
+        const data = await res.json();
+        if (data.assets) {
+          setAssets(data.assets);
+        }
+      } catch (error) {
+        console.error("Failed to fetch lesson assets:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    if (lessonId) {
+      fetchAssets();
+    }
+  }, [lessonId]);
+
+  const handlePreview = (asset: Asset) => {
+    setPreviewAsset(asset);
+  };
+
+  const handleDownload = (asset: Asset) => {
+    window.open(asset.public_url, "_blank");
+  };
+
+  if (loading) {
+    return <span className="text-xs text-gray-500">Loading...</span>;
+  }
+
+  if (assets.length === 0) {
+    return <span className="text-xs text-gray-400 italic">No materials</span>;
+  }
+
+  const displayAssets = assets.slice(0, maxItems);
+  const hasMore = assets.length > maxItems;
+
+  return (
+    <>
+      <div className="space-y-0">
+        {displayAssets.map((asset) => (
+          <CompactAssetItem
+            key={asset.id}
+            asset={asset}
+            onPreview={handlePreview}
+            onDownload={handleDownload}
+          />
+        ))}
+        {hasMore && (
+          <p className="text-xs text-gray-500 py-1">+{assets.length - maxItems} more</p>
+        )}
+      </div>
+
+      {previewAsset && (
+        <div className="fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-8">
+          <div className="absolute top-4 right-4 flex gap-2">
+            <button
+              type="button"
+              onClick={() => handleDownload(previewAsset)}
+              className="p-2 bg-white rounded-full hover:bg-gray-100"
+            >
+              <DownloadIcon className="w-5 h-5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setPreviewAsset(null)}
+              className="p-2 bg-white rounded-full hover:bg-gray-100"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          {previewAsset.file_type === "pdf" ? (
+            <iframe
+              src={previewAsset.public_url}
+              className="w-full h-full max-w-4xl max-h-full bg-white"
+              title={previewAsset.display_name}
+            />
+          ) : ["mp4", "mov", "m4a"].includes(previewAsset.file_type) ? (
+            <video
+              src={previewAsset.public_url}
+              controls
+              autoPlay
+              className="max-w-full max-h-full"
+            />
+          ) : ["mp3", "m4a", "wav"].includes(previewAsset.file_type) ? (
+            <div className="bg-white rounded-lg p-8 flex flex-col items-center gap-4">
+              <Volume2 className="w-16 h-16 text-gray-400" />
+              <p className="text-lg font-medium">{previewAsset.display_name}</p>
+              <audio
+                src={previewAsset.public_url}
+                controls
+                autoPlay
+                className="w-64"
+              />
+            </div>
+          ) : null}
+        </div>
+      )}
+    </>
   );
 }

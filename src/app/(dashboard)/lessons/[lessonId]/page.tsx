@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { LessonAssetsPanel } from "@/components/lesson-assets-panel";
+import { CompactLessonAssets } from "@/components/lesson-assets-panel";
 
 interface Lesson {
   id: string;
@@ -140,7 +140,7 @@ export default function LessonContentPage({
       <div className="border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex gap-6">
-            {/* Image - Same width as nav buttons */}
+            {/* Image - 250px fixed */}
             <div className="w-[250px] h-[250px] bg-[#d7ffef] flex items-center justify-center rounded-none overflow-hidden flex-shrink-0">
               {course.image_url ? (
                 <img
@@ -153,8 +153,8 @@ export default function LessonContentPage({
               )}
             </div>
 
-            {/* Title Info */}
-            <div className="flex-1 flex flex-col justify-start py-2 -mt-2">
+            {/* Title Info - 40% width */}
+            <div className="w-[40%] flex-shrink-0 flex flex-col justify-start py-2">
               <div>
                 <div className="text-sm text-black uppercase tracking-wide">
                   {course.title} | Grade {course.grade}
@@ -168,11 +168,7 @@ export default function LessonContentPage({
                 </div>
               </div>
 
-              <div className="mt-4 pt-4 border-t border-gray-200">
-                <LessonAssetsPanel lessonId={lesson.id} canEdit={false} />
-              </div>
-
-              <div className="flex gap-4 mt-2">
+              <div className="flex gap-4 mt-4">
                 <Link
                   href={isAdmin ? `/admin/courses/${course.id}` : `/teacher/courses/${course.id}`}
                   className="text-[#0d7377] hover:underline text-sm"
@@ -191,6 +187,12 @@ export default function LessonContentPage({
                   </Link>
                 )}
               </div>
+            </div>
+
+            {/* Lesson Materials - 60% width */}
+            <div className="flex-1 flex flex-col justify-start py-2">
+              <h3 className="text-sm font-semibold text-gray-700 mb-2">Lesson Materials</h3>
+              <CompactLessonAssets lessonId={lesson.id} maxItems={6} />
             </div>
           </div>
         </div>
