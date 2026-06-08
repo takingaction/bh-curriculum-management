@@ -69,6 +69,7 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
   const [tableWidth, setTableWidth] = useState(75);
   const [tableAlignment, setTableAlignment] = useState("center");
   const [tableContextKey, setTableContextKey] = useState(0);
+  const [widthInputFocused, setWidthInputFocused] = useState(false);
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -125,7 +126,7 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
   };
 
   const syncTableState = () => {
-    if (!editor || !editor.isActive("table")) return;
+    if (!editor || !editor.isActive("table") || widthInputFocused) return;
     const domSelection = window.getSelection();
     let tableEl: HTMLElement | null = null;
     if (domSelection && domSelection.rangeCount > 0) {
@@ -688,6 +689,8 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
             max={100}
             value={tableWidth}
             onChange={(e) => updateTableWidth(Math.max(10, Math.min(100, parseInt(e.target.value) || 50)))}
+            onFocus={() => setWidthInputFocused(true)}
+            onBlur={() => setWidthInputFocused(false)}
             className="w-14 h-7 px-1 text-xs border border-[#e5e5e0] rounded text-center"
           />
           <span className="text-xs text-gray-500">%</span>
