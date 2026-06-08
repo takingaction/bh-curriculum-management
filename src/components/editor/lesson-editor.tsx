@@ -68,6 +68,7 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
   const [showTableInsertDialog, setShowTableInsertDialog] = useState(false);
   const [tableWidth, setTableWidth] = useState(75);
   const [tableAlignment, setTableAlignment] = useState("center");
+  const [tableContextKey, setTableContextKey] = useState(0);
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -145,6 +146,7 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
   useEffect(() => {
     if (!editor) return;
     const handleSelectionUpdate = () => {
+      setTableContextKey(k => k + 1);
       if (isInsideTable()) {
         syncTableState();
       }
@@ -575,7 +577,7 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
         </Button>
       </div>
 
-      {isInsideTable() && (
+      {isInsideTable() && tableContextKey > 0 && (
         <div className="flex items-center gap-1 py-2 px-3 bg-gray-50 border-t border-[#e5e5e0]">
           <span className="text-xs text-gray-500 mr-2">Table:</span>
           <Button

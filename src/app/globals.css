@@ -251,7 +251,8 @@
   }
 
   .lesson-content table {
-    @apply border-collapse w-full my-4;
+    @apply border-collapse my-4;
+    width: auto;
   }
 
   .lesson-content th,
