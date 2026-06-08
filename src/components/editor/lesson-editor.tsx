@@ -227,24 +227,37 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
     }, 0);
   };
 
-  const updateTableWidth = (width: number) => {
-    if (!editor) return;
-    const { view } = editor;
-    const { selection } = editor.state;
-    const domSelection = window.getSelection();
-    if (domSelection && domSelection.rangeCount > 0) {
-      const range = domSelection.getRangeAt(0);
-      const tableEl = range.startContainer.parentElement?.closest("table");
-      if (tableEl) {
-        (tableEl as HTMLElement).style.width = `${width}%`;
-        setTableWidth(width);
-        onChange(editor.getHTML());
-        return;
+  const getTableElementFromSelection = (): HTMLElement | null => {
+    if (!editor) return null;
+    const { state } = editor;
+    const { selection } = state;
+    const { $from } = selection;
+    for (let d = $from.depth; d > 0; d--) {
+      if ($from.node(d).type.name === "table") {
+        const pos = $from.start(d);
+        const domNode = editor.view.nodeDOM(pos);
+        if (domNode && domNode instanceof HTMLElement) {
+          return domNode;
+        }
+        const tableEls = editor.view.dom.querySelectorAll("table");
+        for (const tableEl of tableEls) {
+          const bbox = tableEl.getBoundingClientRect();
+          const editorRect = editor.view.dom.getBoundingClientRect();
+          if (bbox.top >= editorRect.top && bbox.bottom <= editorRect.bottom) {
+            return tableEl as HTMLElement;
+          }
+        }
+        return null;
       }
     }
-    const tableEl = view.dom.querySelector("table");
+    return null;
+  };
+
+  const updateTableWidth = (width: number) => {
+    if (!editor) return;
+    const tableEl = getTableElementFromSelection();
     if (tableEl) {
-      (tableEl as HTMLElement).style.width = `${width}%`;
+      tableEl.style.width = `${width}%`;
       setTableWidth(width);
       onChange(editor.getHTML());
     }
@@ -252,22 +265,10 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
 
   const updateTableAlignment = (alignment: string) => {
     if (!editor) return;
-    const domSelection = window.getSelection();
-    if (domSelection && domSelection.rangeCount > 0) {
-      const range = domSelection.getRangeAt(0);
-      const tableEl = range.startContainer.parentElement?.closest("table");
-      if (tableEl) {
-        (tableEl as HTMLElement).style.marginLeft = alignment === "left" ? "0" : "auto";
-        (tableEl as HTMLElement).style.marginRight = alignment === "right" ? "0" : "auto";
-        setTableAlignment(alignment);
-        onChange(editor.getHTML());
-        return;
-      }
-    }
-    const tableEl = editor.view.dom.querySelector("table");
+    const tableEl = getTableElementFromSelection();
     if (tableEl) {
-      (tableEl as HTMLElement).style.marginLeft = alignment === "left" ? "0" : "auto";
-      (tableEl as HTMLElement).style.marginRight = alignment === "right" ? "0" : "auto";
+      tableEl.style.marginLeft = alignment === "left" ? "0" : "auto";
+      tableEl.style.marginRight = alignment === "right" ? "0" : "auto";
       setTableAlignment(alignment);
       onChange(editor.getHTML());
     }
