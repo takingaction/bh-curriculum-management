@@ -76,20 +76,6 @@ export async function POST() {
           // 5. Clean orphaned </strong></p>
           transformed = transformed.replace(/<\/strong><\/p>/g, '</p>');
 
-          // 6. Fix tables: remove colgroup, replace min-width with proper width/alignment
-          transformed = transformed.replace(/<colgroup>.*?<\/colgroup>/gi, '');
-          transformed = transformed.replace(
-            /<table([^>]*)style="min-width:\s*\d+px"/gi,
-            '<table$1style="width: 75%; margin-left: auto; margin-right: auto;"'
-          );
-          transformed = transformed.replace(
-            /<table([^>]*)>/gi,
-            (match: string, attrs: string) => {
-              if (attrs.includes('style="')) return match;
-              return `<table${attrs}style="width: 75%; margin-left: auto; margin-right: auto;">`;
-            }
-          );
-
           if (transformed !== original) {
             updateData[field] = transformed;
             needsUpdate = true;
