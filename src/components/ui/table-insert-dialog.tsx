@@ -21,7 +21,7 @@ interface TableInsertDialogProps {
 export function TableInsertDialog({ open, onClose, onInsert }: TableInsertDialogProps) {
   const [cols, setCols] = useState(3);
   const [rows, setRows] = useState(3);
-  const [width, setWidth] = useState("auto");
+  const [width, setWidth] = useState(75);
   const [alignment, setAlignment] = useState("left");
   const [withHeaderRow, setWithHeaderRow] = useState(true);
 
@@ -29,7 +29,7 @@ export function TableInsertDialog({ open, onClose, onInsert }: TableInsertDialog
     onInsert({
       cols,
       rows,
-      width,
+      width: `${width}%`,
       alignment,
       withHeaderRow,
     });
@@ -71,17 +71,18 @@ export function TableInsertDialog({ open, onClose, onInsert }: TableInsertDialog
 
           <div className="space-y-2">
             <Label htmlFor="table-width">Width</Label>
-            <select
-              id="table-width"
-              value={width}
-              onChange={(e) => setWidth(e.target.value)}
-              className="w-full p-2 border border-[#e5e5e0] rounded-lg text-sm focus:border-[#0d7377] focus:outline-none"
-            >
-              <option value="auto">Auto</option>
-              <option value="50%">50%</option>
-              <option value="75%">75%</option>
-              <option value="100%">100%</option>
-            </select>
+            <div className="flex items-center gap-2">
+              <Input
+                id="table-width"
+                type="number"
+                min={1}
+                max={100}
+                value={width}
+                onChange={(e) => setWidth(Math.max(1, Math.min(100, parseInt(e.target.value) || 1)))}
+                className="w-20"
+              />
+              <span className="text-sm text-gray-500">%</span>
+            </div>
           </div>
 
           <div className="space-y-2">

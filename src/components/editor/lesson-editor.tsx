@@ -150,11 +150,20 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
   }) => {
     if (!editor) return;
     const { cols, rows, width, alignment, withHeaderRow } = options;
-    const style = `width: ${width}; margin-left: ${alignment === "left" ? "0" : alignment === "center" ? "auto" : "auto"}; margin-right: ${alignment === "right" ? "0" : "auto"};`;
-    editor.chain().focus().insertTable({ rows, cols, withHeaderRow, }).run();
-    if (width !== "auto") {
-      editor.chain().focus().updateAttributes("table", { style }).run();
-    }
+
+    editor.chain().focus().insertTable({ rows, cols, withHeaderRow }).run();
+
+    setTimeout(() => {
+      const tableEl = editor.view.dom.querySelector("table:last-child");
+      if (tableEl && width !== "auto") {
+        const widthValue = width.includes("%") ? width : `${width}%`;
+        (tableEl as HTMLElement).style.width = widthValue;
+        (tableEl as HTMLElement).style.marginLeft = alignment === "left" ? "0" : "auto";
+        (tableEl as HTMLElement).style.marginRight = alignment === "right" ? "0" : "auto";
+      } else if (tableEl) {
+        (tableEl as HTMLElement).style.width = "auto";
+      }
+    }, 0);
   };
 
   const getWordAtCursor = () => {
