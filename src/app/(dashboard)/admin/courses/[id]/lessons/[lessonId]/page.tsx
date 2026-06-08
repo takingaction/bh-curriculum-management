@@ -246,7 +246,8 @@ export default function EditLessonPage({
           </div>
           <div className="flex gap-2 shrink-0">
             <Button
-              type="submit"
+              type="button"
+              onClick={() => handleSubmit({ preventDefault: () => {} } as React.FormEvent)}
               disabled={loading}
               className="bg-[#0d7377] hover:bg-[#0a5c5f] text-white"
             >
