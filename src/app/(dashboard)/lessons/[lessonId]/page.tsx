@@ -206,7 +206,7 @@ export default function LessonContentPage({
                 <a
                   key={section.key}
                   href={`#${section.key}`}
-                  className="block px-4 py-1 text-sm font-medium bg-[#d7ffef] text-black hover:bg-[#c7efe0] transition-colors"
+                  className="block px-2 py-1 text-xs font-medium bg-[#d7ffef] text-black hover:bg-[#c7efe0] transition-colors"
                 >
                   {section.label}
                 </a>
