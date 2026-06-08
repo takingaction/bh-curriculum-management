@@ -16,6 +16,7 @@ A Next.js-based curriculum management system for music education, built with Sup
 - **Large File Support**: Direct client-side uploads to Supabase Storage (bypasses serverless 4.5MB limit)
 - **Multi-file Upload**: Upload multiple files at once with summary display
 - **Lesson Attachments**: Attach resources to lessons for student access
+- **Reordering**: Drag-and-drop to reorder attached resources (admin only)
 - **Rename Resources**: Click edit icon in preview panel to rename assets
 - **Attached Status**: Assets already added to lesson show checkmark badge and "Already Added" state
 - **Duplicate Prevention**: Cannot add same resource twice; friendly message shown
@@ -47,6 +48,7 @@ A Next.js-based curriculum management system for music education, built with Sup
 - **Rich Text Editor**: TipTap
 - **Styling**: Tailwind CSS with shadcn/ui components
 - **Storage**: Supabase Storage (direct client-side uploads)
+- **Drag & Drop**: @dnd-kit/core and @dnd-kit/sortable
 - **Font**: Montserrat
 
 ## Getting Started
@@ -87,8 +89,9 @@ SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 - `POST /api/assets/fix-urls` - Fix legacy asset URLs (missing bucket name)
 
 ### Lesson Assets
-- `GET /api/lessons/[id]/assets` - Get lesson's assets
+- `GET /api/lessons/[id]/assets` - Get lesson's assets (ordered by sort_order)
 - `POST /api/lessons/[id]/assets` - Attach asset to lesson
+- `PATCH /api/lessons/[id]/assets/reorder` - Reorder assets (body: `{ orderedAssetIds: string[] }`)
 - `DELETE /api/lessons/[id]/assets/[assetId]` - Detach asset
 
 ## Editor Features

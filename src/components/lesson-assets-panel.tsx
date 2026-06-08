@@ -17,8 +17,26 @@ import {
   X,
   PlusIcon,
   TrashIcon,
+  GripVertical,
 } from "lucide-react";
 import { AssetLibraryModal } from "./asset-library-modal";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 interface Asset {
   id: string;
@@ -27,6 +45,7 @@ interface Asset {
   public_url: string;
   file_type: string;
   asset_categories?: { name: string };
+  sort_order?: number;
 }
 
 interface LessonAssetsPanelProps {
@@ -49,11 +68,115 @@ function getFileIcon(fileType: string) {
   }
 }
 
+interface SortableAssetItemProps {
+  asset: Asset;
+  canEdit: boolean;
+  onPreview: (asset: Asset) => void;
+  onDownload: (asset: Asset) => void;
+  onRemove: (assetId: string) => void;
+}
+
+function SortableAssetItem({
+  asset,
+  canEdit,
+  onPreview,
+  onDownload,
+  onRemove,
+}: SortableAssetItemProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: asset.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 50 : "auto",
+  };
+
+  const Icon = getFileIcon(asset.file_type);
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`flex items-center gap-3 p-2 bg-gray-50 rounded-lg group ${
+        isDragging ? "shadow-lg ring-2 ring-[#0d7377]" : ""
+      }`}
+    >
+      {canEdit && (
+        <button
+          type="button"
+          className="p-1 hover:bg-gray-200 rounded cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600"
+          {...attributes}
+          {...listeners}
+          title="Drag to reorder"
+        >
+          <GripVertical className="w-4 h-4" />
+        </button>
+      )}
+      <div className="p-1.5 bg-white border rounded">
+        <Icon className="w-4 h-4 text-gray-600" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium truncate">{asset.display_name}</p>
+        {asset.asset_categories && (
+          <p className="text-xs text-gray-500">{asset.asset_categories.name}</p>
+        )}
+      </div>
+      <div className="flex items-center gap-1">
+        <button
+          type="button"
+          onClick={() => onPreview(asset)}
+          className="p-1.5 hover:bg-gray-200 rounded text-gray-600"
+          title="Preview"
+        >
+          <EyeIcon className="w-4 h-4" />
+        </button>
+        <button
+          type="button"
+          onClick={() => onDownload(asset)}
+          className="p-1.5 hover:bg-gray-200 rounded text-gray-600"
+          title="Download"
+        >
+          <DownloadIcon className="w-4 h-4" />
+        </button>
+        {canEdit && (
+          <button
+            type="button"
+            onClick={() => onRemove(asset.id)}
+            className="p-1.5 hover:bg-red-100 rounded text-red-600"
+            title="Remove"
+          >
+            <TrashIcon className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function LessonAssetsPanel({ lessonId, canEdit = false }: LessonAssetsPanelProps) {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(false);
   const [showLibrary, setShowLibrary] = useState(false);
   const [previewAsset, setPreviewAsset] = useState<Asset | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   const fetchAssets = useCallback(async () => {
     setLoading(true);
@@ -77,7 +200,6 @@ export function LessonAssetsPanel({ lessonId, canEdit = false }: LessonAssetsPan
   }, [lessonId, fetchAssets]);
 
   const handleAddAsset = (asset: Asset) => {
-    // Attach asset to lesson
     fetch(`/api/lessons/${lessonId}/assets`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -117,6 +239,35 @@ export function LessonAssetsPanel({ lessonId, canEdit = false }: LessonAssetsPan
     setPreviewAsset(asset);
   };
 
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = assets.findIndex((a) => a.id === active.id);
+    const newIndex = assets.findIndex((a) => a.id === over.id);
+
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    // Optimistically update UI
+    const newAssets = arrayMove(assets, oldIndex, newIndex);
+    setAssets(newAssets);
+
+    // Send reorder request to API
+    try {
+      const orderedAssetIds = newAssets.map((a) => a.id);
+      await fetch(`/api/lessons/${lessonId}/assets/reorder`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderedAssetIds }),
+      });
+    } catch (error) {
+      console.error("Failed to reorder assets:", error);
+      // Revert on failure
+      fetchAssets();
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center gap-2 text-sm text-gray-500">
@@ -141,55 +292,29 @@ export function LessonAssetsPanel({ lessonId, canEdit = false }: LessonAssetsPan
       {assets.length === 0 ? (
         <p className="text-sm text-gray-500 italic">No materials attached</p>
       ) : (
-        <div className="space-y-2">
-          {assets.map((asset) => {
-            const Icon = getFileIcon(asset.file_type);
-            return (
-              <div
-                key={asset.id}
-                className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg group"
-              >
-                <div className="p-1.5 bg-white border rounded">
-                  <Icon className="w-4 h-4 text-gray-600" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{asset.display_name}</p>
-                  {asset.asset_categories && (
-                    <p className="text-xs text-gray-500">{asset.asset_categories.name}</p>
-                  )}
-                </div>
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => handlePreview(asset)}
-                    className="p-1.5 hover:bg-gray-200 rounded text-gray-600"
-                    title="Preview"
-                  >
-                    <EyeIcon className="w-4 h-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDownload(asset)}
-                    className="p-1.5 hover:bg-gray-200 rounded text-gray-600"
-                    title="Download"
-                  >
-                    <DownloadIcon className="w-4 h-4" />
-                  </button>
-                  {canEdit && (
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveAsset(asset.id)}
-                      className="p-1.5 hover:bg-red-100 rounded text-red-600"
-                      title="Remove"
-                    >
-                      <TrashIcon className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext
+            items={assets.map((a) => a.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            <div className="space-y-2">
+              {assets.map((asset) => (
+                <SortableAssetItem
+                  key={asset.id}
+                  asset={asset}
+                  canEdit={canEdit}
+                  onPreview={handlePreview}
+                  onDownload={handleDownload}
+                  onRemove={handleRemoveAsset}
+                />
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
       )}
 
       {/* Curriculum Resources Modal */}
