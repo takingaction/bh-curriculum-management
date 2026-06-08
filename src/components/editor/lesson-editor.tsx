@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/dialog";
 import { useEffect, useRef, useState } from "react";
 import { MediaLibrary } from "@/components/media-library";
-import { ImageIcon, CodeIcon, EyeIcon, EyeOffIcon, LinkIcon } from "lucide-react";
+import { ImageIcon, CodeIcon, EyeIcon, EyeOffIcon, LinkIcon, ChevronLeft, ChevronRight } from "lucide-react";
 import { SpellCheckExtension } from "./extensions/spell-check";
 
 const ParagraphWithStyle = Paragraph.extend({
@@ -302,6 +302,26 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
           className={`h-8 px-2 ${editor.isActive("orderedList") ? "bg-[#f5f5f0]" : ""}`}
         >
           1.
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => editor.chain().focus().sinkListItem("listItem").run()}
+          className="h-8 px-1 text-gray-500"
+          title="Increase List Level"
+        >
+          <ChevronRight className="w-4 h-4" />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => editor.chain().focus().liftListItem("listItem").run()}
+          className="h-8 px-1 text-gray-500"
+          title="Decrease List Level"
+        >
+          <ChevronLeft className="w-4 h-4" />
         </Button>
 
         <div className="w-px h-6 bg-[#e5e5e0] mx-1 self-center" />
