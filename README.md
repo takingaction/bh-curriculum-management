@@ -20,6 +20,8 @@ A Next.js-based curriculum management system for music education, built with Sup
 - **Rename Resources**: Click edit icon in preview panel to rename assets
 - **Attached Status**: Assets already added to lesson show checkmark badge and "Already Added" state
 - **Duplicate Prevention**: Cannot add same resource twice; friendly message shown
+- **Presentation Links**: Add presentation name + URL (opens in new tab)
+- **Spotify Playlists**: Add Spotify embed code; displays in slideout panel
 
 ### Spellcheck System
 - Custom spellcheck extension with 107K word dictionary
@@ -99,7 +101,7 @@ SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 ### Toolbar Buttons
 - **Text**: Bold, Italic, Strikethrough, Link (chain icon)
 - **Headings**: H2, H3
-- **Lists**: Bullet, Ordered
+- **Lists**: Bullet, Ordered, Increase List Level (→), Decrease List Level (←)
 - **Table**: Insert table, Toggle grid
 - **View**: Show invisibles, Undo/Redo
 - **Media**: Media library, Upload image
