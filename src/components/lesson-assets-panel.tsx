@@ -11,7 +11,7 @@ import {
 import {
   FileTextIcon,
   VideoIcon,
-  MusicIcon,
+  Speaker,
   DownloadIcon,
   EyeIcon,
   X,
@@ -59,10 +59,11 @@ function getFileIcon(fileType: string) {
       return FileTextIcon;
     case "mp4":
     case "mov":
-    case "m4a":
       return VideoIcon;
+    case "m4a":
     case "mp3":
-      return MusicIcon;
+    case "wav":
+      return Speaker;
     default:
       return FileTextIcon;
   }
@@ -358,9 +359,9 @@ export function LessonAssetsPanel({ lessonId, canEdit = false }: LessonAssetsPan
               autoPlay
               className="max-w-full max-h-full"
             />
-          ) : ["mp3"].includes(previewAsset.file_type) ? (
+          ) : ["mp3", "m4a", "wav"].includes(previewAsset.file_type) ? (
             <div className="bg-white rounded-lg p-8 flex flex-col items-center gap-4">
-              <MusicIcon className="w-16 h-16 text-gray-400" />
+              <Speaker className="w-16 h-16 text-gray-400" />
               <p className="text-lg font-medium">{previewAsset.display_name}</p>
               <audio
                 src={previewAsset.public_url}
