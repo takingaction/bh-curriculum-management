@@ -224,23 +224,56 @@ export default function EditLessonPage({
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="mb-8">
-        <div className="flex gap-4 mb-2">
-          <Link
-            href={`/lessons/${lesson?.id}`}
-            className="text-[#0d7377] hover:underline text-sm"
-          >
-            View Lesson
-          </Link>
-          <Link
-            href={`/admin/courses/${lesson?.course_id}`}
-            className="text-[#0d7377] hover:underline text-sm"
-          >
-            ← Back to Course
-          </Link>
+      <div className="sticky top-0 z-10 bg-white -mx-4 px-4 py-4 mb-6 border-b border-[#e5e5e0]">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <div className="flex gap-4 mb-2">
+              <Link
+                href={`/lessons/${lesson?.id}`}
+                className="text-[#0d7377] hover:underline text-sm"
+              >
+                View Lesson
+              </Link>
+              <Link
+                href={`/admin/courses/${lesson?.course_id}`}
+                className="text-[#0d7377] hover:underline text-sm"
+              >
+                ← Back to Course
+              </Link>
+            </div>
+            <h2 className="text-2xl font-bold text-[#2d2d2d]">Edit Lesson</h2>
+            <p className="text-[#666666]">{fields.title}</p>
+          </div>
+          <div className="flex gap-2 shrink-0">
+            <Button
+              type="submit"
+              disabled={loading}
+              className="bg-[#0d7377] hover:bg-[#0a5c5f] text-white"
+            >
+              {loading ? "Saving..." : saved ? "Saved!" : "Save Changes"}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => router.back()}
+              className="border-[#e5e5e0]"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={async () => {
+                if (confirm("Delete this lesson?")) {
+                  await fetch(`/api/admin/lessons/${lesson.id}`, { method: "DELETE" });
+                  router.push(`/admin/courses/${lesson.course_id}`);
+                }
+              }}
+            >
+              Delete
+            </Button>
+          </div>
         </div>
-        <h2 className="text-2xl font-bold text-[#2d2d2d]">Edit Lesson</h2>
-        <p className="text-[#666666]">{fields.title}</p>
       </div>
 
       <Card className="border-[#e5e5e0] shadow-sm">
@@ -309,46 +342,6 @@ export default function EditLessonPage({
                 />
               </div>
             ))}
-
-            <div className="flex gap-4 pt-4 border-t border-[#e5e5e0]">
-              <Button
-                type="submit"
-                disabled={loading}
-                className="bg-[#0d7377] hover:bg-[#0a5c5f] text-white"
-              >
-                {loading ? "Saving..." : saved ? "Saved!" : "Save Changes"}
-              </Button>
-              {/*
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setShowPreview(!showPreview)}
-                className={showPreview ? "bg-[#ecb0a1] border-[#ecb0a1]" : "border-[#e5e5e0]"}
-              >
-                {showPreview ? "Hide Preview" : "Show Preview"}
-              </Button>
-              */}
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => router.back()}
-                className="border-[#e5e5e0]"
-              >
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                variant="destructive"
-                onClick={async () => {
-                  if (confirm("Delete this lesson?")) {
-                    await fetch(`/api/admin/lessons/${lesson.id}`, { method: "DELETE" });
-                    router.push(`/admin/courses/${lesson.course_id}`);
-                  }
-                }}
-              >
-                Delete
-</Button>
-            </div>
           </form>
 
         </CardContent>

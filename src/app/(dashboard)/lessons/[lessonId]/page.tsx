@@ -49,9 +49,9 @@ const sections = [
   { key: "warm_up", label: "Warm Up" },
   { key: "main_activity", label: "Main Activity" },
   { key: "instrument_expectations", label: "Instrument Expectations" },
-  { key: "assessment", label: "Assessment" },
   { key: "reflection", label: "Reflection" },
   { key: "closing_ceremony", label: "Closing Ceremony" },
+  { key: "assessment", label: "Assessment" },
 ];
 
 export default function LessonContentPage({
