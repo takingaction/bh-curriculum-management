@@ -211,6 +211,7 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
         (tableEl as HTMLElement).style.marginRight = alignment === "right" ? "0" : "auto";
         setTableWidth(parseInt(widthValue) || 75);
         setTableAlignment(alignment);
+        onChange(editor.getHTML());
       }
     }, 0);
   };
@@ -221,6 +222,7 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
     if (tableEl) {
       (tableEl as HTMLElement).style.width = `${width}%`;
       setTableWidth(width);
+      onChange(editor.getHTML());
     }
   };
 
@@ -231,6 +233,7 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
       (tableEl as HTMLElement).style.marginLeft = alignment === "left" ? "0" : "auto";
       (tableEl as HTMLElement).style.marginRight = alignment === "right" ? "0" : "auto";
       setTableAlignment(alignment);
+      onChange(editor.getHTML());
     }
   };
 
