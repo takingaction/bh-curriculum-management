@@ -21,7 +21,8 @@ import {
 } from "@/components/ui/dialog";
 import { useEffect, useRef, useState } from "react";
 import { MediaLibrary } from "@/components/media-library";
-import { ImageIcon, CodeIcon, EyeIcon, EyeOffIcon, LinkIcon, ChevronLeft, ChevronRight } from "lucide-react";
+import { ImageIcon, CodeIcon, EyeIcon, EyeOffIcon, LinkIcon, ChevronLeft, ChevronRight, Plus, Minus } from "lucide-react";
+import { TableInsertDialog } from "@/components/ui/table-insert-dialog";
 import { SpellCheckExtension } from "./extensions/spell-check";
 
 const ParagraphWithStyle = Paragraph.extend({
@@ -64,6 +65,7 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
   const [linkModalOpen, setLinkModalOpen] = useState(false);
   const [linkUrl, setLinkUrl] = useState("");
   const [linkNewWindow, setLinkNewWindow] = useState(false);
+  const [showTableInsertDialog, setShowTableInsertDialog] = useState(false);
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -136,6 +138,22 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
     const current = getCurrentMarginLeft();
     if (current > 0) {
       setMarginLeft(current - 10);
+    }
+  };
+
+  const insertTableWithOptions = (options: {
+    cols: number;
+    rows: number;
+    width: string;
+    alignment: string;
+    withHeaderRow: boolean;
+  }) => {
+    if (!editor) return;
+    const { cols, rows, width, alignment, withHeaderRow } = options;
+    const style = `width: ${width}; margin-left: ${alignment === "left" ? "0" : alignment === "center" ? "auto" : "auto"}; margin-right: ${alignment === "right" ? "0" : "auto"};`;
+    editor.chain().focus().insertTable({ rows, cols, withHeaderRow, }).run();
+    if (width !== "auto") {
+      editor.chain().focus().updateAttributes("table", { style }).run();
     }
   };
 
@@ -330,7 +348,7 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
           type="button"
           variant="ghost"
           size="sm"
-          onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true })}
+          onClick={() => setShowTableInsertDialog(true)}
           className="h-8 px-2 text-sm"
         >
           Table
@@ -481,6 +499,72 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
           <CodeIcon className="w-4 h-4" />
         </Button>
       </div>
+
+      {editor?.isActive("table") && (
+        <div className="flex items-center gap-1 py-2 px-3 bg-gray-50 border-t border-[#e5e5e0]">
+          <span className="text-xs text-gray-500 mr-2">Table:</span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => editor.chain().focus().addColumnBefore().run()}
+            className="h-7 px-2 text-xs"
+            title="Add Column Left"
+          >
+            <Plus className="w-3 h-3 mr-1" />Col←
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => editor.chain().focus().addColumnAfter().run()}
+            className="h-7 px-2 text-xs"
+            title="Add Column Right"
+          >
+            <Plus className="w-3 h-3 mr-1" />Col→
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => editor.chain().focus().addRowBefore().run()}
+            className="h-7 px-2 text-xs"
+            title="Add Row Above"
+          >
+            <Plus className="w-3 h-3 mr-1" />Row↑
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => editor.chain().focus().addRowAfter().run()}
+            className="h-7 px-2 text-xs"
+            title="Add Row Below"
+          >
+            <Plus className="w-3 h-3 mr-1" />Row↓
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => editor.chain().focus().deleteColumn().run()}
+            className="h-7 px-2 text-xs text-red-600"
+            title="Delete Column"
+          >
+            <Minus className="w-3 h-3 mr-1" />Col
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => editor.chain().focus().deleteRow().run()}
+            className="h-7 px-2 text-xs text-red-600"
+            title="Delete Row"
+          >
+            <Minus className="w-3 h-3 mr-1" />Row
+          </Button>
+        </div>
+      )}
 
       {showSource ? (
         <div>
@@ -650,6 +734,12 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <TableInsertDialog
+        open={showTableInsertDialog}
+        onClose={() => setShowTableInsertDialog(false)}
+        onInsert={insertTableWithOptions}
+      />
     </div>
   );
 }
