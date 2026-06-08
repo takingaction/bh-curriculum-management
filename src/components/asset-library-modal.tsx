@@ -14,7 +14,7 @@ import {
   TrashIcon,
   FileTextIcon,
   VideoIcon,
-  Speaker,
+  Volume2,
   DownloadIcon,
   EyeIcon,
   X,
@@ -58,9 +58,9 @@ const FILE_TYPES = [
   { value: "pdf", label: "PDF", icon: FileTextIcon },
   { value: "mp4", label: "MP4", icon: VideoIcon },
   { value: "mov", label: "MOV", icon: VideoIcon },
-  { value: "m4a", label: "M4A", icon: Speaker },
-  { value: "mp3", label: "MP3", icon: Speaker },
-  { value: "wav", label: "WAV", icon: Speaker },
+  { value: "m4a", label: "M4A", icon: Volume2 },
+  { value: "mp3", label: "MP3", icon: Volume2 },
+  { value: "wav", label: "WAV", icon: Volume2 },
 ];
 
 function getFileIcon(fileType: string) {

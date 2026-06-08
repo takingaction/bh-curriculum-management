@@ -11,7 +11,7 @@ import {
 import {
   FileTextIcon,
   VideoIcon,
-  Speaker,
+  Volume2,
   DownloadIcon,
   EyeIcon,
   X,
@@ -63,7 +63,7 @@ function getFileIcon(fileType: string) {
     case "m4a":
     case "mp3":
     case "wav":
-      return Speaker;
+      return Volume2;
     default:
       return FileTextIcon;
   }
@@ -361,7 +361,7 @@ export function LessonAssetsPanel({ lessonId, canEdit = false }: LessonAssetsPan
             />
           ) : ["mp3", "m4a", "wav"].includes(previewAsset.file_type) ? (
             <div className="bg-white rounded-lg p-8 flex flex-col items-center gap-4">
-              <Speaker className="w-16 h-16 text-gray-400" />
+              <Volume2 className="w-16 h-16 text-gray-400" />
               <p className="text-lg font-medium">{previewAsset.display_name}</p>
               <audio
                 src={previewAsset.public_url}
