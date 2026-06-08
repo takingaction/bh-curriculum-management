@@ -127,12 +127,14 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
   const syncTableState = () => {
     if (!editor) return;
     const tableEl = editor.view.dom.querySelector("table");
-    if (tableEl) {
+    if (tableEl && editor.isActive("table")) {
       const width = (tableEl as HTMLElement).style.width;
       const marginLeft = (tableEl as HTMLElement).style.marginLeft;
-      if (width) {
+      if (width && width !== "0px") {
         const numWidth = parseInt(width.replace("%", ""));
-        if (!isNaN(numWidth)) setTableWidth(numWidth);
+        if (!isNaN(numWidth) && numWidth >= 10 && numWidth <= 100) {
+          setTableWidth(numWidth);
+        }
       }
       if (marginLeft === "0") {
         setTableAlignment("left");
