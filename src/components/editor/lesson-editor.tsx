@@ -66,6 +66,8 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
   const [linkUrl, setLinkUrl] = useState("");
   const [linkNewWindow, setLinkNewWindow] = useState(false);
   const [showTableInsertDialog, setShowTableInsertDialog] = useState(false);
+  const [tableWidth, setTableWidth] = useState(75);
+  const [tableAlignment, setTableAlignment] = useState("center");
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -155,15 +157,36 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
 
     setTimeout(() => {
       const tableEl = editor.view.dom.querySelector("table:last-child");
-      if (tableEl && width !== "auto") {
+      if (tableEl) {
+        const colgroup = tableEl.querySelector("colgroup");
+        if (colgroup) colgroup.remove();
         const widthValue = width.includes("%") ? width : `${width}%`;
         (tableEl as HTMLElement).style.width = widthValue;
         (tableEl as HTMLElement).style.marginLeft = alignment === "left" ? "0" : "auto";
         (tableEl as HTMLElement).style.marginRight = alignment === "right" ? "0" : "auto";
-      } else if (tableEl) {
-        (tableEl as HTMLElement).style.width = "auto";
+        setTableWidth(parseInt(widthValue) || 75);
+        setTableAlignment(alignment);
       }
     }, 0);
+  };
+
+  const updateTableWidth = (width: number) => {
+    if (!editor) return;
+    const tableEl = editor.view.dom.querySelector("table");
+    if (tableEl) {
+      (tableEl as HTMLElement).style.width = `${width}%`;
+      setTableWidth(width);
+    }
+  };
+
+  const updateTableAlignment = (alignment: string) => {
+    if (!editor) return;
+    const tableEl = editor.view.dom.querySelector("table");
+    if (tableEl) {
+      (tableEl as HTMLElement).style.marginLeft = alignment === "left" ? "0" : "auto";
+      (tableEl as HTMLElement).style.marginRight = alignment === "right" ? "0" : "auto";
+      setTableAlignment(alignment);
+    }
   };
 
   const getWordAtCursor = () => {
@@ -572,6 +595,47 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
           >
             <Minus className="w-3 h-3 mr-1" />Row
           </Button>
+
+          <div className="w-px h-5 bg-gray-300 mx-2" />
+
+          <span className="text-xs text-gray-500">Width:</span>
+          <input
+            type="number"
+            min={10}
+            max={100}
+            value={tableWidth}
+            onChange={(e) => updateTableWidth(Math.max(10, Math.min(100, parseInt(e.target.value) || 50)))}
+            className="w-14 h-7 px-1 text-xs border border-[#e5e5e0] rounded text-center"
+          />
+          <span className="text-xs text-gray-500">%</span>
+
+          <div className="w-px h-5 bg-gray-300 mx-2" />
+
+          <span className="text-xs text-gray-500">Align:</span>
+          <button
+            type="button"
+            onClick={() => updateTableAlignment("left")}
+            className={`h-7 px-2 text-xs rounded ${tableAlignment === "left" ? "bg-gray-200" : ""}`}
+            title="Align Left"
+          >
+            ≡L
+          </button>
+          <button
+            type="button"
+            onClick={() => updateTableAlignment("center")}
+            className={`h-7 px-2 text-xs rounded ${tableAlignment === "center" ? "bg-gray-200" : ""}`}
+            title="Align Center"
+          >
+            ≡C
+          </button>
+          <button
+            type="button"
+            onClick={() => updateTableAlignment("right")}
+            className={`h-7 px-2 text-xs rounded ${tableAlignment === "right" ? "bg-gray-200" : ""}`}
+            title="Align Right"
+          >
+            ≡R
+          </button>
         </div>
       )}
 
