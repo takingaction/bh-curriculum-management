@@ -157,6 +157,18 @@ export const CheckForUnderstanding = Node.create<CheckForUnderstandingOptions>({
     return [
       {
         tag: "div[data-check-for-understanding]",
+        getAttrs: (dom) => {
+          const el = dom as HTMLElement;
+          return {
+            cfuId: el.getAttribute("cfuid") || el.getAttribute("data-cfu-id") || null,
+            backgroundImage: el.getAttribute("backgroundimage") || "",
+            pngImage: el.getAttribute("pngimage") || "",
+            heading: el.getAttribute("heading") || "",
+            content: el.getAttribute("content") || "",
+            alignment: el.getAttribute("alignment") || "center",
+            width: el.getAttribute("width") || "50%",
+          };
+        },
       },
     ];
   },
@@ -218,6 +230,7 @@ export const CheckForUnderstanding = Node.create<CheckForUnderstandingOptions>({
       "div",
       mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, {
         "data-check-for-understanding": "true",
+        "cfuid": cfuId,
         "data-cfu-id": cfuId,
         class: cssClass,
         style: `background-image: url('${backgroundImage}'); background-size: contain; background-position: center; background-repeat: no-repeat; padding: 20px; width: ${width};`,
