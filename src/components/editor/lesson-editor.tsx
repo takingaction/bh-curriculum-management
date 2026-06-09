@@ -123,23 +123,6 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
     },
   });
 
-  useEffect(() => {
-    if (editor && content !== undefined && content !== null) {
-      console.log("Content prop changed, setting editor content...");
-      console.log("Content HTML:", content?.substring(0, 1000));
-      editor.commands.setContent(content || "");
-    }
-  }, [content, editor]);
-
-  useEffect(() => {
-    if (editor) {
-      console.log("Editor ready");
-      const types: string[] = [];
-      editor.state.doc.descendants((node) => { types.push(node.type.name); return true; });
-      console.log("Initial doc types:", types);
-    }
-  }, [editor]);
-
   const isInsideTable = () => {
     if (!editor) return false;
     const { selection } = editor.state;
