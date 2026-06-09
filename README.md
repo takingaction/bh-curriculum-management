@@ -127,6 +127,21 @@ Click link button (chain icon) to insert hyperlink:
   - No `colgroup` or `min-width` generation
 - **Default**: New tables default to 100% width, center alignment
 
+### Check for Understanding (CFU) Entity
+- **TipTap Block Node**: Custom `CheckForUnderstanding` extension with ReactNodeViewRenderer
+- **Storage**: CFU assets stored in `cfu_assets` table with `cfu-assets` Supabase Storage bucket
+- **API Routes**: 
+  - `GET /api/cfu-assets` - List assets
+  - `POST /api/cfu-assets` - Upload new asset
+  - `DELETE /api/cfu-assets/[id]` - Delete asset
+- **Attributes**: cfuId (unique), backgroundImage, pngImage, heading, content, alignment, width
+- **9 Position Options**: wrap-top-left, wrap-top-center, wrap-top-right, left, center, right, wrap-bottom-left, wrap-bottom-center, wrap-bottom-right
+- **Click-to-Edit**: Single click opens modal for editing; modal shows "Insert" for new CFUs, "Update" for existing
+- **cfuId Generation**: New CFUs get unique ID via `Date.now().toString(36) + random`
+- **Editor Isolation**: Only the editor containing the CFU opens its modal (critical for lessons with 13+ content sections)
+- **CSS Classes**: `.cfu-wrap-top-left`, `.cfu-wrap-top-center`, `.cfu-wrap-top-right`, `.cfu-left`, `.cfu-center`, `.cfu-right`, `.cfu-wrap-bottom-left`, `.cfu-wrap-bottom-center`, `.cfu-wrap-bottom-right`
+- **HTML Attributes**: CFU entities render with `cfuid`, `data-cfu-id`, `backgroundimage`, `pngimage`, `heading`, `content`, `alignment`, `width` for parseHTML compatibility
+
 ## Deploy on Vercel
 
 The app is designed for Vercel deployment with Supabase integration.
