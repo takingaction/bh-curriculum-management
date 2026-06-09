@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/dialog";
 import { useEffect, useRef, useState } from "react";
 import { MediaLibrary } from "@/components/media-library";
-import { ImageIcon, CodeIcon, EyeIcon, EyeOffIcon, LinkIcon, ChevronLeft, ChevronRight, Plus, Minus, AlignLeft, AlignCenter, AlignRight, Lightbulb } from "lucide-react";
+import { ImageIcon, CodeIcon, EyeIcon, EyeOffIcon, LinkIcon, ChevronLeft, ChevronRight, Plus, Minus, AlignLeft, AlignCenter, AlignRight, Lightbulb, Edit3 } from "lucide-react";
 import { TableInsertDialog } from "@/components/ui/table-insert-dialog";
 import { SpellCheckExtension } from "./extensions/spell-check";
 import { CheckForUnderstandingModal } from "@/components/check-for-understanding-modal";
@@ -74,6 +74,7 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
   const [widthInputFocused, setWidthInputFocused] = useState(false);
   const [showCFUModal, setShowCFUModal] = useState(false);
   const [editingCFUAttrs, setEditingCFUAttrs] = useState<any>(null);
+  const [existingCFUAttrs, setExistingCFUAttrs] = useState<any>(null);
   const editingCFUAttrsRef = useRef<any>(null);
   const tableElementRef = useRef<HTMLElement | null>(null);
 
@@ -246,6 +247,38 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
     window.addEventListener("cfu-edit-modal", handleCFUEditModal as EventListener);
     return () => {
       window.removeEventListener("cfu-edit-modal", handleCFUEditModal as EventListener);
+    };
+  }, [editor]);
+
+  // Track existing CFU in editor
+  useEffect(() => {
+    if (!editor) return;
+    
+    const findCFU = () => {
+      let cfuAttrs = null;
+      editor.state.doc.descendants((node) => {
+        if (node.type.name === "checkForUnderstanding") {
+          cfuAttrs = {
+            cfuId: node.attrs.cfuId,
+            backgroundImage: node.attrs.backgroundImage,
+            pngImage: node.attrs.pngImage,
+            heading: node.attrs.heading,
+            content: node.attrs.content,
+            alignment: node.attrs.alignment,
+            width: node.attrs.width,
+          };
+          return false;
+        }
+        return true;
+      });
+      setExistingCFUAttrs(cfuAttrs);
+    };
+    
+    findCFU();
+    
+    editor.on("update", findCFU);
+    return () => {
+      editor.off("update", findCFU);
     };
   }, [editor]);
 
@@ -648,6 +681,23 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
         >
           <Lightbulb className="w-4 h-4" />
         </Button>
+
+        {existingCFUAttrs && (
+          <Button
+            type="button"
+            variant="default"
+            size="sm"
+            onClick={() => {
+              editingCFUAttrsRef.current = existingCFUAttrs;
+              setEditingCFUAttrs(existingCFUAttrs);
+              setShowCFUModal(true);
+            }}
+            className="h-8 px-2 text-xs"
+            title="Edit Check for Understanding"
+          >
+            <Edit3 className="w-4 h-4" />
+          </Button>
+        )}
 
         <Button
           type="button"
