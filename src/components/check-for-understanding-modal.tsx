@@ -82,8 +82,7 @@ export function CheckForUnderstandingModal({
 
   useEffect(() => {
     if (open) {
-      if (initialAttributes) {
-        console.log("Modal: initializing with attrs", initialAttributes.backgroundImage);
+if (initialAttributes) {
         setBg(initialAttributes.backgroundImage || "");
         setPng(initialAttributes.pngImage || "");
         setHeading(initialAttributes.heading || "");
@@ -92,7 +91,6 @@ export function CheckForUnderstandingModal({
         setWidth(initialAttributes.width || "50%");
         setHasCfuId(!!initialAttributes.cfuId);
       } else {
-        console.log("Modal: initializing without attrs");
         setBg("");
         setPng("");
         setHeading("");
@@ -105,14 +103,12 @@ export function CheckForUnderstandingModal({
   }, [open, initialAttributes]);
 
   const handleInsert = () => {
-    console.log("Modal: handleInsert called");
     const attrs = { backgroundImage: bg, pngImage: png, heading, content, alignment, width };
     onInsertRef.current?.(attrs);
     onCloseRef.current?.();
   };
 
   const handleUpdate = () => {
-    console.log("Modal: handleUpdate called, hasCfuId:", hasCfuId, "bg:", bg);
     if (!hasCfuId) {
       alert("No cfuId - cannot update. Please delete and re-insert this CFU.");
       return;

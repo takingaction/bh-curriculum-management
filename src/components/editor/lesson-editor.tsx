@@ -109,9 +109,6 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
     ],
     content,
     onUpdate: ({ editor }) => {
-      const types: string[] = [];
-      editor.state.doc.descendants((node) => { types.push(node.type.name); return true; });
-      console.log("Editor onUpdate, doc contains:", types);
       onChange(editor.getHTML());
     },
     editorProps: {
@@ -312,31 +309,19 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
     if (!editor) return;
 
     const originalAttrs = editingCFUAttrsRef.current;
-    console.log("insertCheckForUnderstanding:", { originalAttrs, newAttrs: attributes });
 
     if (originalAttrs && originalAttrs.cfuId) {
       const { state } = editor;
-      console.log("Searching for cfuId:", originalAttrs.cfuId);
       let foundPos = -1;
-      let nodeCount = 0;
-      let cfuCount = 0;
-      const nodeTypes = new Set();
       state.doc.descendants((node, pos) => {
-        nodeCount++;
-        nodeTypes.add(node.type.name);
-        if (node.type.name === "checkForUnderstanding") {
-          cfuCount++;
-          console.log("CFU node at", pos, "cfuId:", JSON.stringify(node.attrs.cfuId), "searching for:", JSON.stringify(originalAttrs.cfuId));
-          if (String(node.attrs.cfuId) === String(originalAttrs.cfuId)) {
-            foundPos = pos;
-          }
+        if (foundPos >= 0) return false;
+        if (node.type.name === "checkForUnderstanding" && node.attrs.cfuId === originalAttrs.cfuId) {
+          foundPos = pos;
         }
         return true;
       });
-      console.log("Total nodes checked:", nodeCount, "CFUs found:", cfuCount, "Node types in doc:", Array.from(nodeTypes));
 
       if (foundPos >= 0) {
-        console.log("Found CFU at pos", foundPos, "updating with", attributes);
         const tr = state.tr.setNodeMarkup(foundPos, undefined, { ...attributes, cfuId: originalAttrs.cfuId });
         editor.view.dispatch(tr);
       } else {
