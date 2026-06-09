@@ -52,6 +52,7 @@ export function CheckForUnderstandingModal({
   onClose,
   onInsert,
   initialAttributes,
+  isEditing,
 }: CheckForUnderstandingModalProps) {
   const [assets, setAssets] = useState<CFUAsset[]>([]);
   const [bg, setBg] = useState("");
@@ -110,7 +111,16 @@ export function CheckForUnderstandingModal({
     }
   }, [open, initialAttributes]);
 
+  const handleInsert = () => {
+    console.log("Modal: handleInsert called");
+    const attrs = { backgroundImage: bg, pngImage: png, heading, content, alignment, width };
+    onInsertRef.current?.(attrs);
+    console.log("Modal: calling onClose now");
+    onCloseRef.current?.();
+  };
+
   const handleUpdate = () => {
+    if (!hasCfuId) return;
     console.log("Modal: handleUpdate called");
     const attrs = { backgroundImage: bg, pngImage: png, heading, content, alignment, width };
     onInsertRef.current?.(attrs);
@@ -197,9 +207,15 @@ export function CheckForUnderstandingModal({
           <button onClick={() => onCloseRef.current?.()} style={{ padding: "8px 16px", border: "1px solid #ccc", borderRadius: 6, background: "white", cursor: "pointer" }}>
             Cancel
           </button>
-          <button onClick={handleUpdate} disabled={!bg || !hasCfuId} style={{ padding: "8px 16px", border: "none", borderRadius: 6, background: (bg && hasCfuId) ? "#0d7377" : "#ccc", color: "white", cursor: (bg && hasCfuId) ? "pointer" : "not-allowed" }}>
-            Update
-          </button>
+          {!isEditing ? (
+            <button onClick={handleInsert} disabled={!bg} style={{ padding: "8px 16px", border: "none", borderRadius: 6, background: bg ? "#0d7377" : "#ccc", color: "white", cursor: bg ? "pointer" : "not-allowed" }}>
+              Insert
+            </button>
+          ) : (
+            <button onClick={handleUpdate} disabled={!bg || !hasCfuId} style={{ padding: "8px 16px", border: "none", borderRadius: 6, background: (bg && hasCfuId) ? "#0d7377" : "#ccc", color: "white", cursor: (bg && hasCfuId) ? "pointer" : "not-allowed" }}>
+              Update
+            </button>
+          )}
         </div>
       </div>
     </div>
