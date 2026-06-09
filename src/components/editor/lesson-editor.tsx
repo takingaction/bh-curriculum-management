@@ -312,14 +312,20 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
 
     if (originalAttrs && originalAttrs.cfuId) {
       const { state } = editor;
+      console.log("Searching for cfuId:", originalAttrs.cfuId);
       let foundPos = -1;
       state.doc.descendants((node, pos) => {
+        if (node.type.name === "checkForUnderstanding") {
+          console.log("Found CFU node, cfuId:", node.attrs.cfuId, "type:", typeof node.attrs.cfuId);
+        }
         if (foundPos >= 0) return false;
         if (node.type.name === "checkForUnderstanding" && node.attrs.cfuId === originalAttrs.cfuId) {
+          console.log("MATCH at pos", pos);
           foundPos = pos;
         }
         return true;
       });
+      console.log("Search complete, foundPos:", foundPos);
 
       if (foundPos >= 0) {
         const tr = state.tr.setNodeMarkup(foundPos, undefined, { ...attributes, cfuId: originalAttrs.cfuId });
