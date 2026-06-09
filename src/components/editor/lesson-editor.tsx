@@ -320,7 +320,7 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
 
     if (originalAttrs && originalAttrs.cfuId) {
       const { state } = editor;
-      console.log("Searching for cfuId:", originalAttrs.cfuId);
+      console.log("Searching for cfuId:", originalAttrs.cfuId, "type:", typeof originalAttrs.cfuId);
       
       // Log all node types in document
       const allTypes: string[] = [];
@@ -330,7 +330,7 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
       let foundPos = -1;
       state.doc.descendants((node, pos) => {
         if (node.type.name === "checkForUnderstanding") {
-          console.log("Found CFU node, cfuId:", node.attrs.cfuId, "type:", typeof node.attrs.cfuId);
+          console.log("Found CFU node, cfuId:", JSON.stringify(node.attrs.cfuId), "type:", typeof node.attrs.cfuId, "pos:", pos);
         }
         if (foundPos >= 0) return false;
         if (node.type.name === "checkForUnderstanding" && node.attrs.cfuId === originalAttrs.cfuId) {
