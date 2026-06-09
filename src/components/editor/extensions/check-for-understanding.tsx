@@ -168,7 +168,7 @@ export const CheckForUnderstanding = Node.create<CheckForUnderstandingOptions>({
     const heading = node.attrs.heading || "";
     const content = node.attrs.content || "";
     const width = node.attrs.width || "50%";
-    const cfuId = node.attrs.cfuid || "";
+    const cfuId = node.attrs.cfuId || "";
 
     const alignmentClasses: Record<string, string> = {
       "wrap-top-left": "cfu-wrap-top-left",
