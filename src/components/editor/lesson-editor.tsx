@@ -109,6 +109,7 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
     ],
     content,
     onUpdate: ({ editor }) => {
+      console.log("onUpdate called, doc has checkForUnderstanding:", editor.state.doc.descendants(n => n.type.name === 'checkForUnderstanding').length > 0);
       onChange(editor.getHTML());
     },
     editorProps: {
@@ -309,10 +310,17 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
     if (!editor) return;
 
     const originalAttrs = editingCFUAttrsRef.current;
+    console.log("insertCheckForUnderstanding called, editor doc checkForUnderstanding count:", editor.state.doc.descendants(n => n.type.name === 'checkForUnderstanding').length);
 
     if (originalAttrs && originalAttrs.cfuId) {
       const { state } = editor;
       console.log("Searching for cfuId:", originalAttrs.cfuId);
+      
+      // Log all node types in document
+      const allTypes: string[] = [];
+      state.doc.descendants((node) => { allTypes.push(node.type.name); return true; });
+      console.log("All node types in doc:", [...new Set(allTypes)]);
+      
       let foundPos = -1;
       state.doc.descendants((node, pos) => {
         if (node.type.name === "checkForUnderstanding") {
