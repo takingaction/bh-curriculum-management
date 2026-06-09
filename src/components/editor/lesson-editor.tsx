@@ -109,7 +109,9 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
     ],
     content,
     onUpdate: ({ editor }) => {
-      console.log("onUpdate called, doc has checkForUnderstanding:", editor.state.doc.descendants(n => n.type.name === 'checkForUnderstanding').length > 0);
+      let hasCFU = false;
+      editor.state.doc.descendants((node) => { if (node.type.name === 'checkForUnderstanding') hasCFU = true; return true; });
+      console.log("onUpdate called, doc has checkForUnderstanding:", hasCFU);
       onChange(editor.getHTML());
     },
     editorProps: {
@@ -310,7 +312,11 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
     if (!editor) return;
 
     const originalAttrs = editingCFUAttrsRef.current;
-    console.log("insertCheckForUnderstanding called, editor doc checkForUnderstanding count:", editor.state.doc.descendants(n => n.type.name === 'checkForUnderstanding').length);
+    
+    // Count CFU nodes
+    let cfuCount = 0;
+    editor.state.doc.descendants((node) => { if (node.type.name === 'checkForUnderstanding') cfuCount++; return true; });
+    console.log("insertCheckForUnderstanding called, editor doc CFU count:", cfuCount);
 
     if (originalAttrs && originalAttrs.cfuId) {
       const { state } = editor;
