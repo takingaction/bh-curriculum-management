@@ -80,12 +80,12 @@ function CheckForUnderstandingNodeView({ node, getPos }: NodeViewProps) {
               </td>
               <td style={{ width: "75%", verticalAlign: "middle", textAlign: "left", padding: "8px" }}>
                 {heading && (
-                  <h4 style={{ margin: "0 0 8px 0", fontSize: "18px", fontWeight: "700", color: "#333" }}>
+                  <h4 style={{ margin: "0 0 8px 0", fontSize: "16px", fontWeight: "700", color: "#333" }}>
                     {heading}
                   </h4>
                 )}
                 {content && (
-                  <p style={{ margin: 0, fontSize: "18px", color: "#333" }}>{content}</p>
+                  <p style={{ margin: 0, fontSize: "16px", fontWeight: "700", color: "#333" }}>{content}</p>
                 )}
               </td>
             </tr>
