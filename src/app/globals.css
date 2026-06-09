@@ -473,3 +473,53 @@
   z-index: 1;
   clear: both;
 }
+
+/* CFU wrap styles for student view (lesson-content) */
+.lesson-content .cfu-wrap-top-left {
+  float: left;
+  margin: 0 16px 16px 0;
+}
+
+.lesson-content .cfu-wrap-top-right {
+  float: right;
+  margin: 0 0 16px 16px;
+}
+
+.lesson-content .cfu-wrap-top-center {
+  margin: 0 auto 16px auto;
+}
+
+.lesson-content .cfu-wrap-bottom-left {
+  float: left;
+  margin: 16px 16px 0 0;
+}
+
+.lesson-content .cfu-wrap-bottom-right {
+  float: right;
+  margin: 16px 0 0 16px;
+}
+
+.lesson-content .cfu-wrap-bottom-center {
+  margin: 16px auto 0 auto;
+}
+
+.lesson-content .cfu-left {
+  float: left;
+  margin-right: 16px;
+}
+
+.lesson-content .cfu-right {
+  float: right;
+  margin-left: 16px;
+}
+
+.lesson-content .cfu-center {
+  margin: 0 auto;
+}
+
+/* Clear floats after CFU in lesson view */
+.lesson-content [data-check-for-understanding]::after {
+  content: "";
+  display: table;
+  clear: both;
+}
