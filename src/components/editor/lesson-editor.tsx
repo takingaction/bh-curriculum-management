@@ -2,7 +2,7 @@
 
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import { Table } from "@tiptap/extension-table";
+import { TableWithStyles, TableWithStylesExtension } from "./extensions/table-with-styles";
 import { TableRow } from "@tiptap/extension-table-row";
 import { TableCell } from "@tiptap/extension-table-cell";
 import { TableHeader } from "@tiptap/extension-table-header";
@@ -66,7 +66,7 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
   const [linkUrl, setLinkUrl] = useState("");
   const [linkNewWindow, setLinkNewWindow] = useState(false);
   const [showTableInsertDialog, setShowTableInsertDialog] = useState(false);
-  const [tableWidth, setTableWidth] = useState(75);
+  const [tableWidth, setTableWidth] = useState(100);
   const [tableAlignment, setTableAlignment] = useState("center");
   const [tableContextKey, setTableContextKey] = useState(0);
   const [widthInputFocused, setWidthInputFocused] = useState(false);
@@ -82,9 +82,7 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
         paragraph: false,
       }),
       ParagraphWithStyle,
-      Table.configure({
-        resizable: true,
-      }),
+      TableWithStylesExtension,
       TableRow,
       TableCell,
       TableHeader,
@@ -127,27 +125,56 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
   };
 
   const syncTableState = () => {
-    if (!editor || !editor.isActive("table") || widthInputFocused) return;
-    const tableEl = getTableElementFromSelection();
-    if (tableEl) {
-      const style = tableEl.getAttribute("style") || "";
-      const widthMatch = style.match(/width:\s*(\d+)%/);
-      const marginLeftMatch = style.match(/margin-left:\s*(0|auto)/);
-      const marginRightMatch = style.match(/margin-right:\s*(0|auto)/);
-      if (widthMatch) {
-        const numWidth = parseInt(widthMatch[1]);
-        if (numWidth >= 10 && numWidth <= 100) {
+    if (!editor) return;
+    const { state } = editor;
+    const { selection } = state;
+    const $from = selection.$from;
+
+    for (let depth = $from.depth; depth > 0; depth--) {
+      const node = $from.node(depth);
+      if (node.type.name === "table") {
+        const attrs = node.attrs;
+        const width = attrs.width || "100%";
+        const alignment = attrs.alignment || "center";
+        const numWidth = parseInt(width.replace("%", ""));
+        if (numWidth >= 1 && numWidth <= 100) {
           setTableWidth(numWidth);
-        }
-      }
-      if (marginLeftMatch) {
-        if (marginLeftMatch[1] === "0") {
-          setTableAlignment("left");
-        } else if (marginRightMatch && marginRightMatch[1] === "0") {
-          setTableAlignment("right");
         } else {
-          setTableAlignment("center");
+          setTableWidth(100);
         }
+        setTableAlignment(alignment);
+        return;
+      }
+    }
+  };
+
+  const forceSyncTableState = () => {
+    if (!editor) return;
+    const { state } = editor;
+    const { selection } = state;
+    const $from = selection.$from;
+
+    let tableNode = null;
+    let tableDepth = 0;
+    for (let depth = $from.depth; depth > 0; depth--) {
+      const node = $from.node(depth);
+      if (node.type.name === "table") {
+        tableNode = node;
+        tableDepth = depth;
+        break;
+      }
+    }
+
+    if (tableNode) {
+      const pos = $from.before(tableDepth);
+      const nodeAtPos = state.doc.nodeAt(pos);
+      if (nodeAtPos) {
+        const attrs = nodeAtPos.attrs;
+        const width = attrs.width || "100%";
+        const alignment = attrs.alignment || "center";
+        const numWidth = parseInt(width.replace("%", ""));
+        setTableWidth(numWidth >= 1 && numWidth <= 100 ? numWidth : 100);
+        setTableAlignment(alignment);
       }
     }
   };
@@ -161,8 +188,23 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
       }
     };
     editor.on("selectionUpdate", handleSelectionUpdate);
+
+    const handleTransaction = () => {
+      if (isInsideTable()) {
+        forceSyncTableState();
+      }
+    };
+    editor.on("transaction", handleTransaction);
+
+    setTimeout(() => {
+      if (isInsideTable()) {
+        syncTableState();
+      }
+    }, 100);
+
     return () => {
       editor.off("selectionUpdate", handleSelectionUpdate);
+      editor.off("transaction", handleTransaction);
     };
   }, [editor]);
 
@@ -209,19 +251,27 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
 
     editor.chain().focus().insertTable({ rows, cols, withHeaderRow }).run();
 
-    setTimeout(() => {
-      const tableEl = editor.view.dom.querySelector("table:last-child");
-      if (tableEl) {
-        const colgroup = tableEl.querySelector("colgroup");
-        if (colgroup) colgroup.remove();
-        const widthValue = width.includes("%") ? width : `${width}%`;
-        const style = `width: ${widthValue}; margin-left: ${alignment === "left" ? "0" : alignment === "center" ? "auto" : "auto"}; margin-right: ${alignment === "right" ? "0" : "auto"};`;
-        (tableEl as HTMLElement).setAttribute("style", style);
-        setTableWidth(parseInt(widthValue) || 75);
-        setTableAlignment(alignment);
-        onChange(editor.getHTML());
+    const widthValue = width.includes("%") ? width : `${width}%`;
+    const { state } = editor;
+    const { selection } = state;
+    const $from = selection.$from;
+
+    for (let depth = $from.depth; depth > 0; depth--) {
+      const node = $from.node(depth);
+      if (node.type.name === "table") {
+        const pos = $from.before(depth);
+        const tableNode = state.doc.nodeAt(pos);
+        if (tableNode) {
+          const newAttrs = { ...tableNode.attrs, width: widthValue, alignment };
+          const tr = state.tr.setNodeMarkup(pos, undefined, newAttrs);
+          editor.view.dispatch(tr);
+        }
+        break;
       }
-    }, 0);
+    }
+    setTableWidth(parseInt(widthValue) || 100);
+    setTableAlignment(alignment);
+    onChange(editor.getHTML());
   };
 
   const getTableElementFromSelection = (): HTMLElement | null => {
@@ -252,28 +302,47 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
 
   const updateTableWidth = (width: number) => {
     if (!editor) return;
-    const tableEl = getTableElementFromSelection();
-    if (tableEl) {
-      const currentStyle = tableEl.getAttribute("style") || "";
-      const newStyle = currentStyle.replace(/width:\s*\d+%;?/, "") + ` width: ${width}%;`;
-      tableEl.setAttribute("style", newStyle);
-      setTableWidth(width);
-      onChange(editor.getHTML());
+    const { state } = editor;
+    const { selection } = state;
+    const $from = selection.$from;
+
+    for (let depth = $from.depth; depth > 0; depth--) {
+      const node = $from.node(depth);
+      if (node.type.name === "table") {
+        const pos = $from.before(depth);
+        const tableNode = state.doc.nodeAt(pos);
+        if (tableNode) {
+          const newAttrs = { ...tableNode.attrs, width: `${width}%` };
+          const tr = state.tr.setNodeMarkup(pos, undefined, newAttrs);
+          editor.view.dispatch(tr);
+          setTableWidth(width);
+          onChange(editor.getHTML());
+        }
+        break;
+      }
     }
   };
 
   const updateTableAlignment = (alignment: string) => {
     if (!editor) return;
-    const tableEl = getTableElementFromSelection();
-    if (tableEl) {
-      const currentStyle = tableEl.getAttribute("style") || "";
-      let newStyle = currentStyle
-        .replace(/margin-left:\s*(0|auto);?/g, "")
-        .replace(/margin-right:\s*(0|auto);?/g, "");
-      newStyle += ` margin-left: ${alignment === "left" ? "0" : "auto"}; margin-right: ${alignment === "right" ? "0" : "auto"};`;
-      tableEl.setAttribute("style", newStyle);
-      setTableAlignment(alignment);
-      onChange(editor.getHTML());
+    const { state } = editor;
+    const { selection } = state;
+    const $from = selection.$from;
+
+    for (let depth = $from.depth; depth > 0; depth--) {
+      const node = $from.node(depth);
+      if (node.type.name === "table") {
+        const pos = $from.before(depth);
+        const tableNode = state.doc.nodeAt(pos);
+        if (tableNode) {
+          const newAttrs = { ...tableNode.attrs, alignment };
+          const tr = state.tr.setNodeMarkup(pos, undefined, newAttrs);
+          editor.view.dispatch(tr);
+          setTableAlignment(alignment);
+          onChange(editor.getHTML());
+        }
+        break;
+      }
     }
   };
 
@@ -689,12 +758,28 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
           <span className="text-xs text-gray-500">Width:</span>
           <input
             type="number"
-            min={10}
+            min={1}
             max={100}
             value={tableWidth}
-            onChange={(e) => updateTableWidth(Math.max(10, Math.min(100, parseInt(e.target.value) || 50)))}
+            onChange={(e) => {
+              const parsed = parseInt(e.target.value);
+              if (!isNaN(parsed) && parsed >= 1 && parsed <= 100) {
+                setTableWidth(parsed);
+              }
+            }}
+            onBlur={(e) => {
+              const parsed = parseInt(e.target.value);
+              if (!isNaN(parsed)) {
+                const clamped = Math.min(100, Math.max(1, parsed));
+                updateTableWidth(clamped);
+              }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.currentTarget.blur();
+              }
+            }}
             onFocus={() => setWidthInputFocused(true)}
-            onBlur={() => setWidthInputFocused(false)}
             className="w-14 h-7 px-1 text-xs border border-[#e5e5e0] rounded text-center"
           />
           <span className="text-xs text-gray-500">%</span>

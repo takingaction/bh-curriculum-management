@@ -114,6 +114,19 @@ Click link button (chain icon) to insert hyperlink:
 - Open in New Window checkbox
 - Links styled teal (#0d7377) with underline
 
+### Table Support
+- **Insert Table**: Columns (1-10), rows (1-20), width (1-100%), alignment (left/center/right), header row toggle
+- **Table Context Toolbar**: Shows when cursor is inside a table
+  - Add/Remove columns and rows (+Col, -Col, +Row, -Row)
+  - Width input (1-100%)
+  - Alignment buttons (left/center/right)
+- **Custom Table Extension**: `TableWithStylesExtension` with node attributes for width and alignment
+  - Attributes stored in ProseMirror model (`width`, `alignment`)
+  - `parseHTML` reads from `data-width`, `data-alignment`, and inline styles
+  - `renderHTML` generates proper inline styles
+  - No `colgroup` or `min-width` generation
+- **Default**: New tables default to 100% width, center alignment
+
 ## Deploy on Vercel
 
 The app is designed for Vercel deployment with Supabase integration.

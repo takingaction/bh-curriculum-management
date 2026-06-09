@@ -21,7 +21,7 @@ interface TableInsertDialogProps {
 export function TableInsertDialog({ open, onClose, onInsert }: TableInsertDialogProps) {
   const [cols, setCols] = useState(3);
   const [rows, setRows] = useState(3);
-  const [width, setWidth] = useState(75);
+  const [width, setWidth] = useState(100);
   const [alignment, setAlignment] = useState("left");
   const [withHeaderRow, setWithHeaderRow] = useState(true);
 
