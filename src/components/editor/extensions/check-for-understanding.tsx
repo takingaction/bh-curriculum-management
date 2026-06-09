@@ -36,6 +36,7 @@ function CheckForUnderstandingNodeView({ node, getPos }: NodeViewProps) {
     if (now - lastClickRef.current < 1000) return;
     lastClickRef.current = now;
 
+    console.log("CFU clicked, dispatching event with cfuId:", cfuId);
     window.dispatchEvent(new CustomEvent("cfu-edit-modal", {
       detail: {
         cfuId: cfuId || null,
