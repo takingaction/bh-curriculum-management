@@ -433,19 +433,12 @@
   clear: both;
 }
 
-/* Clear floats after entity - only for non-wrap positions */
-.check-for-understanding:not([class*="wrap"])::after,
-.ProseMirror [data-check-for-understanding]:not([class*="wrap"])::after {
+/* Clear floats after entity */
+.check-for-understanding::after,
+.ProseMirror [data-check-for-understanding]::after {
   content: "";
   display: table;
   clear: both;
-}
-
-/* Remove clearfix for wrap positions so text can flow around */
-.ProseMirror [data-check-for-understanding[class*="wrap"])::after {
-  content: none;
-  display: none;
-  clear: none;
 }
 
 /* Ensure CFU stays within editor bounds */
