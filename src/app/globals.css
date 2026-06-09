@@ -448,6 +448,7 @@
   display: block;
   position: relative;
   z-index: 10;
+  pointer-events: auto;
 }
 
 .check-for-understanding,
@@ -458,6 +459,7 @@
   display: block;
   position: relative;
   z-index: 10;
+  pointer-events: auto;
 }
 
 /* Prevent floats from escaping */

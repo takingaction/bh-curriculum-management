@@ -55,6 +55,7 @@ function CheckForUnderstandingNodeView({ node, getPos }: NodeViewProps) {
         data-check-for-understanding="true"
         data-cfu-id={cfuId || ""}
         className={cssClass}
+        contentEditable={false}
         style={{
           backgroundImage: backgroundImage ? `url('${backgroundImage}')` : undefined,
           backgroundSize: "contain",
@@ -69,9 +70,10 @@ function CheckForUnderstandingNodeView({ node, getPos }: NodeViewProps) {
           cursor: "pointer",
           position: "relative",
           zIndex: 10,
+          pointerEvents: "auto",
         }}
         onClick={handleClick}
-        onMouseDown={(e) => e.preventDefault()}
+        onMouseDown={(e) => e.stopPropagation()}
       >
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <tbody>
