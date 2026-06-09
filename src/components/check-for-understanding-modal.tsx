@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { X } from "lucide-react";
+import { X, Upload, Trash2 } from "lucide-react";
 
 interface CFUAsset {
   id: string;
@@ -62,6 +62,10 @@ export function CheckForUnderstandingModal({
   const [alignment, setAlignment] = useState("center");
   const [width, setWidth] = useState("50%");
   const [hasCfuId, setHasCfuId] = useState(false);
+  const [uploading, setUploading] = useState(false);
+
+  const bgInputRef = useRef<HTMLInputElement>(null);
+  const pngInputRef = useRef<HTMLInputElement>(null);
 
   const onCloseRef = useRef(onClose);
   const onInsertRef = useRef(onInsert);
@@ -101,6 +105,46 @@ if (initialAttributes) {
       }
     }
   }, [open, initialAttributes]);
+
+  const uploadAsset = async (file: File, assetType: "background" | "png") => {
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("asset_type", assetType);
+      formData.append("name", file.name);
+
+      const res = await fetch("/api/cfu-assets", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+      if (data.asset) {
+        setAssets(prev => [...prev, data.asset]);
+        if (assetType === "background") setBg(data.asset.image_url);
+        else setPng(data.asset.image_url);
+      }
+    } catch (err) {
+      console.error("Upload failed:", err);
+      alert("Upload failed");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const deleteAsset = async (id: string) => {
+    if (!confirm("Delete this asset?")) return;
+    try {
+      const res = await fetch(`/api/cfu-assets/${id}`, { method: "DELETE" });
+      if (res.ok) {
+        setAssets(prev => prev.filter(a => a.id !== id));
+        if (bg.includes(id)) setBg("");
+        if (png.includes(id)) setPng("");
+      }
+    } catch (err) {
+      console.error("Delete failed:", err);
+    }
+  };
 
   const handleInsert = () => {
     const attrs = { backgroundImage: bg, pngImage: png, heading, content, alignment, width };
@@ -145,22 +189,64 @@ if (initialAttributes) {
 
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <div>
-            <Label>Background</Label>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <Label>Background</Label>
+              <input type="file" accept="image/*" ref={bgInputRef} style={{ display: "none" }} onChange={e => { if (e.target.files?.[0]) uploadAsset(e.target.files[0], "background"); e.target.value = ""; }} />
+              <button type="button" onClick={() => bgInputRef.current?.click()} disabled={uploading} style={{ padding: "4px 8px", fontSize: 12, border: "1px solid #ccc", borderRadius: 4, background: "#f5f5f5", cursor: "pointer" }}>
+                <Upload size={14} />
+              </button>
+            </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
-              {backgrounds.map(a => (
-                <div key={a.id} onClick={() => setBg(a.image_url)} style={{ cursor: "pointer", border: bg === a.image_url ? "3px solid #0d7377" : "3px solid transparent", borderRadius: 8, overflow: "hidden" }}>
-                  <img src={a.image_url} alt={a.name} style={{ width: 60, height: 60, objectFit: "cover" }} />
+              {bg && (
+                <div style={{ position: "relative" }}>
+                  <div onClick={() => setBg("")} style={{ cursor: "pointer", border: "3px solid #0d7377", borderRadius: 8, overflow: "hidden" }}>
+                    <img src={bg} alt="Selected" style={{ width: 60, height: 60, objectFit: "cover" }} />
+                  </div>
+                  <button onClick={() => setBg("")} type="button" style={{ position: "absolute", top: -6, right: -6, background: "#ef4444", color: "white", border: "none", borderRadius: "50%", width: 18, height: 18, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <X size={12} />
+                  </button>
+                </div>
+              )}
+              {backgrounds.filter(a => a.image_url !== bg).map(a => (
+                <div key={a.id} style={{ position: "relative" }}>
+                  <div onClick={() => setBg(a.image_url)} style={{ cursor: "pointer", border: bg === a.image_url ? "3px solid #0d7377" : "3px solid transparent", borderRadius: 8, overflow: "hidden" }}>
+                    <img src={a.image_url} alt={a.name} style={{ width: 60, height: 60, objectFit: "cover" }} />
+                  </div>
+                  <button onClick={() => deleteAsset(a.id)} type="button" style={{ position: "absolute", top: -6, right: -6, background: "#ef4444", color: "white", border: "none", borderRadius: "50%", width: 18, height: 18, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <Trash2 size={12} />
+                  </button>
                 </div>
               ))}
             </div>
           </div>
 
           <div>
-            <Label>PNG Image</Label>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <Label>PNG Image</Label>
+              <input type="file" accept="image/*" ref={pngInputRef} style={{ display: "none" }} onChange={e => { if (e.target.files?.[0]) uploadAsset(e.target.files[0], "png"); e.target.value = ""; }} />
+              <button type="button" onClick={() => pngInputRef.current?.click()} disabled={uploading} style={{ padding: "4px 8px", fontSize: 12, border: "1px solid #ccc", borderRadius: 4, background: "#f5f5f5", cursor: "pointer" }}>
+                <Upload size={14} />
+              </button>
+            </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
-              {pngs.map(a => (
-                <div key={a.id} onClick={() => setPng(a.image_url)} style={{ cursor: "pointer", border: png === a.image_url ? "3px solid #0d7377" : "3px solid transparent", borderRadius: 8, overflow: "hidden", background: "repeating-conic-gradient(#ccc 0% 25%, white 0% 50%) 50% / 10px 10px" }}>
-                  <img src={a.image_url} alt={a.name} style={{ width: 60, height: 60, objectFit: "contain" }} />
+              {png && (
+                <div style={{ position: "relative" }}>
+                  <div onClick={() => setPng("")} style={{ cursor: "pointer", border: "3px solid #0d7377", borderRadius: 8, overflow: "hidden", background: "repeating-conic-gradient(#ccc 0% 25%, white 0% 50%) 50% / 10px 10px" }}>
+                    <img src={png} alt="Selected" style={{ width: 60, height: 60, objectFit: "contain" }} />
+                  </div>
+                  <button onClick={() => setPng("")} type="button" style={{ position: "absolute", top: -6, right: -6, background: "#ef4444", color: "white", border: "none", borderRadius: "50%", width: 18, height: 18, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <X size={12} />
+                  </button>
+                </div>
+              )}
+              {pngs.filter(a => a.image_url !== png).map(a => (
+                <div key={a.id} style={{ position: "relative" }}>
+                  <div onClick={() => setPng(a.image_url)} style={{ cursor: "pointer", border: png === a.image_url ? "3px solid #0d7377" : "3px solid transparent", borderRadius: 8, overflow: "hidden", background: "repeating-conic-gradient(#ccc 0% 25%, white 0% 50%) 50% / 10px 10px" }}>
+                    <img src={a.image_url} alt={a.name} style={{ width: 60, height: 60, objectFit: "contain" }} />
+                  </div>
+                  <button onClick={() => deleteAsset(a.id)} type="button" style={{ position: "absolute", top: -6, right: -6, background: "#ef4444", color: "white", border: "none", borderRadius: "50%", width: 18, height: 18, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <Trash2 size={12} />
+                  </button>
                 </div>
               ))}
             </div>
