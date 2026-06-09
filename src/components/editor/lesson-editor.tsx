@@ -316,7 +316,7 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
       let foundPos = -1;
       state.doc.descendants((node, pos) => {
         if (foundPos >= 0) return false;
-        if (node.type.name === "checkForUnderstanding" && node.attrs.cfuId === originalAttrs.cfuid) {
+        if (node.type.name === "checkForUnderstanding" && node.attrs.cfuId === originalAttrs.cfuId) {
           foundPos = pos;
         }
         return true;
@@ -324,7 +324,7 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
 
       if (foundPos >= 0) {
         console.log("Found CFU at pos", foundPos, "updating with", attributes);
-        const tr = state.tr.setNodeMarkup(foundPos, undefined, { ...attributes, cfuId: originalAttrs.cfuid });
+        const tr = state.tr.setNodeMarkup(foundPos, undefined, { ...attributes, cfuId: originalAttrs.cfuId });
         editor.view.dispatch(tr);
       } else {
         console.log("CFU not found by cfuId, inserting new");
