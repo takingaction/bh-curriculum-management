@@ -316,8 +316,11 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
       let foundPos = -1;
       state.doc.descendants((node, pos) => {
         if (foundPos >= 0) return false;
-        if (node.type.name === "checkForUnderstanding" && node.attrs.cfuId === originalAttrs.cfuId) {
-          foundPos = pos;
+        if (node.type.name === "checkForUnderstanding") {
+          console.log("CFU node at", pos, "cfuId:", node.attrs.cfuId, "searching for:", originalAttrs.cfuId);
+          if (node.attrs.cfuId === originalAttrs.cfuId) {
+            foundPos = pos;
+          }
         }
         return true;
       });
