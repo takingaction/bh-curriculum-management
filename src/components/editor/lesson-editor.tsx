@@ -313,17 +313,20 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
 
     if (originalAttrs && originalAttrs.cfuId) {
       const { state } = editor;
+      console.log("Searching for cfuId:", originalAttrs.cfuId);
       let foundPos = -1;
+      let nodeCount = 0;
       state.doc.descendants((node, pos) => {
-        if (foundPos >= 0) return false;
+        nodeCount++;
         if (node.type.name === "checkForUnderstanding") {
-          console.log("CFU node at", pos, "cfuId:", node.attrs.cfuId, "searching for:", originalAttrs.cfuId);
-          if (node.attrs.cfuId === originalAttrs.cfuId) {
+          console.log("CFU node at", pos, "cfuId:", JSON.stringify(node.attrs.cfuId), "searching for:", JSON.stringify(originalAttrs.cfuId));
+          if (String(node.attrs.cfuId) === String(originalAttrs.cfuId)) {
             foundPos = pos;
           }
         }
         return true;
       });
+      console.log("Total nodes checked:", nodeCount, "CFUs found:", state.doc.descendants(n => n.type.name === 'checkForUnderstanding').length);
 
       if (foundPos >= 0) {
         console.log("Found CFU at pos", foundPos, "updating with", attributes);
