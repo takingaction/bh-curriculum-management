@@ -427,9 +427,9 @@
   margin: 16px auto 0 auto;
 }
 
-/* Clear floats after entity */
-.check-for-understanding::after,
-.ProseMirror [data-check-for-understanding]::after {
+/* Clear floats after entity - only for non-wrapped positions */
+.check-for-understanding:not([class*="wrap"])::after,
+.ProseMirror [data-check-for-understanding]:not([class*="wrap"])::after {
   content: "";
   display: table;
   clear: both;
@@ -471,7 +471,6 @@
 .ProseMirror [data-check-for-understanding] {
   position: relative;
   z-index: 1;
-  clear: both;
 }
 
 /* CFU wrap styles for student view (lesson-content) */
@@ -497,6 +496,7 @@
 .lesson-content .cfu-wrap-bottom-right {
   float: right;
   margin: 16px 0 0 16px;
+  clear: left;
 }
 
 .lesson-content .cfu-wrap-bottom-center {
@@ -517,9 +517,4 @@
   margin: 0 auto;
 }
 
-/* Clear floats after CFU in lesson view */
-.lesson-content [data-check-for-understanding]::after {
-  content: "";
-  display: table;
-  clear: both;
-}
+
