@@ -109,6 +109,7 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
     ],
     content,
     onUpdate: ({ editor }) => {
+      console.log("Editor onUpdate, doc contains:", editor.state.doc.descendants(n => n.type.name).map(n => n.type.name));
       onChange(editor.getHTML());
     },
     editorProps: {
@@ -119,6 +120,20 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
       },
     },
   });
+
+  useEffect(() => {
+    if (editor) {
+      console.log("Editor initialized, checking for CFUs...");
+      const cfuNodes: string[] = [];
+      editor.state.doc.descendants((node) => {
+        if (node.type.name === "checkForUnderstanding") {
+          cfuNodes.push(`pos:${node.attrs.cfuId || 'no-id'}`);
+        }
+      });
+      console.log("CFU nodes found:", cfuNodes.length, cfuNodes);
+      console.log("All node types:", [...new Set(editor.state.doc.descendants(n => n.type.name))]);
+    }
+  }, [editor, content]);
 
   const isInsideTable = () => {
     if (!editor) return false;
