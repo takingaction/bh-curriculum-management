@@ -109,15 +109,12 @@ if (initialAttributes) {
   };
 
   const handleUpdate = () => {
-    console.log("handleUpdate called, hasCfuId:", hasCfuId, "bg:", bg ? "set" : "empty");
     if (!hasCfuId) {
       alert("No cfuId - cannot update. Please delete and re-insert this CFU.");
       return;
     }
     const attrs = { backgroundImage: bg, pngImage: png, heading, content, alignment, width };
-    console.log("handleUpdate calling onInsertRef with:", attrs);
     onInsertRef.current?.(attrs);
-    console.log("handleUpdate calling onCloseRef");
     onCloseRef.current?.();
   };
 

@@ -109,9 +109,6 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
     ],
     content,
     onUpdate: ({ editor }) => {
-      let hasCFU = false;
-      editor.state.doc.descendants((node) => { if (node.type.name === 'checkForUnderstanding') hasCFU = true; return true; });
-      console.log("onUpdate called, doc has checkForUnderstanding:", hasCFU);
       onChange(editor.getHTML());
     },
     editorProps: {
@@ -221,9 +218,26 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
   useEffect(() => {
     let lastEventTime = 0;
     const handleCFUEditModal = (e: CustomEvent) => {
+      if (!editor) return;
       const now = Date.now();
       if (now - lastEventTime < 2000) return;
       lastEventTime = now;
+      
+      // Check if this editor contains the CFU being clicked
+      let hasThisCFU = false;
+      editor.state.doc.descendants((node) => {
+        if (node.type.name === "checkForUnderstanding" && node.attrs.cfuId === e.detail.cfuId) {
+          hasThisCFU = true;
+          return false; // stop iterating
+        }
+        return true;
+      });
+      
+      if (!hasThisCFU) {
+        console.log("This editor doesn't contain CFU:", e.detail.cfuId);
+        return; // Don't open modal for editors that don't have this CFU
+      }
+      
       console.log("Lesson Editor: setting attrs and opening modal", e.detail.backgroundImage);
       editingCFUAttrsRef.current = e.detail;
       setEditingCFUAttrs(e.detail);
@@ -233,7 +247,7 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
     return () => {
       window.removeEventListener("cfu-edit-modal", handleCFUEditModal as EventListener);
     };
-  }, []);
+  }, [editor]);
 
   const getCurrentMarginLeft = () => {
     if (!editor) return 0;
@@ -312,41 +326,23 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
     if (!editor) return;
 
     const originalAttrs = editingCFUAttrsRef.current;
-    
-    // Count CFU nodes
-    let cfuCount = 0;
-    editor.state.doc.descendants((node) => { if (node.type.name === 'checkForUnderstanding') cfuCount++; return true; });
-    console.log("insertCheckForUnderstanding called, editor doc CFU count:", cfuCount);
 
     if (originalAttrs && originalAttrs.cfuId) {
       const { state } = editor;
-      console.log("Searching for cfuId:", originalAttrs.cfuId, "type:", typeof originalAttrs.cfuId);
-      
-      // Log all node types in document
-      const allTypes: string[] = [];
-      state.doc.descendants((node) => { allTypes.push(node.type.name); return true; });
-      console.log("All node types in doc:", [...new Set(allTypes)]);
-      
       let foundPos = -1;
       state.doc.descendants((node, pos) => {
-        if (node.type.name === "checkForUnderstanding") {
-          console.log("Found CFU node, cfuId:", JSON.stringify(node.attrs.cfuId), "type:", typeof node.attrs.cfuId, "pos:", pos);
-        }
         if (foundPos >= 0) return false;
         if (node.type.name === "checkForUnderstanding" && node.attrs.cfuId === originalAttrs.cfuId) {
-          console.log("MATCH at pos", pos);
           foundPos = pos;
         }
         return true;
       });
-      console.log("Search complete, foundPos:", foundPos);
 
       if (foundPos >= 0) {
         const tr = state.tr.setNodeMarkup(foundPos, undefined, { ...attributes, cfuId: originalAttrs.cfuId });
         editor.view.dispatch(tr);
       } else {
-        console.log("CFU not found by cfuId, inserting new");
-        editor.chain().focus().insertContent({ type: "checkForUnderstanding", attrs: attributes }).run();
+        alert("CFU not found in this editor. It may be in a different section.");
       }
       editingCFUAttrsRef.current = null;
       setEditingCFUAttrs(null);
