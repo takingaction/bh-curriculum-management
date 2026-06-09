@@ -316,9 +316,11 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
       console.log("Searching for cfuId:", originalAttrs.cfuId);
       let foundPos = -1;
       let nodeCount = 0;
+      let cfuCount = 0;
       state.doc.descendants((node, pos) => {
         nodeCount++;
         if (node.type.name === "checkForUnderstanding") {
+          cfuCount++;
           console.log("CFU node at", pos, "cfuId:", JSON.stringify(node.attrs.cfuId), "searching for:", JSON.stringify(originalAttrs.cfuId));
           if (String(node.attrs.cfuId) === String(originalAttrs.cfuId)) {
             foundPos = pos;
@@ -326,7 +328,7 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
         }
         return true;
       });
-      console.log("Total nodes checked:", nodeCount, "CFUs found:", state.doc.descendants(n => n.type.name === 'checkForUnderstanding').length);
+      console.log("Total nodes checked:", nodeCount, "CFUs found:", cfuCount);
 
       if (foundPos >= 0) {
         console.log("Found CFU at pos", foundPos, "updating with", attributes);
