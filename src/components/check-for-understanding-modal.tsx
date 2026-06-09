@@ -61,12 +61,10 @@ export function CheckForUnderstandingModal({
   const [content, setContent] = useState("");
   const [alignment, setAlignment] = useState("center");
   const [width, setWidth] = useState("50%");
-  const [initialized, setInitialized] = useState(false);
   const [hasCfuId, setHasCfuId] = useState(false);
 
   const onCloseRef = useRef(onClose);
   const onInsertRef = useRef(onInsert);
-  const initRef = useRef(false);
 
   onCloseRef.current = onClose;
   onInsertRef.current = onInsert;
@@ -80,12 +78,10 @@ export function CheckForUnderstandingModal({
         })
         .catch(console.error);
     }
-  }, [open]);
+  }, [open, assets.length]);
 
   useEffect(() => {
-    if (open && !initRef.current) {
-      initRef.current = true;
-      setInitialized(true);
+    if (open) {
       if (initialAttributes) {
         console.log("Modal: initializing with attrs", initialAttributes.backgroundImage);
         setBg(initialAttributes.backgroundImage || "");
@@ -105,9 +101,6 @@ export function CheckForUnderstandingModal({
         setWidth("50%");
         setHasCfuId(false);
       }
-    } else if (!open) {
-      initRef.current = false;
-      setInitialized(false);
     }
   }, [open, initialAttributes]);
 
@@ -115,7 +108,6 @@ export function CheckForUnderstandingModal({
     console.log("Modal: handleInsert called");
     const attrs = { backgroundImage: bg, pngImage: png, heading, content, alignment, width };
     onInsertRef.current?.(attrs);
-    console.log("Modal: calling onClose now");
     onCloseRef.current?.();
   };
 
@@ -124,28 +116,30 @@ export function CheckForUnderstandingModal({
     console.log("Modal: handleUpdate called");
     const attrs = { backgroundImage: bg, pngImage: png, heading, content, alignment, width };
     onInsertRef.current?.(attrs);
-    console.log("Modal: calling onClose now");
     onCloseRef.current?.();
   };
 
   const backgrounds = assets.filter(a => a.asset_type === "background");
   const pngs = assets.filter(a => a.asset_type === "png");
 
-  if (!open || !initialized) return null;
+  if (!open) return null;
 
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <div style={{ background: "white", borderRadius: 12, padding: 24, width: "90%", maxWidth: 500, maxHeight: "90vh", overflow: "auto" }}>
+    <div
+      style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center" }}
+      onClick={(e) => { if (e.target === e.currentTarget) onCloseRef.current?.(); }}
+    >
+      <div style={{ background: "white", borderRadius: 12, padding: 24, width: "90%", maxWidth: 500, maxHeight: "90vh", overflowY: "auto" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <h2 style={{ margin: 0 }}>Check for Understanding</h2>
-            {!hasCfuId && (
+            {isEditing && !hasCfuId && (
               <span style={{ background: "#ef4444", color: "white", padding: "2px 8px", borderRadius: 4, fontSize: 12 }}>
                 No ID - cannot update
               </span>
             )}
           </div>
-          <button onClick={() => onCloseRef.current?.()} style={{ padding: 4, border: "none", background: "transparent", cursor: "pointer" }}>
+          <button onClick={onCloseRef.current} style={{ padding: 4, border: "none", background: "transparent", cursor: "pointer" }}>
             <X size={20} />
           </button>
         </div>
@@ -195,7 +189,7 @@ export function CheckForUnderstandingModal({
             <Label>Position</Label>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 4, marginTop: 4 }}>
               {POSITIONS.map(p => (
-                <button key={p.value} onClick={() => setAlignment(p.value)} style={{ padding: 8, border: alignment === p.value ? "2px solid #0d7377" : "1px solid #ccc", borderRadius: 4, background: alignment === p.value ? "#0d7377" : "white", color: alignment === p.value ? "white" : "black", cursor: "pointer" }}>
+                <button type="button" key={p.value} onClick={() => setAlignment(p.value)} style={{ padding: 8, border: alignment === p.value ? "2px solid #0d7377" : "1px solid #ccc", borderRadius: 4, background: alignment === p.value ? "#0d7377" : "white", color: alignment === p.value ? "white" : "black", cursor: "pointer" }}>
                   {p.label}
                 </button>
               ))}
@@ -204,15 +198,15 @@ export function CheckForUnderstandingModal({
         </div>
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 24 }}>
-          <button onClick={() => onCloseRef.current?.()} style={{ padding: "8px 16px", border: "1px solid #ccc", borderRadius: 6, background: "white", cursor: "pointer" }}>
+          <button type="button" onClick={onCloseRef.current} style={{ padding: "8px 16px", border: "1px solid #ccc", borderRadius: 6, background: "white", cursor: "pointer" }}>
             Cancel
           </button>
           {!isEditing ? (
-            <button onClick={handleInsert} disabled={!bg} style={{ padding: "8px 16px", border: "none", borderRadius: 6, background: bg ? "#0d7377" : "#ccc", color: "white", cursor: bg ? "pointer" : "not-allowed" }}>
+            <button type="button" onClick={handleInsert} disabled={!bg} style={{ padding: "8px 16px", border: "none", borderRadius: 6, background: bg ? "#0d7377" : "#ccc", color: "white", cursor: bg ? "pointer" : "not-allowed" }}>
               Insert
             </button>
           ) : (
-            <button onClick={handleUpdate} disabled={!bg || !hasCfuId} style={{ padding: "8px 16px", border: "none", borderRadius: 6, background: (bg && hasCfuId) ? "#0d7377" : "#ccc", color: "white", cursor: (bg && hasCfuId) ? "pointer" : "not-allowed" }}>
+            <button type="button" onClick={handleUpdate} disabled={!bg || !hasCfuId} style={{ padding: "8px 16px", border: "none", borderRadius: 6, background: (bg && hasCfuId) ? "#0d7377" : "#ccc", color: "white", cursor: (bg && hasCfuId) ? "pointer" : "not-allowed" }}>
               Update
             </button>
           )}
