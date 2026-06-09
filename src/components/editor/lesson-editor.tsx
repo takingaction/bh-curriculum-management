@@ -3,6 +3,7 @@
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { TableWithStyles, TableWithStylesExtension } from "./extensions/table-with-styles";
+import { CheckForUnderstanding } from "./extensions/check-for-understanding";
 import { TableRow } from "@tiptap/extension-table-row";
 import { TableCell } from "@tiptap/extension-table-cell";
 import { TableHeader } from "@tiptap/extension-table-header";
@@ -21,9 +22,10 @@ import {
 } from "@/components/ui/dialog";
 import { useEffect, useRef, useState } from "react";
 import { MediaLibrary } from "@/components/media-library";
-import { ImageIcon, CodeIcon, EyeIcon, EyeOffIcon, LinkIcon, ChevronLeft, ChevronRight, Plus, Minus, AlignLeft, AlignCenter, AlignRight } from "lucide-react";
+import { ImageIcon, CodeIcon, EyeIcon, EyeOffIcon, LinkIcon, ChevronLeft, ChevronRight, Plus, Minus, AlignLeft, AlignCenter, AlignRight, Lightbulb } from "lucide-react";
 import { TableInsertDialog } from "@/components/ui/table-insert-dialog";
 import { SpellCheckExtension } from "./extensions/spell-check";
+import { CheckForUnderstandingModal } from "@/components/check-for-understanding-modal";
 
 const ParagraphWithStyle = Paragraph.extend({
   addAttributes() {
@@ -70,6 +72,9 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
   const [tableAlignment, setTableAlignment] = useState("center");
   const [tableContextKey, setTableContextKey] = useState(0);
   const [widthInputFocused, setWidthInputFocused] = useState(false);
+  const [showCFUModal, setShowCFUModal] = useState(false);
+  const [editingCFUAttrs, setEditingCFUAttrs] = useState<any>(null);
+  const editingCFUAttrsRef = useRef<any>(null);
   const tableElementRef = useRef<HTMLElement | null>(null);
 
   const editor = useEditor({
@@ -80,9 +85,11 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
           levels: [2, 3],
         },
         paragraph: false,
+        link: false,
       }),
       ParagraphWithStyle,
       TableWithStylesExtension,
+      CheckForUnderstanding,
       TableRow,
       TableCell,
       TableHeader,
@@ -107,7 +114,7 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
     editorProps: {
       attributes: {
         class:
-          `prose max-w-none min-h-[150px] px-4 py-3 focus:outline-none border border-[#e5e5e0] rounded-lg${showTableGrid ? " show-table-grid" : ""}`,
+          `prose max-w-none min-h-[150px] px-4 py-3 focus:outline-none border border-[#e5e5e0] rounded-lg overflow-hidden${showTableGrid ? " show-table-grid" : ""}`,
         spellcheck: "false",
       },
     },
@@ -208,6 +215,23 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
     };
   }, [editor]);
 
+  useEffect(() => {
+    let lastEventTime = 0;
+    const handleCFUEditModal = (e: CustomEvent) => {
+      const now = Date.now();
+      if (now - lastEventTime < 2000) return;
+      lastEventTime = now;
+      console.log("Lesson Editor: setting attrs and opening modal", e.detail.backgroundImage);
+      editingCFUAttrsRef.current = e.detail;
+      setEditingCFUAttrs(e.detail);
+      setShowCFUModal(true);
+    };
+    window.addEventListener("cfu-edit-modal", handleCFUEditModal as EventListener);
+    return () => {
+      window.removeEventListener("cfu-edit-modal", handleCFUEditModal as EventListener);
+    };
+  }, []);
+
   const getCurrentMarginLeft = () => {
     if (!editor) return 0;
     const { selection } = editor.state;
@@ -271,6 +295,52 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
     }
     setTableWidth(parseInt(widthValue) || 100);
     setTableAlignment(alignment);
+    onChange(editor.getHTML());
+  };
+
+  const insertCheckForUnderstanding = (attributes: {
+    backgroundImage: string;
+    pngImage: string;
+    heading: string;
+    content: string;
+    alignment: string;
+    width: string;
+  }) => {
+    if (!editor) return;
+
+    const originalAttrs = editingCFUAttrsRef.current;
+    console.log("insertCheckForUnderstanding:", { originalAttrs, newAttrs: attributes });
+
+    if (originalAttrs && originalAttrs.cfuId) {
+      const { state } = editor;
+      let foundPos = -1;
+      state.doc.descendants((node, pos) => {
+        if (foundPos >= 0) return false;
+        if (node.type.name === "checkForUnderstanding" && node.attrs.cfuid === originalAttrs.cfuid) {
+          foundPos = pos;
+        }
+        return true;
+      });
+
+      if (foundPos >= 0) {
+        console.log("Found CFU at pos", foundPos, "updating with", attributes);
+        const tr = state.tr.setNodeMarkup(foundPos, undefined, attributes);
+        editor.view.dispatch(tr);
+      } else {
+        console.log("CFU not found by cfuId, inserting new");
+        editor.chain().focus().insertContent({ type: "checkForUnderstanding", attrs: attributes }).run();
+      }
+      editingCFUAttrsRef.current = null;
+      setEditingCFUAttrs(null);
+    } else if (originalAttrs && !originalAttrs.cfuId) {
+      alert("This CFU has no unique ID. Please delete it and insert a new one.");
+    } else {
+      const newCfuId = Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
+      console.log("No originalAttrs, inserting new CFU with cfuId:", newCfuId);
+      editor.chain().focus().insertContent({ type: "checkForUnderstanding", attrs: { ...attributes, cfuId: newCfuId } }).run();
+      editingCFUAttrsRef.current = null;
+      setEditingCFUAttrs(null);
+    }
     onChange(editor.getHTML());
   };
 
@@ -552,6 +622,17 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
           title="Toggle Table Grid"
         >
           Grid
+        </Button>
+
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => setShowCFUModal(true)}
+          className="h-8 px-2 text-xs"
+          title="Insert Check for Understanding"
+        >
+          <Lightbulb className="w-4 h-4" />
         </Button>
 
         <Button
@@ -987,6 +1068,18 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
         open={showTableInsertDialog}
         onClose={() => setShowTableInsertDialog(false)}
         onInsert={insertTableWithOptions}
+      />
+
+      <CheckForUnderstandingModal
+        open={showCFUModal}
+        onClose={() => {
+          editingCFUAttrsRef.current = null;
+          setShowCFUModal(false);
+          setEditingCFUAttrs(null);
+        }}
+        onInsert={insertCheckForUnderstanding}
+        initialAttributes={editingCFUAttrs}
+        isEditing={!!editingCFUAttrs}
       />
     </div>
   );
