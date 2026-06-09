@@ -109,7 +109,9 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
     ],
     content,
     onUpdate: ({ editor }) => {
-      console.log("Editor onUpdate, doc contains:", editor.state.doc.descendants(n => n.type.name).map(n => n.type.name));
+      const types: string[] = [];
+      editor.state.doc.descendants((node) => { types.push(node.type.name); return true; });
+      console.log("Editor onUpdate, doc contains:", types);
       onChange(editor.getHTML());
     },
     editorProps: {
@@ -122,19 +124,21 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
   });
 
   useEffect(() => {
-    if (editor) {
-      console.log("Editor initialized with content, checking for CFUs...");
-      console.log("Raw content HTML:", content?.substring(0, 500));
-      const cfuNodes: string[] = [];
-      editor.state.doc.descendants((node) => {
-        if (node.type.name === "checkForUnderstanding") {
-          cfuNodes.push(`pos:${node.attrs.cfuId || 'no-id'}`);
-        }
-      });
-      console.log("CFU nodes found:", cfuNodes.length, cfuNodes);
-      console.log("All node types:", [...new Set(editor.state.doc.descendants(n => n.type.name))]);
+    if (editor && content !== undefined && content !== null) {
+      console.log("Content prop changed, setting editor content...");
+      console.log("Content HTML:", content?.substring(0, 1000));
+      editor.commands.setContent(content || "");
     }
-  }, [editor, content]);
+  }, [content, editor]);
+
+  useEffect(() => {
+    if (editor) {
+      console.log("Editor ready");
+      const types: string[] = [];
+      editor.state.doc.descendants((node) => { types.push(node.type.name); return true; });
+      console.log("Initial doc types:", types);
+    }
+  }, [editor]);
 
   const isInsideTable = () => {
     if (!editor) return false;
