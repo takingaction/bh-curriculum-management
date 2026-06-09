@@ -123,7 +123,8 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
 
   useEffect(() => {
     if (editor) {
-      console.log("Editor initialized, checking for CFUs...");
+      console.log("Editor initialized with content, checking for CFUs...");
+      console.log("Raw content HTML:", content?.substring(0, 500));
       const cfuNodes: string[] = [];
       editor.state.doc.descendants((node) => {
         if (node.type.name === "checkForUnderstanding") {
