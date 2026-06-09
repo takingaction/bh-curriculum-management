@@ -112,8 +112,11 @@ export function CheckForUnderstandingModal({
   };
 
   const handleUpdate = () => {
-    if (!hasCfuId) return;
-    console.log("Modal: handleUpdate called");
+    console.log("Modal: handleUpdate called, hasCfuId:", hasCfuId, "bg:", bg);
+    if (!hasCfuId) {
+      alert("No cfuId - cannot update. Please delete and re-insert this CFU.");
+      return;
+    }
     const attrs = { backgroundImage: bg, pngImage: png, heading, content, alignment, width };
     onInsertRef.current?.(attrs);
     onCloseRef.current?.();
