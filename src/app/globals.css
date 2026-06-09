@@ -380,20 +380,17 @@
 .ProseMirror .cfu-wrap-top-left {
   float: left;
   margin: 0 16px 16px 0;
-  clear: both;
 }
 
 .cfu-wrap-top-right,
 .ProseMirror .cfu-wrap-top-right {
   float: right;
   margin: 0 0 16px 16px;
-  clear: both;
 }
 
 .cfu-wrap-top-center,
 .ProseMirror .cfu-wrap-top-center {
   margin: 0 auto 16px auto;
-  clear: both;
 }
 
 .cfu-left,
@@ -417,20 +414,17 @@
 .ProseMirror .cfu-wrap-bottom-left {
   float: left;
   margin: 16px 16px 0 0;
-  clear: both;
 }
 
 .cfu-wrap-bottom-right,
 .ProseMirror .cfu-wrap-bottom-right {
   float: right;
   margin: 16px 0 0 16px;
-  clear: both;
 }
 
 .cfu-wrap-bottom-center,
 .ProseMirror .cfu-wrap-bottom-center {
   margin: 16px auto 0 auto;
-  clear: both;
 }
 
 /* Clear floats after entity */
