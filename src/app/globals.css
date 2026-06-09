@@ -446,6 +446,8 @@
   box-sizing: border-box;
   overflow: visible;
   display: block;
+  position: relative;
+  z-index: 10;
 }
 
 .check-for-understanding,
@@ -454,6 +456,8 @@
   box-sizing: border-box;
   overflow: visible;
   display: block;
+  position: relative;
+  z-index: 10;
 }
 
 /* Prevent floats from escaping */

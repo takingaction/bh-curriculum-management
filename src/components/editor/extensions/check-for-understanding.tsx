@@ -67,8 +67,11 @@ function CheckForUnderstandingNodeView({ node, getPos }: NodeViewProps) {
           outline: "none",
           width: (node.attrs.width as string) || "50%",
           cursor: "pointer",
+          position: "relative",
+          zIndex: 10,
         }}
         onClick={handleClick}
+        onMouseDown={(e) => e.preventDefault()}
       >
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <tbody>
