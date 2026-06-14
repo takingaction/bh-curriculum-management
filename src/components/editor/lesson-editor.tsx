@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/dialog";
 import { useEffect, useRef, useState } from "react";
 import { MediaLibrary } from "@/components/media-library";
-import { ImageIcon, CodeIcon, EyeIcon, EyeOffIcon, LinkIcon, ChevronLeft, ChevronRight, Plus, Minus, AlignLeft, AlignCenter, AlignRight, Lightbulb, Edit3, RefreshCw } from "lucide-react";
+import { ImageIcon, CodeIcon, EyeIcon, EyeOffIcon, LinkIcon, ChevronLeft, ChevronRight, Plus, Minus, AlignLeft, AlignCenter, AlignRight, Lightbulb, Edit3, RefreshCw, Trash2 } from "lucide-react";
 import { TableInsertDialog } from "@/components/ui/table-insert-dialog";
 import { SpellCheckExtension } from "./extensions/spell-check";
 import { CheckForUnderstandingModal } from "@/components/check-for-understanding-modal";
@@ -1374,6 +1374,24 @@ const updateColumnWidth = (widthPercent: number) => {
             className="w-14 h-7 px-1 text-xs border border-[#e5e5e0] rounded text-center"
           />
           <span className="text-xs text-gray-500">%</span>
+
+          <div className="w-px h-5 bg-gray-300 mx-2" />
+
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              if (confirm("Delete this image?")) {
+                editor?.chain().focus().deleteImage().run();
+                setSelectedImagePos(null);
+              }
+            }}
+            className="h-7 px-2 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
+            title="Delete Image"
+          >
+            <Trash2 className="w-4 h-4" />
+          </Button>
         </div>
       )}
       </div>

@@ -3,20 +3,17 @@
 import { mergeAttributes } from "@tiptap/core";
 import Image from "@tiptap/extension-image";
 
-export interface ImageWithOptionsOptions {
-  HTMLAttributes: Record<string, any>;
-}
-
 declare module "@tiptap/core" {
   interface Commands<ReturnType> {
     imageWithOptions: {
       setImageAlign: (align: "left" | "center" | "right") => ReturnType;
       setImageWidth: (widthPercent: number) => ReturnType;
+      deleteImage: () => ReturnType;
     };
   }
 }
 
-export const ImageWithOptions = Image.extend<ImageWithOptionsOptions>({
+export const ImageWithOptions = Image.extend({
   addAttributes() {
     return {
       ...this.parent?.(),
@@ -24,13 +21,18 @@ export const ImageWithOptions = Image.extend<ImageWithOptionsOptions>({
         default: "left",
         parseHTML: (element) => {
           const style = element.getAttribute("style") || "";
-          if (style.includes("float: center") || style.includes("float:center")) return "center";
+          if (style.includes("display: block") && style.includes("margin-left: auto") && style.includes("margin-right: auto")) return "center";
           if (style.includes("float: right") || style.includes("float:right")) return "right";
           return "left";
         },
         renderHTML: (attributes) => {
-          if (attributes.align === "left") return {};
-          return { style: `float: ${attributes.align};` };
+          if (attributes.align === "center") {
+            return { style: "display: block; margin-left: auto; margin-right: auto;" };
+          }
+          if (attributes.align === "right") {
+            return { style: "float: right;" };
+          }
+          return {};
         },
       },
       widthPercent: {
@@ -41,7 +43,6 @@ export const ImageWithOptions = Image.extend<ImageWithOptionsOptions>({
           return match ? parseInt(match[1]) : 100;
         },
         renderHTML: (attributes) => {
-          if (attributes.widthPercent === 100) return {};
           return { style: `width: ${attributes.widthPercent}%;` };
         },
       },
@@ -60,16 +61,11 @@ export const ImageWithOptions = Image.extend<ImageWithOptionsOptions>({
         ({ commands }) => {
           return commands.updateAttributes("image", { widthPercent });
         },
+      deleteImage:
+        () =>
+        ({ commands }) => {
+          return commands.deleteNode("image");
+        },
     };
-  },
-
-  renderHTML({ HTMLAttributes }) {
-    return [
-      "img",
-      mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, {
-        "data-align": HTMLAttributes.align,
-        "data-width-percent": HTMLAttributes.widthPercent,
-      }),
-    ];
   },
 });
