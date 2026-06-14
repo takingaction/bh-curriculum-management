@@ -99,6 +99,7 @@ export default function EditLessonPage({
   const [presentationName, setPresentationName] = useState("");
   const [presentationUrl, setPresentationUrl] = useState("");
   const [spotifyEmbedCode, setSpotifyEmbedCode] = useState("");
+  const [selectedSection, setSelectedSection] = useState(textFields[0].name);
   const [fields, setFields] = useState<Fields>({
     lesson_number: "",
     title: "",
@@ -488,33 +489,48 @@ export default function EditLessonPage({
               )}
             </div>
 
-            {textFields.map((field) => (
-              <div 
-                key={field.name} 
-                className="space-y-2"
-              >
-                <div className="flex items-center justify-between">
-                  <Label htmlFor={field.name} className="text-[#2d2d2d] font-bold text-base">
-                    {field.label}
-                  </Label>
-                  <Link
-                    href={`/admin/courses/${lesson.course_id}/lessons/${lesson.id}/section/${field.name}`}
-                    className="text-xs text-[#0d7377] hover:underline"
-                    target="_blank"
-                  >
-                    Pop Out ↗
-                  </Link>
+            <div className="pt-4 border-t border-[#e5e5e0]">
+              <div className="flex gap-6">
+                {/* Left Navigation - Sticky */}
+                <div className="w-[250px] flex-shrink-0 sticky top-0 self-start">
+                  <div className="space-y-1">
+                    {textFields.map((field) => (
+                      <button
+                        key={field.name}
+                        type="button"
+                        onClick={() => setSelectedSection(field.name)}
+                        className={`w-full text-left px-2 py-1.5 text-xs font-medium transition-colors ${
+                          selectedSection === field.name
+                            ? "bg-[#0d7377] text-white"
+                            : "bg-[#d7ffef] text-black hover:bg-[#c7efe0]"
+                        }`}
+                      >
+                        {field.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <LessonEditor
-                  content={fields[field.name as keyof Fields]}
-                  onChange={(content) => handleFieldChange(field.name, content)}
-                  placeholder={`Enter ${field.label.toLowerCase()}...`}
-                  lessonId={lesson.id}
-                  courseId={lesson.course_id}
-                  isAdmin={true}
-                />
+
+                {/* Right Content - Selected Section Editor */}
+                <div className="flex-1">
+                  {textFields.filter(f => f.name === selectedSection).map((field) => (
+                    <div key={field.name} className="space-y-2">
+                      <Label className="text-[#2d2d2d] font-bold text-base">
+                        {field.label}
+                      </Label>
+                      <LessonEditor
+                        content={fields[field.name as keyof Fields]}
+                        onChange={(content) => handleFieldChange(field.name, content)}
+                        placeholder={`Enter ${field.label.toLowerCase()}...`}
+                        lessonId={lesson.id}
+                        courseId={lesson.course_id}
+                        isAdmin={true}
+                      />
+                    </div>
+                  ))}
+                </div>
               </div>
-            ))}
+            </div>
           </form>
 
         </CardContent>
