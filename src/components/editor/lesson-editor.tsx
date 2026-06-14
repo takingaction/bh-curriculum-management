@@ -723,7 +723,8 @@ const updateColumnWidth = (widthPercent: number) => {
 
   return (
     <div className="space-y-2">
-      <div className="sticky top-0 z-50 flex flex-wrap gap-1 border border-[#e5e5e0] rounded-lg p-2 bg-white">
+      <div className="sticky top-14 z-40">
+        <div className="flex flex-wrap gap-1 border border-[#e5e5e0] rounded-lg p-2 bg-white">
         <Button
           type="button"
           variant="ghost"
@@ -1244,6 +1245,7 @@ const updateColumnWidth = (widthPercent: number) => {
           </label>
         </div>
       )}
+      </div>
 
       {showSource ? (
         <div>
