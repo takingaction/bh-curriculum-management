@@ -101,6 +101,7 @@ export default function EditLessonPage({
   const [spotifyEmbedCode, setSpotifyEmbedCode] = useState("");
   const [selectedSection, setSelectedSection] = useState(textFields[0].name);
   const editorSectionRef = useRef<HTMLDivElement>(null);
+  const [activePanel, setActivePanel] = useState<'general' | 'materials' | 'section'>('general');
   const [fields, setFields] = useState<Fields>({
     lesson_number: "",
     title: "",
@@ -384,14 +385,41 @@ export default function EditLessonPage({
         <div className="flex gap-6">
           {/* Left Navigation - Sticky */}
           <div className="w-[280px] flex-shrink-0 sticky top-14 self-start">
+            {/* Teal header buttons */}
+            <div className="space-y-1 mb-2">
+              <button
+                type="button"
+                onClick={() => setActivePanel('general')}
+                className={`w-full text-left px-2 py-1.5 text-xs font-medium transition-colors truncate ${
+                  activePanel === 'general'
+                    ? "bg-[#0d7377] text-white"
+                    : "bg-[#d7ffef] text-black hover:bg-[#c7efe0]"
+                }`}
+              >
+                General Info
+              </button>
+              <button
+                type="button"
+                onClick={() => setActivePanel('materials')}
+                className={`w-full text-left px-2 py-1.5 text-xs font-medium transition-colors truncate ${
+                  activePanel === 'materials'
+                    ? "bg-[#0d7377] text-white"
+                    : "bg-[#d7ffef] text-black hover:bg-[#c7efe0]"
+                }`}
+              >
+                Lesson Materials
+              </button>
+            </div>
+            <div className="w-full h-px bg-[#e5e5e0] my-2" />
+            {/* Section buttons */}
             <div className="space-y-1">
               {textFields.map((field) => (
                 <button
                   key={field.name}
                   type="button"
-                  onClick={() => setSelectedSection(field.name)}
+                  onClick={() => { setActivePanel('section'); setSelectedSection(field.name); }}
                   className={`w-full text-left px-2 py-1.5 text-xs font-medium transition-colors truncate ${
-                    selectedSection === field.name
+                    activePanel === 'section' && selectedSection === field.name
                       ? "bg-[#0d7377] text-white"
                       : "bg-[#d7ffef] text-black hover:bg-[#c7efe0]"
                   }`}
@@ -402,20 +430,21 @@ export default function EditLessonPage({
             </div>
           </div>
 
-          {/* Right Content - Main editor area */}
-          <div className="flex-1 space-y-6">
-            {/* Lesson basic info */}
-            <div className="bg-white rounded-lg border border-[#e5e5e0] p-4 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="lesson_number" className="text-[#2d2d2d]">Lesson Number</Label>
-                  <Input
-                    id="lesson_number"
-                    name="lesson_number"
-                    type="number"
-                    min="1"
-                    value={fields.lesson_number}
-                    onChange={handleChange}
+          {/* Right Content - Based on activePanel */}
+          <div className="flex-1">
+            {/* General Info Panel */}
+            {activePanel === 'general' && (
+              <div className="bg-white rounded-lg border border-[#e5e5e0] p-4 space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="lesson_number" className="text-[#2d2d2d]">Lesson Number</Label>
+                    <Input
+                      id="lesson_number"
+                      name="lesson_number"
+                      type="number"
+                      min="1"
+                      value={fields.lesson_number}
+                      onChange={handleChange}
                     required
                     className="border-[#e5e5e0] focus:border-[#0d7377]"
                   />
@@ -444,63 +473,68 @@ export default function EditLessonPage({
                 />
               </div>
             </div>
+          )}
 
-            {/* Assets and media */}
-            <div className="bg-white rounded-lg border border-[#e5e5e0] p-4 space-y-4">
-              <LessonAssetsPanel lessonId={lesson.id} canEdit={true} />
-              <div className="flex gap-4 pt-3">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowPresentationModal(true)}
-                  className="border-[#e5e5e0]"
-                >
-                  Add Presentation
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowSpotifyModal(true)}
-                  className="border-[#e5e5e0]"
-                >
-                  Add Spotify Playlist
-                </Button>
+            {/* Materials Panel */}
+            {activePanel === 'materials' && (
+              <div className="bg-white rounded-lg border border-[#e5e5e0] p-4 space-y-4">
+                <LessonAssetsPanel lessonId={lesson.id} canEdit={true} />
+                <div className="flex gap-4 pt-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowPresentationModal(true)}
+                    className="border-[#e5e5e0]"
+                  >
+                    Add Presentation
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowSpotifyModal(true)}
+                    className="border-[#e5e5e0]"
+                  >
+                    Add Spotify Playlist
+                  </Button>
+                </div>
+                {presentationName && (
+                  <div className="flex items-center gap-3 py-2 px-3 bg-gray-50 rounded-lg">
+                    <PresentationLink name={presentationName} url={presentationUrl} />
+                    <button type="button" onClick={() => setShowPresentationModal(true)} className="text-xs text-[#0d7377] hover:underline">Edit</button>
+                    <button type="button" onClick={handleRemovePresentation} className="text-xs text-red-600 hover:underline">Remove</button>
+                  </div>
+                )}
+                {spotifyEmbedCode && (
+                  <div className="flex items-center gap-3 py-2 px-3 bg-gray-50 rounded-lg">
+                    <SpotifyLink onClick={() => {}} />
+                    <button type="button" onClick={() => setShowSpotifyModal(true)} className="text-xs text-[#0d7377] hover:underline">Edit</button>
+                    <button type="button" onClick={handleRemoveSpotify} className="text-xs text-red-600 hover:underline">Remove</button>
+                  </div>
+                )}
               </div>
-              {presentationName && (
-                <div className="flex items-center gap-3 py-2 px-3 bg-gray-50 rounded-lg">
-                  <PresentationLink name={presentationName} url={presentationUrl} />
-                  <button type="button" onClick={() => setShowPresentationModal(true)} className="text-xs text-[#0d7377] hover:underline">Edit</button>
-                  <button type="button" onClick={handleRemovePresentation} className="text-xs text-red-600 hover:underline">Remove</button>
-                </div>
-              )}
-              {spotifyEmbedCode && (
-                <div className="flex items-center gap-3 py-2 px-3 bg-gray-50 rounded-lg">
-                  <SpotifyLink onClick={() => {}} />
-                  <button type="button" onClick={() => setShowSpotifyModal(true)} className="text-xs text-[#0d7377] hover:underline">Edit</button>
-                  <button type="button" onClick={handleRemoveSpotify} className="text-xs text-red-600 hover:underline">Remove</button>
-                </div>
-              )}
-            </div>
+            )}
 
-            {/* Selected Section Editor */}
-            <div data-section-editor className="bg-white rounded-lg border border-[#e5e5e0] p-4">
-              <div className="space-y-2">
-                <Label className="text-[#2d2d2d] font-bold text-base">
-                  {textFields.find(f => f.name === selectedSection)?.label}
-                </Label>
-                <LessonEditor
-                  key={selectedSection}
-                  content={fields[selectedSection as keyof Fields]}
-                  onChange={(content) => handleFieldChange(selectedSection, content)}
-                  placeholder={`Enter ${textFields.find(f => f.name === selectedSection)?.label.toLowerCase()}...`}
-                  lessonId={lesson.id}
-                  courseId={lesson.course_id}
-                  isAdmin={true}
-                />
+            {/* Section Editor Panel */}
+            {activePanel === 'section' && (
+              <div className="bg-white rounded-lg border border-[#e5e5e0] p-4">
+                <div className="space-y-2">
+                  <Label className="text-[#2d2d2d] font-bold text-base">
+                    {textFields.find(f => f.name === selectedSection)?.label}
+                  </Label>
+                  <LessonEditor
+                    key={selectedSection}
+                    content={fields[selectedSection as keyof Fields]}
+                    onChange={(content) => handleFieldChange(selectedSection, content)}
+                    placeholder={`Enter ${textFields.find(f => f.name === selectedSection)?.label.toLowerCase()}...`}
+                    lessonId={lesson.id}
+                    courseId={lesson.course_id}
+                    isAdmin={true}
+                  />
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       </div>
