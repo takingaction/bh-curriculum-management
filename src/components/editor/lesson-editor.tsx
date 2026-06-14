@@ -141,6 +141,9 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
     const { selection } = state;
     const $from = selection.$from;
 
+    let cellDepth = 0;
+    let cellOffset = 0;
+
     for (let depth = $from.depth; depth > 0; depth--) {
       const node = $from.node(depth);
       if (node.type.name === "table") {
@@ -154,8 +157,17 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
           setTableWidth(100);
         }
         setTableAlignment(alignment);
-        return;
       }
+      if (node.type.name === "tableCell" || node.type.name === "tableHeader") {
+        cellDepth = depth;
+        cellOffset = $from.index(depth);
+      }
+    }
+
+    if (cellDepth > 0) {
+      const cell = $from.node(cellDepth);
+      const colWidth = cell.attrs.width;
+      setSelectedColumnWidth(colWidth || "");
     }
   };
 
@@ -199,6 +211,7 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
         if (cellDepth > 0) {
           const cell = $from.node(cellDepth);
           const colWidth = cell.attrs.width;
+          console.log("forceSyncTableState: cell depth", cellDepth, "colWidth:", colWidth);
           setSelectedColumnWidth(colWidth || "");
         } else {
           setSelectedColumnWidth("");
@@ -484,7 +497,11 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
   };
 
 const updateColumnWidth = (widthPercent: number) => {
-    if (!editor) return;
+    console.log("updateColumnWidth called with:", widthPercent);
+    if (!editor) {
+      console.log("No editor");
+      return;
+    }
     const { state } = editor;
     const { selection } = state;
     const $from = selection.$from;
@@ -498,9 +515,11 @@ const updateColumnWidth = (widthPercent: number) => {
       if (node.type.name === "table") {
         tableNode = node;
         tableDepth = depth;
+        console.log("Found table at depth", depth);
       }
       if (node.type.name === "tableCell" || node.type.name === "tableHeader") {
         const row = $from.node(depth - 1);
+        console.log("Found cell at depth", depth, "row:", row?.type.name);
         if (row) {
           for (let i = 0; i < $from.index(depth); i++) {
             const cell = row.child(i);
@@ -510,12 +529,16 @@ const updateColumnWidth = (widthPercent: number) => {
               cellColIndex++;
             }
           }
+          console.log("cellColIndex:", cellColIndex);
         }
       }
     }
 
+    console.log("tableNode:", !!tableNode, "cellColIndex:", cellColIndex);
+    
     if (tableNode && cellColIndex >= 0) {
       const tablePos = $from.before(tableDepth);
+      console.log("tablePos:", tablePos);
       const tr = state.tr;
       let updated = 0;
       
@@ -524,22 +547,25 @@ const updateColumnWidth = (widthPercent: number) => {
         rowNode.forEach((cell, cellOffset) => {
           if (colIndex === cellColIndex) {
             const absolutePos = tablePos + rowOffset + 1 + cellOffset;
-            const newAttrs = { ...cell.attrs, width: `${widthPercent}%` };
-            console.log("Updating cell at pos", absolutePos, "with width", `${widthPercent}%`, "cell attrs before:", cell.attrs);
-            tr.setNodeMarkup(absolutePos, undefined, newAttrs);
+            const nodeAtPos = state.doc.nodeAt(absolutePos);
+            console.log("Cell node at", absolutePos, ":", nodeAtPos?.type.name, "current width:", nodeAtPos?.attrs.width);
+            tr.setNodeAttribute(absolutePos, "width", `${widthPercent}%`);
             updated++;
           }
           colIndex += cell.attrs.colspan || 1;
         });
       });
       
-      console.log("Total cells updated:", updated, "HTML before dispatch:", editor.getHTML().substring(0, 500));
+      console.log("Total cells updated:", updated);
       if (updated > 0) {
         editor.view.dispatch(tr);
-        console.log("HTML after dispatch:", editor.getHTML().substring(0, 500));
         setSelectedColumnWidth(`${widthPercent}%`);
         onChange(editor.getHTML());
+      } else {
+        console.log("No cells updated - check cellColIndex or table structure");
       }
+    } else {
+      console.log("Skipping update - tableNode:", !!tableNode, "cellColIndex:", cellColIndex);
     }
   };
 
@@ -1084,8 +1110,8 @@ const updateColumnWidth = (widthPercent: number) => {
             type="number"
             min={1}
             max={100}
-            value={selectedColumnWidth ? parseInt(selectedColumnWidth) || "" : ""}
-            placeholder="="
+            value={selectedColumnWidth ? parseInt(selectedColumnWidth.replace("%", "")) || "" : ""}
+            placeholder="100"
             onChange={(e) => {
               const parsed = parseInt(e.target.value);
               if (!isNaN(parsed) && parsed >= 1 && parsed <= 100) {
@@ -1097,7 +1123,10 @@ const updateColumnWidth = (widthPercent: number) => {
             onBlur={(e) => {
               const parsed = parseInt(e.target.value);
               if (!isNaN(parsed) && parsed >= 1 && parsed <= 100) {
+                console.log("Blur: calling updateColumnWidth with", parsed);
                 updateColumnWidth(parsed);
+              } else {
+                console.log("Blur: invalid value", e.target.value, "parsed:", parsed);
               }
             }}
             onKeyDown={(e) => {
