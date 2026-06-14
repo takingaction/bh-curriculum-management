@@ -77,6 +77,7 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
   const [tableShowGrid, setTableShowGrid] = useState(true);
   const [showDeleteTableModal, setShowDeleteTableModal] = useState(false);
   const [showDeleteImageModal, setShowDeleteImageModal] = useState(false);
+  const [showDeleteCFUModal, setShowDeleteCFUModal] = useState(false);
   const [showCFUModal, setShowCFUModal] = useState(false);
   const [editingCFUAttrs, setEditingCFUAttrs] = useState<any>(null);
   const [existingCFUAttrs, setExistingCFUAttrs] = useState<any>(null);
@@ -708,9 +709,9 @@ const updateColumnWidth = (widthPercent: number) => {
   const deleteImage = () => {
     if (!editor) return;
     const { state } = editor;
-    
+
     let deleted = false;
-    
+
     state.doc.descendants((node, pos) => {
       if (deleted) return false;
       if (node.type.name === "image") {
@@ -728,6 +729,35 @@ const updateColumnWidth = (widthPercent: number) => {
 
     setShowDeleteImageModal(false);
     setSelectedImagePos(null);
+  };
+
+  const deleteCFU = () => {
+    if (!editor || !editingCFUAttrsRef.current?.cfuId) return;
+    const cfuId = editingCFUAttrsRef.current.cfuId;
+    const { state } = editor;
+
+    let deleted = false;
+
+    state.doc.descendants((node, pos) => {
+      if (deleted) return false;
+      if (node.type.name === "checkForUnderstanding" && node.attrs.cfuId === cfuId) {
+        const tr = state.tr.delete(pos, pos + node.nodeSize);
+        editor.view.dispatch(tr);
+        deleted = true;
+        return false;
+      }
+      return true;
+    });
+
+    if (deleted) {
+      onChange(editor.getHTML());
+    }
+
+    setShowDeleteCFUModal(false);
+    setShowCFUModal(false);
+    editingCFUAttrsRef.current = null;
+    setEditingCFUAttrs(null);
+    setExistingCFUAttrs(null);
   };
 
   const getWordAtCursor = () => {
@@ -1601,6 +1631,7 @@ const updateColumnWidth = (widthPercent: number) => {
           setEditingCFUAttrs(null);
         }}
         onInsert={insertCheckForUnderstanding}
+        onDelete={() => setShowDeleteCFUModal(true)}
         initialAttributes={editingCFUAttrs}
         isEditing={!!editingCFUAttrs}
       />
@@ -1632,6 +1663,23 @@ const updateColumnWidth = (widthPercent: number) => {
                 Cancel
               </Button>
               <Button variant="destructive" onClick={deleteImage}>
+                Delete
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDeleteCFUModal && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ background: "white", borderRadius: 12, padding: 24, width: "90%", maxWidth: 400 }}>
+            <h3 style={{ margin: "0 0 16px 0" }}>Delete Check for Understanding?</h3>
+            <p style={{ margin: "0 0 16px 0", color: "#666" }}>This action cannot be undone.</p>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              <Button variant="outline" onClick={() => setShowDeleteCFUModal(false)}>
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={deleteCFU}>
                 Delete
               </Button>
             </div>

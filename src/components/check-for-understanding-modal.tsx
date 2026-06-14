@@ -24,6 +24,7 @@ interface CheckForUnderstandingModalProps {
     width: string;
     pngWidth: number;
   }) => void;
+  onDelete?: () => void;
   initialAttributes?: {
     cfuId?: string | null;
     backgroundImage: string;
@@ -53,6 +54,7 @@ export function CheckForUnderstandingModal({
   open,
   onClose,
   onInsert,
+  onDelete,
   initialAttributes,
   isEditing,
 }: CheckForUnderstandingModalProps) {
@@ -274,19 +276,26 @@ useEffect(() => {
           </div>
         </div>
 
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 24 }}>
-          <button type="button" onClick={onCloseRef.current} style={{ padding: "8px 16px", border: "1px solid #ccc", borderRadius: 6, background: "white", cursor: "pointer" }}>
-            Cancel
-          </button>
-          {!isEditing ? (
-            <button type="button" onClick={handleInsert} disabled={!bg} style={{ padding: "8px 16px", border: "none", borderRadius: 6, background: bg ? "#0d7377" : "#ccc", color: "white", cursor: bg ? "pointer" : "not-allowed" }}>
-              Insert
-            </button>
-          ) : (
-            <button type="button" onClick={handleUpdate} disabled={!bg || !hasCfuId} style={{ padding: "8px 16px", border: "none", borderRadius: 6, background: (bg && hasCfuId) ? "#0d7377" : "#ccc", color: "white", cursor: (bg && hasCfuId) ? "pointer" : "not-allowed" }}>
-              Update
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 8, marginTop: 24 }}>
+          {isEditing && onDelete && (
+            <button type="button" onClick={onDelete} style={{ padding: "8px 16px", border: "none", borderRadius: 6, background: "#ef4444", color: "white", cursor: "pointer" }}>
+              Delete CFU
             </button>
           )}
+          <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
+            <button type="button" onClick={onCloseRef.current} style={{ padding: "8px 16px", border: "1px solid #ccc", borderRadius: 6, background: "white", cursor: "pointer" }}>
+              Cancel
+            </button>
+            {!isEditing ? (
+              <button type="button" onClick={handleInsert} disabled={!bg} style={{ padding: "8px 16px", border: "none", borderRadius: 6, background: bg ? "#0d7377" : "#ccc", color: "white", cursor: bg ? "pointer" : "not-allowed" }}>
+                Insert
+              </button>
+            ) : (
+              <button type="button" onClick={handleUpdate} disabled={!bg || !hasCfuId} style={{ padding: "8px 16px", border: "none", borderRadius: 6, background: (bg && hasCfuId) ? "#0d7377" : "#ccc", color: "white", cursor: (bg && hasCfuId) ? "pointer" : "not-allowed" }}>
+                Update
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>
