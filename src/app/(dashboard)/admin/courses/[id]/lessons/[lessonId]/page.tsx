@@ -322,111 +322,123 @@ export default function EditLessonPage({
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="sticky top-0 z-10 bg-white -mx-4 px-4 py-4 mb-6 border-b border-[#e5e5e0]">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <div className="flex gap-4 mb-2">
-              <Link
-                href={`/lessons/${lesson?.id}`}
-                className="text-[#0d7377] hover:underline text-sm"
-              >
-                View Lesson
-              </Link>
+    <div className="min-h-screen bg-white">
+      <div className="sticky top-0 z-50 bg-white border-b border-[#e5e5e0] shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-14">
+            <div className="flex items-center gap-4">
               <Link
                 href={`/admin/courses/${lesson?.course_id}`}
-                className="text-[#0d7377] hover:underline text-sm"
+                className="text-sm text-[#0d7377] hover:underline"
               >
                 ← Back to Course
               </Link>
+              <span className="text-gray-300">|</span>
+              <span className="text-sm text-gray-600">Edit Lesson</span>
             </div>
-            <h2 className="text-2xl font-bold text-[#2d2d2d]">Edit Lesson</h2>
-            <p className="text-[#666666]">{fields.title}</p>
-          </div>
-          <div className="flex gap-2 shrink-0">
-            <Button
-              type="button"
-              onClick={() => handleSubmit({ preventDefault: () => {} } as React.FormEvent)}
-              disabled={loading}
-              className="bg-[#0d7377] hover:bg-[#0a5c5f] text-white"
-            >
-              {loading ? "Saving..." : saved ? "Saved!" : "Save Changes"}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => router.back()}
-              className="border-[#e5e5e0]"
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              variant="destructive"
-              onClick={async () => {
-                if (confirm("Delete this lesson?")) {
-                  await fetch(`/api/admin/lessons/${lesson.id}`, { method: "DELETE" });
-                  router.push(`/admin/courses/${lesson.course_id}`);
-                }
-              }}
-            >
-              Delete
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                onClick={() => handleSubmit({ preventDefault: () => {} } as React.FormEvent)}
+                disabled={loading}
+                className="bg-[#0d7377] hover:bg-[#0a5c5f] text-white"
+              >
+                {loading ? "Saving..." : saved ? "Saved!" : "Save"}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => router.back()}
+                className="border-[#e5e5e0]"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={async () => {
+                  if (confirm("Delete this lesson?")) {
+                    await fetch(`/api/admin/lessons/${lesson.id}`, { method: "DELETE" });
+                    router.push(`/admin/courses/${lesson.course_id}`);
+                  }
+                }}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                Delete
+              </Button>
+            </div>
           </div>
         </div>
       </div>
 
-      <Card className="border-[#e5e5e0] shadow-sm">
-        <CardContent className="pt-6">
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {error && (
-              <div className="p-3 text-sm text-white bg-[#e85d5d] rounded-lg">
-                {error}
-              </div>
-            )}
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="lesson_number" className="text-[#2d2d2d]">Lesson Number</Label>
-                <Input
-                  id="lesson_number"
-                  name="lesson_number"
-                  type="number"
-                  min="1"
-                  value={fields.lesson_number}
-                  onChange={handleChange}
-                  required
-                  className="border-[#e5e5e0] focus:border-[#0d7377]"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="title" className="text-[#2d2d2d]">Title</Label>
-                <Input
-                  id="title"
-                  name="title"
-                  value={fields.title}
-                  onChange={handleChange}
-                  required
-                  className="border-[#e5e5e0] focus:border-[#0d7377]"
-                />
-              </div>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+        <div className="flex gap-6">
+          {/* Left Navigation - Sticky */}
+          <div className="w-[250px] flex-shrink-0 sticky top-14 self-start">
+            <div className="space-y-1">
+              {textFields.map((field) => (
+                <button
+                  key={field.name}
+                  type="button"
+                  onClick={() => setSelectedSection(field.name)}
+                  className={`w-full text-left px-2 py-1.5 text-xs font-medium transition-colors ${
+                    selectedSection === field.name
+                      ? "bg-[#0d7377] text-white"
+                      : "bg-[#d7ffef] text-black hover:bg-[#c7efe0]"
+                  }`}
+                >
+                  {field.label}
+                </button>
+              ))}
             </div>
+          </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="total_time" className="text-[#2d2d2d]">Total Time</Label>
-              <Input
-                id="total_time"
-                name="total_time"
+          {/* Right Content - Main editor area */}
+          <div className="flex-1 space-y-6">
+            {/* Lesson basic info */}
+            <div className="bg-white rounded-lg border border-[#e5e5e0] p-4 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="lesson_number" className="text-[#2d2d2d]">Lesson Number</Label>
+                  <Input
+                    id="lesson_number"
+                    name="lesson_number"
+                    type="number"
+                    min="1"
+                    value={fields.lesson_number}
+                    onChange={handleChange}
+                    required
+                    className="border-[#e5e5e0] focus:border-[#0d7377]"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="title" className="text-[#2d2d2d]">Title</Label>
+                  <Input
+                    id="title"
+                    name="title"
+                    value={fields.title}
+                    onChange={handleChange}
+                    required
+                    className="border-[#e5e5e0] focus:border-[#0d7377]"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="total_time" className="text-[#2d2d2d]">Total Time</Label>
+                <Input
+                  id="total_time"
+                  name="total_time"
                 placeholder="e.g., 45 minutes"
-                value={fields.total_time}
-                onChange={handleChange}
-                className="border-[#e5e5e0] focus:border-[#0d7377]"
-              />
+                  value={fields.total_time}
+                  onChange={handleChange}
+                  className="border-[#e5e5e0] focus:border-[#0d7377] max-w-xs"
+                />
+              </div>
             </div>
 
-            <div className="space-y-2 pt-4 border-t border-[#e5e5e0]">
+            {/* Assets and media */}
+            <div className="bg-white rounded-lg border border-[#e5e5e0] p-4 space-y-4">
               <LessonAssetsPanel lessonId={lesson.id} canEdit={true} />
-
               <div className="flex gap-4 pt-3">
                 <Button
                   type="button"
@@ -447,94 +459,41 @@ export default function EditLessonPage({
                   Add Spotify Playlist
                 </Button>
               </div>
-
               {presentationName && (
                 <div className="flex items-center gap-3 py-2 px-3 bg-gray-50 rounded-lg">
                   <PresentationLink name={presentationName} url={presentationUrl} />
-                  <button
-                    type="button"
-                    onClick={() => setShowPresentationModal(true)}
-                    className="text-xs text-[#0d7377] hover:underline"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleRemovePresentation}
-                    className="text-xs text-red-600 hover:underline"
-                  >
-                    Remove
-                  </button>
+                  <button type="button" onClick={() => setShowPresentationModal(true)} className="text-xs text-[#0d7377] hover:underline">Edit</button>
+                  <button type="button" onClick={handleRemovePresentation} className="text-xs text-red-600 hover:underline">Remove</button>
                 </div>
               )}
-
               {spotifyEmbedCode && (
                 <div className="flex items-center gap-3 py-2 px-3 bg-gray-50 rounded-lg">
                   <SpotifyLink onClick={() => {}} />
-                  <button
-                    type="button"
-                    onClick={() => setShowSpotifyModal(true)}
-                    className="text-xs text-[#0d7377] hover:underline"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleRemoveSpotify}
-                    className="text-xs text-red-600 hover:underline"
-                  >
-                    Remove
-                  </button>
+                  <button type="button" onClick={() => setShowSpotifyModal(true)} className="text-xs text-[#0d7377] hover:underline">Edit</button>
+                  <button type="button" onClick={handleRemoveSpotify} className="text-xs text-red-600 hover:underline">Remove</button>
                 </div>
               )}
             </div>
 
-            <div className="pt-4 border-t border-[#e5e5e0]">
-              <div className="flex gap-6">
-                {/* Left Navigation - Sticky */}
-                <div className="w-[250px] flex-shrink-0 sticky top-0 self-start">
-                  <div className="space-y-1">
-                    {textFields.map((field) => (
-                      <button
-                        key={field.name}
-                        type="button"
-                        onClick={() => setSelectedSection(field.name)}
-                        className={`w-full text-left px-2 py-1.5 text-xs font-medium transition-colors ${
-                          selectedSection === field.name
-                            ? "bg-[#0d7377] text-white"
-                            : "bg-[#d7ffef] text-black hover:bg-[#c7efe0]"
-                        }`}
-                      >
-                        {field.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Right Content - Selected Section Editor */}
-                <div className="flex-1">
-                  {textFields.filter(f => f.name === selectedSection).map((field) => (
-                    <div key={field.name} className="space-y-2">
-                      <Label className="text-[#2d2d2d] font-bold text-base">
-                        {field.label}
-                      </Label>
-                      <LessonEditor
-                        content={fields[field.name as keyof Fields]}
-                        onChange={(content) => handleFieldChange(field.name, content)}
-                        placeholder={`Enter ${field.label.toLowerCase()}...`}
-                        lessonId={lesson.id}
-                        courseId={lesson.course_id}
-                        isAdmin={true}
-                      />
-                    </div>
-                  ))}
-                </div>
+            {/* Selected Section Editor */}
+            <div className="bg-white rounded-lg border border-[#e5e5e0] p-4">
+              <div className="space-y-2">
+                <Label className="text-[#2d2d2d] font-bold text-base">
+                  {textFields.find(f => f.name === selectedSection)?.label}
+                </Label>
+                <LessonEditor
+                  content={fields[selectedSection as keyof Fields]}
+                  onChange={(content) => handleFieldChange(selectedSection, content)}
+                  placeholder={`Enter ${textFields.find(f => f.name === selectedSection)?.label.toLowerCase()}...`}
+                  lessonId={lesson.id}
+                  courseId={lesson.course_id}
+                  isAdmin={true}
+                />
               </div>
             </div>
-          </form>
-
-        </CardContent>
-      </Card>
+          </div>
+        </div>
+      </div>
 
       <PresentationModal
         open={showPresentationModal}
