@@ -170,8 +170,8 @@ export default function SectionEditPage() {
   }
   
   return (
-    <div className="min-h-screen bg-white">
-      <div className="sticky top-0 z-50 bg-white border-b border-[#e5e5e0] shadow-sm">
+    <div className="min-h-screen bg-white flex flex-col">
+      <div className="sticky top-0 z-50 bg-white border-b border-[#e5e5e0] shadow-sm w-full">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-14">
             <div className="flex items-center gap-4">

@@ -500,8 +500,9 @@ export default function EditLessonPage({
                   <Link
                     href={`/admin/courses/${lesson.course_id}/lessons/${lesson.id}/section/${field.name}`}
                     className="text-xs text-[#0d7377] hover:underline"
+                    target="_blank"
                   >
-                    Pop Out
+                    Pop Out ↗
                   </Link>
                 </div>
                 <LessonEditor
