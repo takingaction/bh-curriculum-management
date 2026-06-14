@@ -168,7 +168,11 @@ export default function EditLessonPage({
   }, []);
 
   useEffect(() => {
-    editorSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (editorSectionRef.current) {
+      const rect = editorSectionRef.current.getBoundingClientRect();
+      const offsetTop = rect.top + window.scrollY - 64;
+      window.scrollTo({ top: offsetTop, behavior: "smooth" });
+    }
   }, [selectedSection]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -379,14 +383,14 @@ export default function EditLessonPage({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
         <div className="flex gap-6">
           {/* Left Navigation - Sticky */}
-          <div className="w-[250px] flex-shrink-0 sticky top-14 self-start">
+          <div className="w-[280px] flex-shrink-0 sticky top-14 self-start">
             <div className="space-y-1">
               {textFields.map((field) => (
                 <button
                   key={field.name}
                   type="button"
                   onClick={() => setSelectedSection(field.name)}
-                  className={`w-full text-left px-2 py-1.5 text-xs font-medium transition-colors ${
+                  className={`w-full text-left px-2 py-1.5 text-[11px] font-medium transition-colors truncate ${
                     selectedSection === field.name
                       ? "bg-[#0d7377] text-white"
                       : "bg-[#d7ffef] text-black hover:bg-[#c7efe0]"
