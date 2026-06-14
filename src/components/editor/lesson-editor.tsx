@@ -74,6 +74,7 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
   const [widthInputFocused, setWidthInputFocused] = useState(false);
   const [selectedColumnWidth, setSelectedColumnWidth] = useState<string>("");
   const [tableShowGrid, setTableShowGrid] = useState(true);
+  const [showDeleteTableModal, setShowDeleteTableModal] = useState(false);
   const [showCFUModal, setShowCFUModal] = useState(false);
   const [editingCFUAttrs, setEditingCFUAttrs] = useState<any>(null);
   const [existingCFUAttrs, setExistingCFUAttrs] = useState<any>(null);
@@ -560,6 +561,13 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
     }
   };
 
+  const deleteTable = () => {
+    if (!editor) return;
+    editor.chain().focus().deleteTable().run();
+    setShowDeleteTableModal(false);
+    onChange(editor.getHTML());
+  };
+
   const getWordAtCursor = () => {
     if (!editor) return "";
     const { selection } = editor.state;
@@ -932,7 +940,7 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
       </div>
 
       {isInsideTable() && tableContextKey > 0 && (
-        <div className="flex items-center gap-1 py-2 px-3 bg-gray-50 border-t border-[#e5e5e0]">
+        <div className="flex flex-wrap items-center gap-1 py-2 px-3 bg-gray-50 border-t border-[#e5e5e0]">
           <span className="text-xs text-gray-500 mr-2">Table:</span>
           <Button
             type="button"
@@ -993,6 +1001,16 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
             title="Delete Row"
           >
             <Minus className="w-3 h-3 mr-1" />Row
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowDeleteTableModal(true)}
+            className="h-7 px-2 text-xs text-red-600"
+            title="Delete Table"
+          >
+            <Minus className="w-3 h-3 mr-1" />Table
           </Button>
 
           <div className="w-px h-5 bg-gray-300 mx-2" />
@@ -1286,6 +1304,23 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
         initialAttributes={editingCFUAttrs}
         isEditing={!!editingCFUAttrs}
       />
+
+      {showDeleteTableModal && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ background: "white", borderRadius: 12, padding: 24, width: "90%", maxWidth: 400 }}>
+            <h3 style={{ margin: "0 0 16px 0" }}>Delete Table?</h3>
+            <p style={{ margin: "0 0 16px 0", color: "#666" }}>This action cannot be undone.</p>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              <Button variant="outline" onClick={() => setShowDeleteTableModal(false)}>
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={deleteTable}>
+                Delete
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
