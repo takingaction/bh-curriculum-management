@@ -71,10 +71,11 @@ Located in `src/components/editor/extensions/`:
 
 #### Check for Understanding (CFU) Entity
 - TipTap block node with ReactNodeViewRenderer
-- 7 attributes: cfuId, backgroundImage, pngImage, heading, content, alignment, width
+- 8 attributes: cfuId, backgroundImage, pngImage, heading, content, alignment, width, pngWidth
 - 9 position options: wrap-top-left/center/right, left/center/right, wrap-bottom-left/center/right
 - Default entity width: 50%, background: contain, padding: 30px 40px
 - Text: 16px, weight 700, vertical-align middle, text-align left
+- **Left column: 25% fixed width, image right-aligned, pngWidth (1-100, default 100) controls image width within column**
 - **Click-to-edit**: Single click opens modal (with z-index, contentEditable=false fixes)
 - **Unique cfuId**: Generated on insert (Date.now().toString(36) + random)
 - **Editor isolation**: Only the editor containing the CFU opens its modal

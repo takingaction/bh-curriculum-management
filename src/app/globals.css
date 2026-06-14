@@ -359,8 +359,8 @@
 }
 
 .cfu-image-cell img {
-  max-width: 100%;
   height: auto;
+  max-width: 100%;
 }
 
 .cfu-text-cell {
@@ -370,7 +370,7 @@
 
 .cfu-text-cell h4,
 .cfu-text-cell p {
-  margin: 0 0 8px 0;
+  margin: 0;
   font-size: 16px;
   font-weight: 700;
   color: #333;
@@ -493,6 +493,11 @@
 }
 
 /* CFU wrap styles for student view (lesson-content) */
+.lesson-content .cfu-text-cell h4,
+.lesson-content .cfu-text-cell p {
+  margin: 0 !important;
+}
+
 .lesson-content .cfu-wrap-top-left {
   float: left;
   margin: 0 16px 16px 0;

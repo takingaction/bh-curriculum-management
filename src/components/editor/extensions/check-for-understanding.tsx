@@ -5,7 +5,7 @@ import { useRef } from "react";
 function CheckForUnderstandingNodeView({ node, getPos }: NodeViewProps) {
   const lastClickRef = useRef(0);
 
-  const { backgroundImage, pngImage, heading, content, alignment, width, cfuId } = node.attrs as {
+  const { backgroundImage, pngImage, heading, content, alignment, width, cfuId, pngWidth } = node.attrs as {
     backgroundImage: string;
     pngImage: string;
     heading: string;
@@ -13,6 +13,7 @@ function CheckForUnderstandingNodeView({ node, getPos }: NodeViewProps) {
     alignment: string;
     width: string;
     cfuId: string;
+    pngWidth: number;
   };
 
   const alignmentClasses: Record<string, string> = {
@@ -45,6 +46,7 @@ function CheckForUnderstandingNodeView({ node, getPos }: NodeViewProps) {
         content,
         alignment,
         width: width || "50%",
+        pngWidth: pngWidth || 100,
       },
     }));
   };
@@ -78,19 +80,19 @@ function CheckForUnderstandingNodeView({ node, getPos }: NodeViewProps) {
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <tbody>
             <tr>
-              <td style={{ width: "25%", verticalAlign: "middle", padding: "8px", textAlign: "center" }}>
+              <td style={{ width: "25%", verticalAlign: "middle", padding: "8px", textAlign: "right" }}>
                 {pngImage && (
-                  <img src={pngImage} style={{ maxWidth: "100%", height: "auto" }} />
+                  <img src={pngImage} style={{ maxWidth: `${pngWidth || 100}%`, height: "auto", display: "block", marginLeft: "auto" }} />
                 )}
               </td>
               <td style={{ width: "75%", verticalAlign: "middle", textAlign: "left", padding: "8px" }}>
                 {heading && (
-                  <h4 style={{ margin: "0 0 8px 0", fontSize: "16px", fontWeight: "700", color: "#333" }}>
+                  <h4 style={{ margin: 0, fontSize: "16px", fontWeight: "700", color: "#333" }}>
                     {heading}
                   </h4>
                 )}
                 {content && (
-                  <p style={{ margin: 0, fontSize: "16px", fontWeight: "700", color: "#333" }}>{content}</p>
+                  <p style={{ margin: "4px 0 0 0", fontSize: "16px", fontWeight: "700", color: "#333" }}>{content}</p>
                 )}
               </td>
             </tr>
@@ -155,6 +157,9 @@ export const CheckForUnderstanding = Node.create<CheckForUnderstandingOptions>({
       width: {
         default: "50%",
       },
+      pngWidth: {
+        default: 100,
+      },
     };
   },
 
@@ -172,6 +177,7 @@ export const CheckForUnderstanding = Node.create<CheckForUnderstandingOptions>({
             content: el.getAttribute("content") || "",
             alignment: el.getAttribute("alignment") || "center",
             width: el.getAttribute("width") || "50%",
+            pngWidth: parseInt(el.getAttribute("pngwidth") || "100") || 100,
           };
         },
       },
@@ -185,6 +191,7 @@ export const CheckForUnderstanding = Node.create<CheckForUnderstandingOptions>({
     const heading = node.attrs.heading || "";
     const content = node.attrs.content || "";
     const width = node.attrs.width || "50%";
+    const pngWidth = node.attrs.pngWidth || 100;
     const cfuId = node.attrs.cfuId || "";
 
     const alignmentClasses: Record<string, string> = {
@@ -208,10 +215,10 @@ export const CheckForUnderstanding = Node.create<CheckForUnderstandingOptions>({
 
     const imageCell: any[] = [
       "td",
-      { class: "cfu-image-cell", style: "width: 25%; vertical-align: middle; text-align: center; padding: 8px;" },
+      { class: "cfu-image-cell", style: "width: 25%; vertical-align: middle; text-align: right; padding: 8px;" },
     ];
     if (pngImage) {
-      imageCell.push(["img", { src: pngImage, style: "max-width: 100%; height: auto;" }]);
+      imageCell.push(["img", { src: pngImage, style: `max-width: ${pngWidth}%; height: auto; display: block; margin-left: auto;` }]);
     }
 
     const textCell: any[] = [
@@ -219,7 +226,7 @@ export const CheckForUnderstanding = Node.create<CheckForUnderstandingOptions>({
       { class: "cfu-text-cell", style: "width: 75%; vertical-align: middle; text-align: left; padding: 8px;" },
     ];
     if (heading) {
-      textCell.push(["h4", { style: "margin: 0 0 8px 0; font-size: 18px; color: #333;" }, heading]);
+      textCell.push(["h4", { style: "margin: 0; font-size: 18px; font-weight: 700; color: #333;" }, heading]);
     }
     if (content) {
       textCell.push(["p", { style: "margin: 0; color: #333;" }, content]);

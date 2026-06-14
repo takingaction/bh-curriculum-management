@@ -22,6 +22,7 @@ interface CheckForUnderstandingModalProps {
     content: string;
     alignment: string;
     width: string;
+    pngWidth: number;
   }) => void;
   initialAttributes?: {
     cfuId?: string | null;
@@ -31,6 +32,7 @@ interface CheckForUnderstandingModalProps {
     content: string;
     alignment: string;
     width: string;
+    pngWidth: number;
   } | null;
   isEditing?: boolean;
 }
@@ -61,6 +63,7 @@ export function CheckForUnderstandingModal({
   const [content, setContent] = useState("");
   const [alignment, setAlignment] = useState("center");
   const [width, setWidth] = useState("50%");
+  const [pngWidth, setPngWidth] = useState(100);
   const [hasCfuId, setHasCfuId] = useState(false);
   const [uploading, setUploading] = useState(false);
 
@@ -84,15 +87,16 @@ export function CheckForUnderstandingModal({
     }
   }, [open, assets.length]);
 
-  useEffect(() => {
+useEffect(() => {
     if (open) {
-if (initialAttributes) {
+      if (initialAttributes) {
         setBg(initialAttributes.backgroundImage || "");
         setPng(initialAttributes.pngImage || "");
         setHeading(initialAttributes.heading || "");
         setContent(initialAttributes.content || "");
         setAlignment(initialAttributes.alignment || "center");
         setWidth(initialAttributes.width || "50%");
+        setPngWidth(initialAttributes.pngWidth || 100);
         setHasCfuId(!!initialAttributes.cfuId);
       } else {
         setBg("");
@@ -101,6 +105,7 @@ if (initialAttributes) {
         setContent("");
         setAlignment("center");
         setWidth("50%");
+        setPngWidth(100);
         setHasCfuId(false);
       }
     }
@@ -147,7 +152,7 @@ if (initialAttributes) {
   };
 
   const handleInsert = () => {
-    const attrs = { backgroundImage: bg, pngImage: png, heading, content, alignment, width };
+    const attrs = { backgroundImage: bg, pngImage: png, heading, content, alignment, width, pngWidth };
     onInsertRef.current?.(attrs);
     onCloseRef.current?.();
   };
@@ -157,7 +162,7 @@ if (initialAttributes) {
       alert("No cfuId - cannot update. Please delete and re-insert this CFU.");
       return;
     }
-    const attrs = { backgroundImage: bg, pngImage: png, heading, content, alignment, width };
+    const attrs = { backgroundImage: bg, pngImage: png, heading, content, alignment, width, pngWidth };
     onInsertRef.current?.(attrs);
     onCloseRef.current?.();
   };
@@ -197,19 +202,9 @@ if (initialAttributes) {
               </button>
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
-              {bg && (
-                <div style={{ position: "relative" }}>
-                  <div onClick={() => setBg("")} style={{ cursor: "pointer", border: "3px solid #0d7377", borderRadius: 8, overflow: "hidden" }}>
-                    <img src={bg} alt="Selected" style={{ width: 60, height: 60, objectFit: "cover" }} />
-                  </div>
-                  <button onClick={() => setBg("")} type="button" style={{ position: "absolute", top: -6, right: -6, background: "#ef4444", color: "white", border: "none", borderRadius: "50%", width: 18, height: 18, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <X size={12} />
-                  </button>
-                </div>
-              )}
-              {backgrounds.filter(a => a.image_url !== bg).map(a => (
+              {backgrounds.map(a => (
                 <div key={a.id} style={{ position: "relative" }}>
-                  <div onClick={() => setBg(a.image_url)} style={{ cursor: "pointer", border: bg === a.image_url ? "3px solid #0d7377" : "3px solid transparent", borderRadius: 8, overflow: "hidden" }}>
+                  <div onClick={() => setBg(bg === a.image_url ? "" : a.image_url)} style={{ cursor: "pointer", border: bg === a.image_url ? "3px solid #0d7377" : "3px solid transparent", borderRadius: 8, overflow: "hidden" }}>
                     <img src={a.image_url} alt={a.name} style={{ width: 60, height: 60, objectFit: "cover" }} />
                   </div>
                   <button onClick={() => deleteAsset(a.id)} type="button" style={{ position: "absolute", top: -6, right: -6, background: "#ef4444", color: "white", border: "none", borderRadius: "50%", width: 18, height: 18, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -229,19 +224,9 @@ if (initialAttributes) {
               </button>
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
-              {png && (
-                <div style={{ position: "relative" }}>
-                  <div onClick={() => setPng("")} style={{ cursor: "pointer", border: "3px solid #0d7377", borderRadius: 8, overflow: "hidden", background: "repeating-conic-gradient(#ccc 0% 25%, white 0% 50%) 50% / 10px 10px" }}>
-                    <img src={png} alt="Selected" style={{ width: 60, height: 60, objectFit: "contain" }} />
-                  </div>
-                  <button onClick={() => setPng("")} type="button" style={{ position: "absolute", top: -6, right: -6, background: "#ef4444", color: "white", border: "none", borderRadius: "50%", width: 18, height: 18, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <X size={12} />
-                  </button>
-                </div>
-              )}
-              {pngs.filter(a => a.image_url !== png).map(a => (
+              {pngs.map(a => (
                 <div key={a.id} style={{ position: "relative" }}>
-                  <div onClick={() => setPng(a.image_url)} style={{ cursor: "pointer", border: png === a.image_url ? "3px solid #0d7377" : "3px solid transparent", borderRadius: 8, overflow: "hidden", background: "repeating-conic-gradient(#ccc 0% 25%, white 0% 50%) 50% / 10px 10px" }}>
+                  <div onClick={() => setPng(png === a.image_url ? "" : a.image_url)} style={{ cursor: "pointer", border: png === a.image_url ? "3px solid #0d7377" : "3px solid transparent", borderRadius: 8, overflow: "hidden", background: "repeating-conic-gradient(#ccc 0% 25%, white 0% 50%) 50% / 10px 10px" }}>
                     <img src={a.image_url} alt={a.name} style={{ width: 60, height: 60, objectFit: "contain" }} />
                   </div>
                   <button onClick={() => deleteAsset(a.id)} type="button" style={{ position: "absolute", top: -6, right: -6, background: "#ef4444", color: "white", border: "none", borderRadius: "50%", width: 18, height: 18, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -250,6 +235,13 @@ if (initialAttributes) {
                 </div>
               ))}
             </div>
+            {png && (
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+                <Label style={{ fontSize: 12 }}>Image Width:</Label>
+                <Input type="number" min={1} max={100} value={pngWidth} onChange={e => { const v = parseInt(e.target.value); if (!isNaN(v) && v >= 1 && v <= 100) setPngWidth(v); }} style={{ width: 80 }} />
+                <span style={{ fontSize: 12 }}>%</span>
+              </div>
+            )}
           </div>
 
           <div>
