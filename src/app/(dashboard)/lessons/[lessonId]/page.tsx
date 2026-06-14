@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CompactLessonAssets } from "@/components/lesson-assets-panel";
 import { PresentationLink } from "@/components/presentation-modal";
-import { SpotifySlideout } from "@/components/spotify-slideout";
+import { SpotifyEmbed } from "@/components/spotify-embed";
 
 interface Lesson {
   id: string;
@@ -286,7 +286,7 @@ export default function LessonContentPage({
         </div>
       </div>
 
-      <SpotifySlideout
+      <SpotifyEmbed
         open={showSpotify}
         onClose={() => setShowSpotify(false)}
         embedCode={lesson?.spotify_embed_code || ""}

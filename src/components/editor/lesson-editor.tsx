@@ -7,7 +7,7 @@ import { CheckForUnderstanding } from "./extensions/check-for-understanding";
 import { TableRow } from "@tiptap/extension-table-row";
 import { TableCellWithWidth } from "./extensions/table-cell-with-width";
 import { TableHeader } from "@tiptap/extension-table-header";
-import Image from "@tiptap/extension-image";
+import { ImageWithOptions } from "./extensions/image-with-options";
 import Link from "@tiptap/extension-link";
 import { Paragraph } from "@tiptap/extension-paragraph";
 import InvisibleCharacters, { HardBreakNode, ParagraphNode } from "@tiptap/extension-invisible-characters";
@@ -81,6 +81,9 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
   const [existingCFUAttrs, setExistingCFUAttrs] = useState<any>(null);
   const editingCFUAttrsRef = useRef<any>(null);
   const tableElementRef = useRef<HTMLElement | null>(null);
+  const [selectedImagePos, setSelectedImagePos] = useState<number | null>(null);
+  const [imageAlign, setImageAlign] = useState<"left" | "center" | "right">("left");
+  const [imageWidth, setImageWidth] = useState(100);
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -98,7 +101,7 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
       TableRow,
       TableCellWithWidth,
       TableHeader,
-      Image,
+      ImageWithOptions,
       Link.configure({
         openOnClick: false,
         HTMLAttributes: {
@@ -134,6 +137,50 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
       if (node.type.name === "table") return true;
     }
     return false;
+  };
+
+  const isInsideImage = () => {
+    if (!editor) return false;
+    const { selection } = editor.state;
+    const { $from } = selection;
+    const node = $from.nodeAfter;
+    if (node && node.type.name === "image") return true;
+    const nodeBefore = $from.nodeBefore;
+    if (nodeBefore && nodeBefore.type.name === "image") return true;
+    return false;
+  };
+
+  const syncImageState = () => {
+    if (!editor) return;
+    const { state } = editor;
+    const { selection } = state;
+    const { $from } = selection;
+
+    let imageNode = null;
+    let imagePos = null;
+
+    const nodeAfter = $from.nodeAfter;
+    if (nodeAfter && nodeAfter.type.name === "image") {
+      imageNode = nodeAfter;
+      imagePos = $from.pos + 1;
+    } else {
+      const nodeBefore = $from.nodeBefore;
+      if (nodeBefore && nodeBefore.type.name === "image") {
+        imageNode = nodeBefore;
+        imagePos = $from.pos - nodeBefore.nodeSize;
+      }
+    }
+
+    if (imageNode) {
+      const attrs = imageNode.attrs;
+      const align = attrs.align || "left";
+      const widthPercent = attrs.widthPercent || 100;
+      setImageAlign(align);
+      setImageWidth(widthPercent);
+      setSelectedImagePos(imagePos);
+    } else {
+      setSelectedImagePos(null);
+    }
   };
 
   const syncTableState = () => {
@@ -271,6 +318,11 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
       if (isInsideTable()) {
         syncTableState();
       }
+      if (isInsideImage()) {
+        syncImageState();
+      } else {
+        setSelectedImagePos(null);
+      }
     };
     editor.on("selectionUpdate", handleSelectionUpdate);
 
@@ -284,6 +336,9 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
     setTimeout(() => {
       if (isInsideTable()) {
         syncTableState();
+      }
+      if (isInsideImage()) {
+        syncImageState();
       }
     }, 100);
 
@@ -1243,6 +1298,82 @@ const updateColumnWidth = (widthPercent: number) => {
             />
             <span className="text-xs text-gray-500">Lesson Grid</span>
           </label>
+        </div>
+      )}
+
+      {selectedImagePos !== null && (
+        <div className="flex flex-wrap items-center gap-1 py-2 px-3 bg-gray-50 border-t border-[#e5e5e0]">
+          <span className="text-xs text-gray-500 mr-2">Image:</span>
+          <Button
+            type="button"
+            variant={imageAlign === "left" ? "default" : "ghost"}
+            size="sm"
+            onClick={() => {
+              editor?.chain().focus().setImageAlign("left").run();
+              setImageAlign("left");
+            }}
+            className="h-7 px-2 text-xs"
+            title="Align Left"
+          >
+            <AlignLeft className="w-4 h-4" />
+          </Button>
+          <Button
+            type="button"
+            variant={imageAlign === "center" ? "default" : "ghost"}
+            size="sm"
+            onClick={() => {
+              editor?.chain().focus().setImageAlign("center").run();
+              setImageAlign("center");
+            }}
+            className="h-7 px-2 text-xs"
+            title="Align Center"
+          >
+            <AlignCenter className="w-4 h-4" />
+          </Button>
+          <Button
+            type="button"
+            variant={imageAlign === "right" ? "default" : "ghost"}
+            size="sm"
+            onClick={() => {
+              editor?.chain().focus().setImageAlign("right").run();
+              setImageAlign("right");
+            }}
+            className="h-7 px-2 text-xs"
+            title="Align Right"
+          >
+            <AlignRight className="w-4 h-4" />
+          </Button>
+
+          <div className="w-px h-5 bg-gray-300 mx-2" />
+
+          <span className="text-xs text-gray-500">Width:</span>
+          <input
+            type="number"
+            min={1}
+            max={100}
+            value={imageWidth}
+            onChange={(e) => {
+              const parsed = parseInt(e.target.value);
+              if (!isNaN(parsed) && parsed >= 1 && parsed <= 100) {
+                setImageWidth(parsed);
+              }
+            }}
+            onBlur={(e) => {
+              const parsed = parseInt(e.target.value);
+              if (!isNaN(parsed)) {
+                const clamped = Math.min(100, Math.max(1, parsed));
+                editor?.chain().focus().setImageWidth(clamped).run();
+                setImageWidth(clamped);
+              }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.currentTarget.blur();
+              }
+            }}
+            className="w-14 h-7 px-1 text-xs border border-[#e5e5e0] rounded text-center"
+          />
+          <span className="text-xs text-gray-500">%</span>
         </div>
       )}
       </div>
