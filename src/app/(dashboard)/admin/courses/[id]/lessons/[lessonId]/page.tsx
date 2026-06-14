@@ -392,7 +392,7 @@ export default function EditLessonPage({
                 onClick={() => setActivePanel('general')}
                 className={`w-full text-left px-2 py-1.5 text-xs font-medium transition-colors truncate ${
                   activePanel === 'general'
-                    ? "bg-[#0d7377] text-white"
+                    ? "bg-[#e85d5d] text-white"
                     : "bg-[#d7ffef] text-black hover:bg-[#c7efe0]"
                 }`}
               >
@@ -403,7 +403,7 @@ export default function EditLessonPage({
                 onClick={() => setActivePanel('materials')}
                 className={`w-full text-left px-2 py-1.5 text-xs font-medium transition-colors truncate ${
                   activePanel === 'materials'
-                    ? "bg-[#0d7377] text-white"
+                    ? "bg-[#e85d5d] text-white"
                     : "bg-[#d7ffef] text-black hover:bg-[#c7efe0]"
                 }`}
               >
