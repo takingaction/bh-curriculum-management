@@ -168,11 +168,11 @@ export default function EditLessonPage({
   }, []);
 
   useEffect(() => {
-    if (editorSectionRef.current) {
-      const rect = editorSectionRef.current.getBoundingClientRect();
-      const offsetTop = rect.top + window.scrollY - 64;
-      window.scrollTo({ top: offsetTop, behavior: "smooth" });
-    }
+    setTimeout(() => {
+      if (editorSectionRef.current) {
+        editorSectionRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }, 150);
   }, [selectedSection]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -390,7 +390,7 @@ export default function EditLessonPage({
                   key={field.name}
                   type="button"
                   onClick={() => setSelectedSection(field.name)}
-                  className={`w-full text-left px-2 py-1.5 text-[11px] font-medium transition-colors truncate ${
+                  className={`w-full text-left px-2 py-1.5 text-xs font-medium transition-colors truncate ${
                     selectedSection === field.name
                       ? "bg-[#0d7377] text-white"
                       : "bg-[#d7ffef] text-black hover:bg-[#c7efe0]"
@@ -485,7 +485,7 @@ export default function EditLessonPage({
             </div>
 
             {/* Selected Section Editor */}
-            <div ref={editorSectionRef} className="bg-white rounded-lg border border-[#e5e5e0] p-4">
+            <div data-section-editor className="bg-white rounded-lg border border-[#e5e5e0] p-4">
               <div className="space-y-2">
                 <Label className="text-[#2d2d2d] font-bold text-base">
                   {textFields.find(f => f.name === selectedSection)?.label}
