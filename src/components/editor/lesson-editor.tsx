@@ -58,7 +58,7 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
   const [showMediaLibrary, setShowMediaLibrary] = useState(false);
   const [showSource, setShowSource] = useState(false);
   const [sourceContent, setSourceContent] = useState(content);
-  const [showTableGrid, setShowTableGrid] = useState(false);
+  const [showTableGrid, setShowTableGrid] = useState(true);
   const [showInvisibles, setShowInvisibles] = useState(false);
   const [addWordModalOpen, setAddWordModalOpen] = useState(false);
   const [removeWordModalOpen, setRemoveWordModalOpen] = useState(false);
