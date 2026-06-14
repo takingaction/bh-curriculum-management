@@ -139,7 +139,7 @@ Two-column layout at `src/app/(dashboard)/admin/courses/[id]/lessons/[lessonId]/
 
 ### Database Schema
 - `profiles` - User profiles with role (admin/teacher)
-- `courses` - Course information with discipline and grade
+- `courses` - Course information with discipline, grade, and spotify_embed_code
 - `lessons` - Individual lessons with content, timing, presentation, etc. (Spotify is now on courses table)
 - `teacher_assignments` - Links teachers to courses
 - `lesson_assets` - Links assets to lessons with sort_order
@@ -171,6 +171,8 @@ Two-column layout at `src/app/(dashboard)/admin/courses/[id]/lessons/[lessonId]/
 - `SUPABASE_SERVICE_ROLE_KEY`
 
 ### Relevant Files
+- `src/app/(dashboard)/admin/courses/[id]/page.tsx` - Course edit page with Spotify section
+- `src/components/course-spotify-section.tsx` - Course-level Spotify modal and controls
 - `src/app/(dashboard)/admin/courses/[id]/lessons/[lessonId]/page.tsx` - Main lesson edit page with two-column layout
 - `src/components/editor/lesson-editor.tsx` - TipTap editor with sticky toolbar
 - `src/components/editor/extensions/spell-check.ts` - Spellcheck extension
@@ -178,6 +180,6 @@ Two-column layout at `src/app/(dashboard)/admin/courses/[id]/lessons/[lessonId]/
 - `src/components/editor/extensions/table-with-styles.ts` - Custom table with column widths
 - `src/components/editor/extensions/image-with-options.ts` - Custom image with align/width
 - `src/components/lesson-assets-panel.tsx` - Lesson assets management
-- `src/components/spotify-embed.tsx` - Draggable Spotify playlist modal
-- `src/app/(dashboard)/lessons/[lessonId]/page.tsx` - Student view with SpotifyEmbed
+- `src/components/spotify-embed.tsx` - Draggable Spotify playlist modal (lesson view)
+- `src/app/(dashboard)/lessons/[lessonId]/page.tsx` - Student view with SpotifyEmbed from course
 - `src/components/check-for-understanding-modal.tsx` - CFU edit modal
