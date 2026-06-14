@@ -76,6 +76,7 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
   const [selectedColumnWidth, setSelectedColumnWidth] = useState<string>("");
   const [tableShowGrid, setTableShowGrid] = useState(true);
   const [showDeleteTableModal, setShowDeleteTableModal] = useState(false);
+  const [showDeleteImageModal, setShowDeleteImageModal] = useState(false);
   const [showCFUModal, setShowCFUModal] = useState(false);
   const [editingCFUAttrs, setEditingCFUAttrs] = useState<any>(null);
   const [existingCFUAttrs, setExistingCFUAttrs] = useState<any>(null);
@@ -701,6 +702,37 @@ const updateColumnWidth = (widthPercent: number) => {
     editor.chain().focus().deleteTable().run();
     setShowDeleteTableModal(false);
     onChange(editor.getHTML());
+  };
+
+  const deleteImage = () => {
+    if (!editor) return;
+    const { state } = editor;
+    const { selection } = state;
+    const { $from } = selection;
+
+    let imageNode = null;
+    let imagePos = 0;
+
+    const nodeAfter = $from.nodeAfter;
+    if (nodeAfter && nodeAfter.type.name === "image") {
+      imageNode = nodeAfter;
+      imagePos = $from.pos + 1;
+    } else {
+      const nodeBefore = $from.nodeBefore;
+      if (nodeBefore && nodeBefore.type.name === "image") {
+        imageNode = nodeBefore;
+        imagePos = $from.pos - nodeBefore.nodeSize;
+      }
+    }
+
+    if (imageNode) {
+      const tr = state.tr.delete(imagePos, imagePos + imageNode.nodeSize);
+      editor.view.dispatch(tr);
+      onChange(editor.getHTML());
+    }
+
+    setShowDeleteImageModal(false);
+    setSelectedImagePos(null);
   };
 
   const getWordAtCursor = () => {
@@ -1381,12 +1413,7 @@ const updateColumnWidth = (widthPercent: number) => {
             type="button"
             variant="ghost"
             size="sm"
-            onClick={() => {
-              if (confirm("Delete this image?")) {
-                editor?.chain().focus().deleteImage().run();
-                setSelectedImagePos(null);
-              }
-            }}
+            onClick={() => setShowDeleteImageModal(true)}
             className="h-7 px-2 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
             title="Delete Image"
           >
@@ -1593,6 +1620,23 @@ const updateColumnWidth = (widthPercent: number) => {
                 Cancel
               </Button>
               <Button variant="destructive" onClick={deleteTable}>
+                Delete
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDeleteImageModal && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ background: "white", borderRadius: 12, padding: 24, width: "90%", maxWidth: 400 }}>
+            <h3 style={{ margin: "0 0 16px 0" }}>Delete Image?</h3>
+            <p style={{ margin: "0 0 16px 0", color: "#666" }}>This action cannot be undone.</p>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              <Button variant="outline" onClick={() => setShowDeleteImageModal(false)}>
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={deleteImage}>
                 Delete
               </Button>
             </div>
