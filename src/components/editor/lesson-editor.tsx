@@ -724,8 +724,8 @@ const updateColumnWidth = (widthPercent: number) => {
   }
 
   return (
-    <div className={`space-y-2 ${isSticky ? "sticky top-0 z-50 bg-white pt-2" : ""}`}>
-      <div className="flex flex-wrap gap-1 border border-[#e5e5e0] rounded-lg p-2 bg-white">
+    <div className="space-y-2">
+      <div className={`flex flex-wrap gap-1 border border-[#e5e5e0] rounded-lg p-2 bg-white ${isSticky ? "sticky top-0 z-50" : ""}`}>
         <Button
           type="button"
           variant="ghost"
