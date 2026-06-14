@@ -547,24 +547,33 @@ const updateColumnWidth = (widthPercent: number) => {
     
     if (tableNode && cellColIndex >= 0) {
       const tablePos = $from.before(tableDepth);
-      console.log("tablePos:", tablePos, "tableNode child count:", tableNode.childCount);
       const tr = state.tr;
       let updated = 0;
       
-      tableNode.forEach((rowNode, rowOffset) => {
-        console.log("Row", rowOffset, "at offset", rowOffset, "childCount:", rowNode.childCount);
-        let colIndex = 0;
-        rowNode.forEach((cell, cellOffset) => {
-          console.log("  Cell", colIndex, "cellOffset:", cellOffset);
-          if (colIndex === cellColIndex) {
-            const absolutePos = tablePos + rowOffset + 1 + cellOffset;
-            const nodeAtPos = state.doc.nodeAt(absolutePos);
-            console.log("  Trying pos", absolutePos, "got:", nodeAtPos?.type.name, "expected: tableCell/tableHeader");
-            tr.setNodeAttribute(absolutePos, "width", `${widthPercent}%`);
+      state.doc.nodesBetween(tablePos, tablePos + tableNode.nodeSize, (node, pos) => {
+        if ((node.type.name === "tableCell" || node.type.name === "tableHeader") && node.attrs.width !== `${widthPercent}%`) {
+          const row = node.parent;
+          let colIndex = 0;
+          let cellColIndexInRow = -1;
+          let cellIndex = 0;
+          const targetCell = node;
+          
+          row.forEach((cell, i) => {
+            if (cell === targetCell) {
+              cellColIndexInRow = colIndex;
+            }
+            colIndex += cell.attrs.colspan || 1;
+            cellIndex++;
+          });
+          
+          console.log("Found cell, calculated colIndex:", cellColIndexInRow, "target:", cellColIndex);
+          
+          if (cellColIndexInRow === cellColIndex) {
+            console.log("Updating cell at pos", pos, "with width", `${widthPercent}%`);
+            tr.setNodeAttribute(pos, "width", `${widthPercent}%`);
             updated++;
           }
-          colIndex += cell.attrs.colspan || 1;
-        });
+        }
       });
       
       console.log("Total cells updated:", updated);
@@ -572,11 +581,7 @@ const updateColumnWidth = (widthPercent: number) => {
         editor.view.dispatch(tr);
         setSelectedColumnWidth(`${widthPercent}%`);
         onChange(editor.getHTML());
-      } else {
-        console.log("No cells updated - check cellColIndex or table structure");
       }
-    } else {
-      console.log("Skipping update - tableNode:", !!tableNode, "cellColIndex:", cellColIndex);
     }
   };
 
