@@ -99,6 +99,7 @@ export default function EditLessonPage({
   const [presentationName, setPresentationName] = useState("");
   const [presentationUrl, setPresentationUrl] = useState("");
   const [spotifyEmbedCode, setSpotifyEmbedCode] = useState("");
+  const [stickySection, setStickySection] = useState<string | null>(null);
   const [fields, setFields] = useState<Fields>({
     lesson_number: "",
     title: "",
@@ -500,6 +501,8 @@ export default function EditLessonPage({
                   lessonId={lesson.id}
                   courseId={lesson.course_id}
                   isAdmin={true}
+                  isSticky={stickySection === field.name}
+                  onStickyToggle={() => setStickySection(stickySection === field.name ? null : field.name)}
                 />
               </div>
             ))}
