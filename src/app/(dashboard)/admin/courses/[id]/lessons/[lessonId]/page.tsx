@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Pin, PinOff } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
@@ -100,7 +99,6 @@ export default function EditLessonPage({
   const [presentationName, setPresentationName] = useState("");
   const [presentationUrl, setPresentationUrl] = useState("");
   const [spotifyEmbedCode, setSpotifyEmbedCode] = useState("");
-  const [stickySection, setStickySection] = useState<string | null>(null);
   const [fields, setFields] = useState<Fields>({
     lesson_number: "",
     title: "",
@@ -493,22 +491,18 @@ export default function EditLessonPage({
             {textFields.map((field) => (
               <div 
                 key={field.name} 
-                className={`space-y-2 ${stickySection === field.name ? "sticky top-0 z-50 bg-white pb-4" : ""}`}
+                className="space-y-2"
               >
                 <div className="flex items-center justify-between">
                   <Label htmlFor={field.name} className="text-[#2d2d2d] font-bold text-base">
                     {field.label}
                   </Label>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setStickySection(stickySection === field.name ? null : field.name)}
-                    className={`h-7 px-2 text-xs ${stickySection === field.name ? "text-[#0d7377]" : "text-gray-400"}`}
-                    title={stickySection === field.name ? "Unpin Section" : "Pin Section"}
+                  <Link
+                    href={`/admin/courses/${lesson.course_id}/lessons/${lesson.id}/section/${field.name}`}
+                    className="text-xs text-[#0d7377] hover:underline"
                   >
-                    {stickySection === field.name ? <Pin className="w-4 h-4" /> : <PinOff className="w-4 h-4" />}
-                  </Button>
+                    Pop Out
+                  </Link>
                 </div>
                 <LessonEditor
                   content={fields[field.name as keyof Fields]}
