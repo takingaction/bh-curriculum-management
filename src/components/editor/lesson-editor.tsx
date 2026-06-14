@@ -493,7 +493,6 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
     let tableDepth = 0;
     let cellColIndex = -1;
 
-    // Find table and column index
     for (let depth = $from.depth; depth > 0; depth--) {
       const node = $from.node(depth);
       if (node.type.name === "table") {
@@ -501,7 +500,6 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
         tableDepth = depth;
       }
       if (node.type.name === "tableCell" || node.type.name === "tableHeader") {
-        // Calculate column index by counting cells in row before this one
         const row = $from.node(depth - 1);
         if (row) {
           for (let i = 0; i < $from.index(depth); i++) {
@@ -519,6 +517,7 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
     if (tableNode && cellColIndex >= 0) {
       const tablePos = $from.before(tableDepth);
       const tr = state.tr;
+      let updated = 0;
       
       tableNode.forEach((rowNode, rowOffset) => {
         let colIndex = 0;
@@ -527,14 +526,17 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
             const absolutePos = tablePos + rowOffset + 1 + cellOffset;
             const newAttrs = { ...cell.attrs, width: `${widthPercent}%` };
             tr.setNodeMarkup(absolutePos, undefined, newAttrs);
+            updated++;
           }
           colIndex += cell.attrs.colspan || 1;
         });
       });
       
-      editor.view.dispatch(tr);
-      setSelectedColumnWidth(`${widthPercent}%`);
-      onChange(editor.getHTML());
+if (updated > 0) {
+        editor.view.dispatch(tr);
+        setSelectedColumnWidth(`${widthPercent}%`);
+        onChange(editor.getHTML());
+      }
     }
   };
 

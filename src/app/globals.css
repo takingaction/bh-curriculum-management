@@ -305,7 +305,6 @@
   .ProseMirror table td,
   .ProseMirror table th {
     box-sizing: border-box;
-    overflow: hidden;
   }
 }
 

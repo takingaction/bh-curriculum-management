@@ -7,31 +7,16 @@ export const TableCellWithWidth = TableCell.extend({
       width: {
         default: null,
         parseHTML: (element) => {
-          const style = element.getAttribute("style") || "";
-          const match = style.match(/width:\s*(\d+(?:\.\d+)?)%/);
-          return match ? match[1] + "%" : null;
+          return element.getAttribute("width") || null;
         },
         renderHTML: (attributes) => {
           if (attributes.width) {
-            return { style: `width: ${attributes.width};` };
+            return { width: attributes.width };
           }
           return {};
         },
       },
     };
-  },
-
-  renderHTML({ node, HTMLAttributes }) {
-    const width = node.attrs.width;
-    const style = width ? `width: ${width};` : "";
-    
-    return [
-      "td",
-      mergeAttributes(HTMLAttributes, {
-        style: style + (HTMLAttributes.style || ""),
-      }),
-      0,
-    ];
   },
 });
 
