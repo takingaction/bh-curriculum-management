@@ -344,7 +344,13 @@ export default function EditLessonPage({
                 ← Back to Course
               </Link>
               <span className="text-gray-300">|</span>
-              <span className="text-sm text-gray-600">Edit Lesson</span>
+              <Link
+                href={`/lessons/${lesson?.id}`}
+                target="_blank"
+                className="text-sm text-[#0d7377] hover:underline"
+              >
+                View Lesson ↗
+              </Link>
             </div>
             <div className="flex items-center gap-2">
               <Button
