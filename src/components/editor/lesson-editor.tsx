@@ -500,6 +500,7 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
     content: string;
     alignment: string;
     width: string;
+    pngWidth: number;
   }) => {
     if (!editor) return;
 
