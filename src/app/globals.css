@@ -252,6 +252,7 @@
 
   .lesson-content table {
     @apply border-collapse my-4;
+    table-layout: fixed;
   }
 
   .lesson-content table[data-show-grid="false"] th,
@@ -263,6 +264,8 @@
   .lesson-content th,
   .lesson-content td {
     @apply border border-gray-300 px-3 py-2 text-left align-top;
+    width: auto;
+    max-width: none;
   }
 
   .lesson-content th {
@@ -293,10 +296,16 @@
 
   .ProseMirror.show-table-grid table {
     border: 1px solid black !important;
+    table-layout: fixed;
   }
   .ProseMirror.show-table-grid table td,
   .ProseMirror.show-table-grid table th {
     border: 1px solid black !important;
+  }
+  .ProseMirror table td,
+  .ProseMirror table th {
+    box-sizing: border-box;
+    overflow: hidden;
   }
 }
 
