@@ -146,9 +146,13 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
     let tableDepth = 0;
     let cellColIndex = 0;
 
+    console.log("=== syncTableState START ===");
+
     for (let depth = $from.depth; depth > 0; depth--) {
       const node = $from.node(depth);
       if (node.type.name === "table") {
+        tableNode = node;
+        tableDepth = depth;
         const attrs = node.attrs;
         const width = attrs.width || "100%";
         const alignment = attrs.alignment || "center";
@@ -159,23 +163,30 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
           setTableWidth(100);
         }
         setTableAlignment(alignment);
-        tableNode = node;
-        tableDepth = depth;
+        console.log("Found table at depth", depth, "columnWidths:", attrs.columnWidths);
       }
       if (node.type.name === "tableCell" || node.type.name === "tableHeader") {
         const row = $from.node(depth - 1);
+        const cellIndexInRow = $from.index(depth);
+        console.log("Found cell at depth", depth, "cellIndexInRow:", cellIndexInRow);
         if (row) {
-          for (let i = 0; i < $from.index(depth); i++) {
+          console.log("Row childCount:", row.childCount);
+          for (let i = 0; i < cellIndexInRow; i++) {
             const cell = row.child(i);
             cellColIndex += cell.attrs.colspan || 1;
           }
+          console.log("After loop, cellColIndex:", cellColIndex);
         }
       }
     }
 
-    if (!tableNode) return;
+    if (!tableNode) {
+      console.log("syncTableState: no tableNode found");
+      return;
+    }
 
     let columnWidths = tableNode.attrs.columnWidths;
+    console.log("tableNode.attrs.columnWidths:", columnWidths);
 
     if (!columnWidths || columnWidths.length === 0) {
       console.warn("syncTableState: columnWidths missing, generating fallback");
@@ -186,6 +197,7 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
       columnWidths = Array(colCount).fill(null).map((_, i) =>
         i === colCount - 1 ? `${colWidth + remainder}%` : `${colWidth}%`
       );
+      console.log("Generated fallback columnWidths:", columnWidths);
       const tr = state.tr.setNodeMarkup($from.before(tableDepth), undefined, {
         ...tableNode.attrs,
         columnWidths,
@@ -194,7 +206,8 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
     }
 
     const colWidth = columnWidths[cellColIndex] || "";
-    console.log("syncTableState: cellColIndex=", cellColIndex, "colWidth=", colWidth, "columnWidths=", columnWidths);
+    console.log("syncTableState FINAL: cellColIndex=", cellColIndex, "colWidth=", colWidth, "columnWidths=", columnWidths);
+    console.log("=== syncTableState END ===");
     setSelectedColumnWidth(colWidth);
   };
 
@@ -558,38 +571,55 @@ const updateColumnWidth = (widthPercent: number) => {
     let tableNode = null;
     let tableDepth = 0;
     let cellColIndex = 0;
+    let foundCellDepth = 0;
+
+    console.log("=== updateColumnWidth START ===");
+    console.log("widthPercent:", widthPercent);
 
     for (let depth = $from.depth; depth > 0; depth--) {
       const node = $from.node(depth);
+      console.log("depth", depth, "node type:", node.type.name);
       if (node.type.name === "table") {
         tableNode = node;
         tableDepth = depth;
+        console.log("Found table at depth", depth, "tableNode.attrs.columnWidths:", tableNode.attrs.columnWidths);
       }
       if (node.type.name === "tableCell" || node.type.name === "tableHeader") {
+        foundCellDepth = depth;
         const row = $from.node(depth - 1);
+        const cellIndexInRow = $from.index(depth);
+        console.log("Found cell at depth", depth, "row:", row?.type.name, "cellIndexInRow:", cellIndexInRow);
         if (row) {
-          for (let i = 0; i < $from.index(depth); i++) {
+          for (let i = 0; i < cellIndexInRow; i++) {
             const cell = row.child(i);
             cellColIndex += cell.attrs.colspan || 1;
           }
+          console.log("After loop, cellColIndex:", cellColIndex, "row.childCount:", row.childCount);
         }
       }
     }
 
+    console.log("Final: tableDepth:", tableDepth, "foundCellDepth:", foundCellDepth, "cellColIndex:", cellColIndex);
+
     if (tableNode && cellColIndex >= 0) {
       const tablePos = $from.before(tableDepth);
+      console.log("tablePos:", tablePos);
       const currentWidths = tableNode.attrs.columnWidths || [];
+      console.log("currentWidths:", currentWidths, "length:", currentWidths.length);
       let newWidths;
 
       if (currentWidths.length === 0) {
         const firstRow = tableNode.firstChild;
         const colCount = firstRow ? firstRow.childCount : 1;
+        console.log("No columnWidths, generating fallback. colCount:", colCount);
         const colWidth = Math.floor(100 / colCount);
         newWidths = Array(colCount).fill(`${colWidth}%`);
       } else {
         newWidths = [...currentWidths];
       }
+      console.log("Before update newWidths:", newWidths);
       newWidths[cellColIndex] = `${widthPercent}%`;
+      console.log("After update newWidths:", newWidths);
 
       try {
         const tr = state.tr.setNodeMarkup(tablePos, undefined, {
@@ -598,13 +628,16 @@ const updateColumnWidth = (widthPercent: number) => {
         });
         editor.view.dispatch(tr);
         setSelectedColumnWidth(`${widthPercent}%`);
-        console.log("updateColumnWidth: cellColIndex=", cellColIndex, "before=", currentWidths, "after=", newWidths);
+        console.log("updateColumnWidth SUCCESS: cellColIndex=", cellColIndex, "newWidths=", newWidths);
       } catch (error) {
         console.error("Error updating column width:", error);
       } finally {
         onChange(editor.getHTML());
       }
+    } else {
+      console.log("updateColumnWidth SKIPPED: tableNode:", !!tableNode, "cellColIndex:", cellColIndex);
     }
+    console.log("=== updateColumnWidth END ===");
   };
 
   const updateTableGrid = (showGrid: boolean) => {
