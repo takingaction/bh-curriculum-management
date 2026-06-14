@@ -94,6 +94,25 @@ Located in `src/components/editor/extensions/`:
 
 **Table column index fix**: Changed from `$from.index(depth)` to node reference comparison (`row.child(i) === cellNode`) to fix always returning 0 bug
 
+#### Image Extension
+**image-with-options.ts** - Custom image extension with alignment and width:
+- `align` attribute: 'left' | 'center' | 'right'
+  - Left: no style (default)
+  - Center: `display: block; margin-left: auto; margin-right: auto;`
+  - Right: `float: right;`
+- `widthPercent` attribute: 1-100 (renders as `width: X%;` style)
+- **Commands**: `setImageAlign`, `setImageWidth`, `deleteImage`
+- **Image toolbar**: Appears when image is selected, contains align buttons, width input, delete button
+- **Delete image**: Uses custom modal confirmation (not browser alert)
+
+#### Spotify Embed Component
+**spotify-embed.tsx** - Draggable and resizable Spotify playlist modal:
+- Appears in top-right corner when opened
+- Draggable by header (uses refs, no re-renders during drag)
+- Resizable from bottom-right corner
+- X button to close
+- Uses direct DOM manipulation during drag to prevent iframe reload
+
 #### Lesson Editor Layout (Admin)
 Two-column layout at `src/app/(dashboard)/admin/courses/[id]/lessons/[lessonId]/page.tsx`:
 
@@ -115,7 +134,8 @@ Two-column layout at `src/app/(dashboard)/admin/courses/[id]/lessons/[lessonId]/
 **Editor Toolbar (sticky at top-14 z-40):**
 - Contains all formatting buttons (Bold, Italic, H2, H3, Lists, etc.)
 - Table context toolbar when inside table
-- Both toolbars in single sticky container
+- Image context toolbar when image is selected
+- All toolbars in single sticky container
 
 ### Database Schema
 - `profiles` - User profiles with role (admin/teacher)
@@ -156,5 +176,8 @@ Two-column layout at `src/app/(dashboard)/admin/courses/[id]/lessons/[lessonId]/
 - `src/components/editor/extensions/spell-check.ts` - Spellcheck extension
 - `src/components/editor/extensions/check-for-understanding.tsx` - CFU entity
 - `src/components/editor/extensions/table-with-styles.ts` - Custom table with column widths
+- `src/components/editor/extensions/image-with-options.ts` - Custom image with align/width
 - `src/components/lesson-assets-panel.tsx` - Lesson assets management
+- `src/components/spotify-embed.tsx` - Draggable Spotify playlist modal
+- `src/app/(dashboard)/lessons/[lessonId]/page.tsx` - Student view with SpotifyEmbed
 - `src/components/check-for-understanding-modal.tsx` - CFU edit modal
