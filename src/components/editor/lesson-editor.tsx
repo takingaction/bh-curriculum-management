@@ -141,8 +141,9 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
     const { selection } = state;
     const $from = selection.$from;
 
-    let cellDepth = 0;
-    let cellOffset = 0;
+    let tableNode = null;
+    let tableDepth = 0;
+    let cellColIndex = 0;
 
     for (let depth = $from.depth; depth > 0; depth--) {
       const node = $from.node(depth);
@@ -157,17 +158,25 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
           setTableWidth(100);
         }
         setTableAlignment(alignment);
+        tableNode = node;
+        tableDepth = depth;
       }
       if (node.type.name === "tableCell" || node.type.name === "tableHeader") {
-        cellDepth = depth;
-        cellOffset = $from.index(depth);
+        const row = $from.node(depth - 1);
+        if (row) {
+          for (let i = 0; i < $from.index(depth); i++) {
+            const cell = row.child(i);
+            cellColIndex += cell.attrs.colspan || 1;
+          }
+        }
       }
     }
 
-    if (cellDepth > 0) {
-      const cell = $from.node(cellDepth);
-      const colWidth = cell.attrs.width;
-      setSelectedColumnWidth(colWidth || "");
+    if (tableNode && tableNode.attrs.columnWidths) {
+      const colWidth = tableNode.attrs.columnWidths[cellColIndex] || "";
+      setSelectedColumnWidth(colWidth);
+    } else {
+      setSelectedColumnWidth("");
     }
   };
 
@@ -179,26 +188,14 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
 
     let tableNode = null;
     let tableDepth = 0;
-    let cellDepth = 0;
-    let cellOffset = 0;
-    
+    let cellColIndex = 0;
+
     for (let depth = $from.depth; depth > 0; depth--) {
       const node = $from.node(depth);
       if (node.type.name === "table") {
         tableNode = node;
         tableDepth = depth;
-      }
-      if (node.type.name === "tableCell" || node.type.name === "tableHeader") {
-        cellDepth = depth;
-        cellOffset = $from.index(depth);
-      }
-    }
-
-    if (tableNode) {
-      const pos = $from.before(tableDepth);
-      const nodeAtPos = state.doc.nodeAt(pos);
-      if (nodeAtPos) {
-        const attrs = nodeAtPos.attrs;
+        const attrs = node.attrs;
         const width = attrs.width || "100%";
         const alignment = attrs.alignment || "center";
         const showGrid = attrs.showGrid !== false;
@@ -206,16 +203,24 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
         setTableWidth(numWidth >= 1 && numWidth <= 100 ? numWidth : 100);
         setTableAlignment(alignment);
         setTableShowGrid(showGrid);
-        
-        // Track selected column info
-        if (cellDepth > 0) {
-          const cell = $from.node(cellDepth);
-          const colWidth = cell.attrs.width;
-          console.log("forceSyncTableState: cell depth", cellDepth, "colWidth:", colWidth);
-          setSelectedColumnWidth(colWidth || "");
-        } else {
-          setSelectedColumnWidth("");
+      }
+      if (node.type.name === "tableCell" || node.type.name === "tableHeader") {
+        const row = $from.node(depth - 1);
+        if (row) {
+          for (let i = 0; i < $from.index(depth); i++) {
+            const cell = row.child(i);
+            cellColIndex += cell.attrs.colspan || 1;
+          }
         }
+      }
+    }
+
+    if (tableNode) {
+      if (tableNode.attrs.columnWidths) {
+        const colWidth = tableNode.attrs.columnWidths[cellColIndex] || "";
+        setSelectedColumnWidth(colWidth);
+      } else {
+        setSelectedColumnWidth("");
       }
     }
   };
@@ -376,19 +381,13 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
 
     if (tableNode && tablePos >= 0) {
       const colWidth = Math.floor(100 / cols);
-      let tr = state.tr;
-      let updated = 0;
+      const remainder = 100 - (colWidth * cols);
+      const columnWidths = Array(cols).fill(null).map((_, i) => 
+        i === cols - 1 ? `${colWidth + remainder}%` : `${colWidth}%`
+      );
       
-      state.doc.nodesBetween(tablePos, tablePos + tableNode.nodeSize, (node, pos) => {
-        if (node.type.name === "tableCell" || node.type.name === "tableHeader") {
-          tr = tr.setNodeAttribute(pos, "width", `${colWidth}%`);
-          updated++;
-        }
-      });
-      
-      if (updated > 0) {
-        editor.view.dispatch(tr);
-      }
+      const tr = state.tr.setNodeAttribute(tablePos, "columnWidths", columnWidths);
+      editor.view.dispatch(tr);
     }
 
     setTableWidth(parseInt(widthValue) || 100);
@@ -512,11 +511,7 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
   };
 
 const updateColumnWidth = (widthPercent: number) => {
-    console.log("updateColumnWidth called with:", widthPercent);
-    if (!editor) {
-      console.log("No editor");
-      return;
-    }
+    if (!editor) return;
     const { state } = editor;
     const { selection } = state;
     const $from = selection.$from;
@@ -530,56 +525,28 @@ const updateColumnWidth = (widthPercent: number) => {
       if (node.type.name === "table") {
         tableNode = node;
         tableDepth = depth;
-        console.log("Found table at depth", depth);
       }
       if (node.type.name === "tableCell" || node.type.name === "tableHeader") {
         const row = $from.node(depth - 1);
-        console.log("Found cell at depth", depth, "row:", row?.type.name);
         if (row) {
           for (let i = 0; i < $from.index(depth); i++) {
             const cell = row.child(i);
-            if (cell.attrs.colspan) {
-              cellColIndex += cell.attrs.colspan;
-            } else {
-              cellColIndex++;
-            }
+            cellColIndex += cell.attrs.colspan || 1;
           }
-          console.log("cellColIndex:", cellColIndex);
         }
       }
     }
 
-    console.log("tableNode:", !!tableNode, "cellColIndex:", cellColIndex);
-    
     if (tableNode && cellColIndex >= 0) {
       const tablePos = $from.before(tableDepth);
-      const tr = state.tr;
-      let updated = 0;
+      const currentWidths = tableNode.attrs.columnWidths || [];
+      const newWidths = [...currentWidths];
+      newWidths[cellColIndex] = `${widthPercent}%`;
       
-      let currentRowIndex = -1;
-      let currentColIndex = 0;
-      
-      state.doc.nodesBetween(tablePos, tablePos + tableNode.nodeSize, (node, pos) => {
-        if (node.type.name === "tableRow") {
-          currentRowIndex++;
-          currentColIndex = 0;
-        }
-        if ((node.type.name === "tableCell" || node.type.name === "tableHeader") && node.attrs.width !== `${widthPercent}%`) {
-          if (currentColIndex === cellColIndex) {
-            console.log("Updating row", currentRowIndex, "col", currentColIndex, "at pos", pos, "with width", `${widthPercent}%`);
-            tr.setNodeAttribute(pos, "width", `${widthPercent}%`);
-            updated++;
-          }
-          currentColIndex += node.attrs.colspan || 1;
-        }
-      });
-      
-      console.log("Total cells updated:", updated);
-      if (updated > 0) {
-        editor.view.dispatch(tr);
-        setSelectedColumnWidth(`${widthPercent}%`);
-        onChange(editor.getHTML());
-      }
+      const tr = state.tr.setNodeAttribute(tablePos, "columnWidths", newWidths);
+      editor.view.dispatch(tr);
+      setSelectedColumnWidth(`${widthPercent}%`);
+      onChange(editor.getHTML());
     }
   };
 

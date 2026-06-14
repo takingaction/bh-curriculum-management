@@ -47,6 +47,22 @@ export const TableWithStylesExtension = Table.extend({
           };
         },
       },
+      columnWidths: {
+        default: null,
+        parseHTML: (element) => {
+          const colgroup = element.querySelector("colgroup");
+          if (colgroup) {
+            const cols = colgroup.querySelectorAll("col");
+            return Array.from(cols).map(col => col.style.width || "0%");
+          }
+          return null;
+        },
+        renderHTML: (attributes) => {
+          return {
+            "data-column-widths": attributes.columnWidths ? attributes.columnWidths.join(",") : "",
+          };
+        },
+      },
     };
   },
 
@@ -56,6 +72,23 @@ export const TableWithStylesExtension = Table.extend({
     const showGrid = node.attrs.showGrid !== false;
     const marginLeft = alignment === "left" ? "0" : "auto";
     const marginRight = alignment === "right" ? "0" : "auto";
+    const columnWidths = node.attrs.columnWidths;
+
+    const colgroupContent: any[] = [];
+    if (columnWidths && columnWidths.length > 0) {
+      columnWidths.forEach((w: string) => {
+        colgroupContent.push(["col", { style: `width: ${w};` }]);
+      });
+    }
+
+    const children: any[] = [
+      "tbody",
+      0,
+    ];
+
+    if (colgroupContent.length > 0) {
+      children.unshift(["colgroup", 0, ...colgroupContent]);
+    }
 
     return [
       "table",
@@ -64,9 +97,9 @@ export const TableWithStylesExtension = Table.extend({
         "data-width": width,
         "data-alignment": alignment,
         "data-show-grid": showGrid ? "true" : "false",
-        style: `width: ${width}; margin-left: ${marginLeft}; margin-right: ${marginRight};`,
+        style: `width: ${width}; margin-left: ${marginLeft}; margin-right: ${marginRight}; table-layout: fixed;`,
       },
-      ["tbody", 0],
+      children,
     ];
   },
 });
