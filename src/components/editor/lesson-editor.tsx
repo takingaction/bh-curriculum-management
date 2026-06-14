@@ -370,7 +370,16 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
         const tableNode = state.doc.nodeAt(pos);
         if (tableNode) {
           const newAttrs = { ...tableNode.attrs, width: widthValue, alignment };
-          const tr = state.tr.setNodeMarkup(pos, undefined, newAttrs);
+          let tr = state.tr.setNodeMarkup(pos, undefined, newAttrs);
+          
+          const colWidth = Math.floor(100 / cols);
+          tableNode.forEach((rowNode, rowOffset) => {
+            rowNode.forEach((cell, cellOffset) => {
+              const cellPos = pos + rowOffset + 1 + cellOffset;
+              tr = tr.setNodeAttribute(cellPos, "width", `${colWidth}%`);
+            });
+          });
+          
           editor.view.dispatch(tr);
         }
         break;
@@ -508,7 +517,7 @@ const updateColumnWidth = (widthPercent: number) => {
 
     let tableNode = null;
     let tableDepth = 0;
-    let cellColIndex = -1;
+    let cellColIndex = 0;
 
     for (let depth = $from.depth; depth > 0; depth--) {
       const node = $from.node(depth);
