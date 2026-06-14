@@ -124,7 +124,7 @@ Two-column layout at `src/app/(dashboard)/admin/courses/[id]/lessons/[lessonId]/
 
 **Right Column (flex-1):**
 - **General Info panel**: Lesson Number, Title, Total Time inputs
-- **Lesson Materials panel**: Assets panel, Presentation, Spotify
+- **Lesson Materials panel**: Assets panel, Presentation (Spotify is now on course level)
 - **Section Editor panel**: Section label + TipTap LessonEditor with sticky toolbar
 
 **State Management:**
@@ -140,7 +140,7 @@ Two-column layout at `src/app/(dashboard)/admin/courses/[id]/lessons/[lessonId]/
 ### Database Schema
 - `profiles` - User profiles with role (admin/teacher)
 - `courses` - Course information with discipline and grade
-- `lessons` - Individual lessons with content, timing, presentation, spotify, etc.
+- `lessons` - Individual lessons with content, timing, presentation, etc. (Spotify is now on courses table)
 - `teacher_assignments` - Links teachers to courses
 - `lesson_assets` - Links assets to lessons with sort_order
 - `cfu_assets` - Check for Understanding assets (admin only)

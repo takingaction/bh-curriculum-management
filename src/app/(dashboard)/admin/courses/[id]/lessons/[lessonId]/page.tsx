@@ -10,7 +10,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { LessonEditor } from "@/components/editor/lesson-editor";
 import { LessonAssetsPanel } from "@/components/lesson-assets-panel";
 import { PresentationModal, PresentationLink } from "@/components/presentation-modal";
-import { SpotifyModal, SpotifyLink } from "@/components/spotify-modal";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
@@ -38,7 +37,6 @@ interface Lesson {
   assessment: string | null;
   presentation_name: string | null;
   presentation_url: string | null;
-  spotify_embed_code: string | null;
 }
 
 interface Fields {
@@ -95,10 +93,8 @@ export default function EditLessonPage({
   const [course, setCourse] = useState<{ title: string; discipline: string; grade: string; image_url: string | null } | null>(null);
 
   const [showPresentationModal, setShowPresentationModal] = useState(false);
-  const [showSpotifyModal, setShowSpotifyModal] = useState(false);
   const [presentationName, setPresentationName] = useState("");
   const [presentationUrl, setPresentationUrl] = useState("");
-  const [spotifyEmbedCode, setSpotifyEmbedCode] = useState("");
   const [selectedSection, setSelectedSection] = useState(textFields[0].name);
   const editorSectionRef = useRef<HTMLDivElement>(null);
   const [activePanel, setActivePanel] = useState<'general' | 'materials' | 'section'>('general');
@@ -159,7 +155,6 @@ export default function EditLessonPage({
         });
         setPresentationName(lessonData.presentation_name || "");
         setPresentationUrl(lessonData.presentation_url || "");
-        setSpotifyEmbedCode(lessonData.spotify_embed_code || "");
       } catch (err: any) {
         setError(err.message);
       } finally {
@@ -257,47 +252,6 @@ export default function EditLessonPage({
       if (!res.ok) throw new Error("Failed to remove");
       setPresentationName("");
       setPresentationUrl("");
-      setSaved(true);
-      setTimeout(() => setSaved(false), 3000);
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSaveSpotify = async (embedCode: string) => {
-    if (!lesson) return;
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/admin/lessons/${lesson.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ spotify_embed_code: embedCode }),
-      });
-      if (!res.ok) throw new Error("Failed to save");
-      setSpotifyEmbedCode(embedCode);
-      setSaved(true);
-      setTimeout(() => setSaved(false), 3000);
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleRemoveSpotify = async () => {
-    if (!lesson) return;
-    if (!confirm("Remove Spotify playlist?")) return;
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/admin/lessons/${lesson.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ spotify_embed_code: null }),
-      });
-      if (!res.ok) throw new Error("Failed to remove");
-      setSpotifyEmbedCode("");
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch (err: any) {
@@ -495,28 +449,12 @@ export default function EditLessonPage({
                   >
                     Add Presentation
                   </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowSpotifyModal(true)}
-                    className="border-[#e5e5e0]"
-                  >
-                    Add Spotify Playlist
-                  </Button>
                 </div>
                 {presentationName && (
                   <div className="flex items-center gap-3 py-2 px-3 bg-gray-50 rounded-lg">
                     <PresentationLink name={presentationName} url={presentationUrl} />
                     <button type="button" onClick={() => setShowPresentationModal(true)} className="text-xs text-[#0d7377] hover:underline">Edit</button>
                     <button type="button" onClick={handleRemovePresentation} className="text-xs text-red-600 hover:underline">Remove</button>
-                  </div>
-                )}
-                {spotifyEmbedCode && (
-                  <div className="flex items-center gap-3 py-2 px-3 bg-gray-50 rounded-lg">
-                    <SpotifyLink onClick={() => {}} />
-                    <button type="button" onClick={() => setShowSpotifyModal(true)} className="text-xs text-[#0d7377] hover:underline">Edit</button>
-                    <button type="button" onClick={handleRemoveSpotify} className="text-xs text-red-600 hover:underline">Remove</button>
                   </div>
                 )}
               </div>
@@ -552,14 +490,6 @@ export default function EditLessonPage({
         existingName={presentationName}
         existingUrl={presentationUrl}
         onSave={handleSavePresentation}
-      />
-
-      <SpotifyModal
-        open={showSpotifyModal}
-        onClose={() => setShowSpotifyModal(false)}
-        lessonId={lesson.id}
-        existingCode={spotifyEmbedCode}
-        onSave={handleSaveSpotify}
       />
     </div>
   );

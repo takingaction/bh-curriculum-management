@@ -30,7 +30,6 @@ interface Lesson {
   assessment: string | null;
   presentation_name: string | null;
   presentation_url: string | null;
-  spotify_embed_code: string | null;
 }
 
 interface Course {
@@ -39,6 +38,7 @@ interface Course {
   discipline: string;
   grade: string;
   image_url: string | null;
+  spotify_embed_code: string | null;
 }
 
 const sections = [
@@ -204,7 +204,7 @@ export default function LessonContentPage({
                   <PresentationLink name={lesson.presentation_name} url={lesson.presentation_url || ""} />
                 </div>
               )}
-              {lesson.spotify_embed_code && (
+              {course?.spotify_embed_code && (
                 <div className="mt-1">
                   <button
                     type="button"
@@ -289,7 +289,7 @@ export default function LessonContentPage({
       <SpotifyEmbed
         open={showSpotify}
         onClose={() => setShowSpotify(false)}
-        embedCode={lesson?.spotify_embed_code || ""}
+        embedCode={course?.spotify_embed_code || ""}
       />
     </div>
   );

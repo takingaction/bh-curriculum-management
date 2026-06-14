@@ -21,7 +21,7 @@ export async function GET(
 
     const { data: course, error: courseError } = await supabaseAdmin
       .from("courses")
-      .select("id, title, discipline, grade, image_url")
+      .select("id, title, discipline, grade, image_url, spotify_embed_code")
       .eq("id", lesson.course_id)
       .single();
 

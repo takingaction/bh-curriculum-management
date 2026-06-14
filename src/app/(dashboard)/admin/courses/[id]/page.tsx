@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { CourseImageUpload } from "@/components/course-image-upload";
 import { ManageImagesButton } from "@/components/manage-images-button";
 import { DeleteCourseButton } from "@/components/delete-course-button";
+import { CourseSpotifySection } from "@/components/course-spotify-section";
 
 export default async function CourseDetailPage({
   params,
@@ -51,6 +52,8 @@ export default async function CourseDetailPage({
           <DeleteCourseButton courseId={course.id} courseTitle={course.title} />
         </div>
       </div>
+
+      <CourseSpotifySection courseId={course.id} initialSpotifyCode={course.spotify_embed_code || ""} />
 
       <Card className="mb-8">
         <CardHeader>
