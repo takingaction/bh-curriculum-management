@@ -272,6 +272,11 @@
     @apply bg-gray-100 font-semibold;
   }
 
+  .lesson-content [data-check-for-understanding="true"] table td,
+  .lesson-content [data-check-for-understanding="true"] table th {
+    border: none;
+  }
+
   .lesson-content img {
     @apply max-w-full h-auto my-4;
   }
