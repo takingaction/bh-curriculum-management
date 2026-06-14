@@ -254,6 +254,12 @@
     @apply border-collapse my-4;
   }
 
+  .lesson-content table[data-show-grid="false"] th,
+  .lesson-content table[data-show-grid="false"] td {
+    border: none;
+    @apply px-3 py-2 text-left align-top;
+  }
+
   .lesson-content th,
   .lesson-content td {
     @apply border border-gray-300 px-3 py-2 text-left align-top;

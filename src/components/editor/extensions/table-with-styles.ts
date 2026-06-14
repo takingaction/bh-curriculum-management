@@ -35,12 +35,25 @@ export const TableWithStylesExtension = Table.extend({
           };
         },
       },
+      showGrid: {
+        default: true,
+        parseHTML: (element) => {
+          const attr = element.getAttribute("data-show-grid");
+          return attr === null || attr === "true";
+        },
+        renderHTML: (attributes) => {
+          return {
+            "data-show-grid": attributes.showGrid ? "true" : "false",
+          };
+        },
+      },
     };
   },
 
   renderHTML({ node, HTMLAttributes }) {
     const width = node.attrs.width || "100%";
     const alignment = node.attrs.alignment || "center";
+    const showGrid = node.attrs.showGrid !== false;
     const marginLeft = alignment === "left" ? "0" : "auto";
     const marginRight = alignment === "right" ? "0" : "auto";
 
@@ -50,6 +63,7 @@ export const TableWithStylesExtension = Table.extend({
         ...HTMLAttributes,
         "data-width": width,
         "data-alignment": alignment,
+        "data-show-grid": showGrid ? "true" : "false",
         style: `width: ${width}; margin-left: ${marginLeft}; margin-right: ${marginRight};`,
       },
       ["tbody", 0],

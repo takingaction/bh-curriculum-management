@@ -5,7 +5,7 @@ import StarterKit from "@tiptap/starter-kit";
 import { TableWithStyles, TableWithStylesExtension } from "./extensions/table-with-styles";
 import { CheckForUnderstanding } from "./extensions/check-for-understanding";
 import { TableRow } from "@tiptap/extension-table-row";
-import { TableCell } from "@tiptap/extension-table-cell";
+import { TableCellWithWidth } from "./extensions/table-cell-with-width";
 import { TableHeader } from "@tiptap/extension-table-header";
 import Image from "@tiptap/extension-image";
 import Link from "@tiptap/extension-link";
@@ -72,6 +72,8 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
   const [tableAlignment, setTableAlignment] = useState("center");
   const [tableContextKey, setTableContextKey] = useState(0);
   const [widthInputFocused, setWidthInputFocused] = useState(false);
+  const [selectedColumnWidth, setSelectedColumnWidth] = useState<string>("");
+  const [tableShowGrid, setTableShowGrid] = useState(true);
   const [showCFUModal, setShowCFUModal] = useState(false);
   const [editingCFUAttrs, setEditingCFUAttrs] = useState<any>(null);
   const [existingCFUAttrs, setExistingCFUAttrs] = useState<any>(null);
@@ -92,7 +94,7 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
       TableWithStylesExtension,
       CheckForUnderstanding,
       TableRow,
-      TableCell,
+      TableCellWithWidth,
       TableHeader,
       Image,
       Link.configure({
@@ -164,12 +166,18 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
 
     let tableNode = null;
     let tableDepth = 0;
+    let cellDepth = 0;
+    let cellOffset = 0;
+    
     for (let depth = $from.depth; depth > 0; depth--) {
       const node = $from.node(depth);
       if (node.type.name === "table") {
         tableNode = node;
         tableDepth = depth;
-        break;
+      }
+      if (node.type.name === "tableCell" || node.type.name === "tableHeader") {
+        cellDepth = depth;
+        cellOffset = $from.index(depth);
       }
     }
 
@@ -180,9 +188,20 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
         const attrs = nodeAtPos.attrs;
         const width = attrs.width || "100%";
         const alignment = attrs.alignment || "center";
+        const showGrid = attrs.showGrid !== false;
         const numWidth = parseInt(width.replace("%", ""));
         setTableWidth(numWidth >= 1 && numWidth <= 100 ? numWidth : 100);
         setTableAlignment(alignment);
+        setTableShowGrid(showGrid);
+        
+        // Track selected column info
+        if (cellDepth > 0) {
+          const cell = $from.node(cellDepth);
+          const colWidth = cell.attrs.width;
+          setSelectedColumnWidth(colWidth || "");
+        } else {
+          setSelectedColumnWidth("");
+        }
       }
     }
   };
@@ -456,6 +475,84 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
           const tr = state.tr.setNodeMarkup(pos, undefined, newAttrs);
           editor.view.dispatch(tr);
           setTableAlignment(alignment);
+          onChange(editor.getHTML());
+        }
+        break;
+      }
+    }
+  };
+
+  const updateColumnWidth = (widthPercent: number) => {
+    if (!editor) return;
+    const { state } = editor;
+    const { selection } = state;
+    const $from = selection.$from;
+
+    let tableNode = null;
+    let tableDepth = 0;
+    let cellColIndex = -1;
+
+    // Find table and column index
+    for (let depth = $from.depth; depth > 0; depth--) {
+      const node = $from.node(depth);
+      if (node.type.name === "table") {
+        tableNode = node;
+        tableDepth = depth;
+      }
+      if (node.type.name === "tableCell" || node.type.name === "tableHeader") {
+        // Calculate column index by counting cells in row before this one
+        const row = $from.node(depth - 1);
+        if (row) {
+          for (let i = 0; i < $from.index(depth); i++) {
+            const cell = row.child(i);
+            if (cell.attrs.colspan) {
+              cellColIndex += cell.attrs.colspan;
+            } else {
+              cellColIndex++;
+            }
+          }
+        }
+      }
+    }
+
+    if (tableNode && cellColIndex >= 0) {
+      const tablePos = $from.before(tableDepth);
+      const tr = state.tr;
+      
+      tableNode.forEach((rowNode, rowOffset) => {
+        let colIndex = 0;
+        rowNode.forEach((cell, cellOffset) => {
+          if (colIndex === cellColIndex) {
+            const absolutePos = tablePos + rowOffset + 1 + cellOffset;
+            const newAttrs = { ...cell.attrs, width: `${widthPercent}%` };
+            tr.setNodeMarkup(absolutePos, undefined, newAttrs);
+          }
+          colIndex += cell.attrs.colspan || 1;
+        });
+      });
+      
+      editor.view.dispatch(tr);
+      setSelectedColumnWidth(`${widthPercent}%`);
+      onChange(editor.getHTML());
+    }
+  };
+
+  const updateTableGrid = (showGrid: boolean) => {
+    if (!editor) return;
+    const { state } = editor;
+    const { selection } = state;
+    const $from = selection.$from;
+
+    for (let depth = $from.depth; depth > 0; depth--) {
+      const node = $from.node(depth);
+      if (node.type.name === "table") {
+        const pos = $from.before(depth);
+        const tableNode = state.doc.nodeAt(pos);
+        if (tableNode) {
+          const newAttrs = { ...tableNode.attrs, showGrid };
+          const tr = state.tr.setNodeMarkup(pos, undefined, newAttrs);
+          editor.view.dispatch(tr);
+          setTableShowGrid(showGrid);
           onChange(editor.getHTML());
         }
         break;
@@ -956,6 +1053,50 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
           >
             <AlignRight className="w-4 h-4" />
           </button>
+
+          <div className="w-px h-5 bg-gray-300 mx-2" />
+
+          <span className="text-xs text-gray-500">Col Width:</span>
+          <input
+            type="number"
+            min={1}
+            max={100}
+            value={selectedColumnWidth ? parseInt(selectedColumnWidth) || "" : ""}
+            placeholder="="
+            onChange={(e) => {
+              const parsed = parseInt(e.target.value);
+              if (!isNaN(parsed) && parsed >= 1 && parsed <= 100) {
+                setSelectedColumnWidth(`${parsed}%`);
+              } else if (e.target.value === "") {
+                setSelectedColumnWidth("");
+              }
+            }}
+            onBlur={(e) => {
+              const parsed = parseInt(e.target.value);
+              if (!isNaN(parsed) && parsed >= 1 && parsed <= 100) {
+                updateColumnWidth(parsed);
+              }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.currentTarget.blur();
+              }
+            }}
+            className="w-14 h-7 px-1 text-xs border border-[#e5e5e0] rounded text-center"
+          />
+          <span className="text-xs text-gray-500">%</span>
+
+          <div className="w-px h-5 bg-gray-300 mx-2" />
+
+          <label className="flex items-center gap-1 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={tableShowGrid}
+              onChange={(e) => updateTableGrid(e.target.checked)}
+              className="w-3.5 h-3.5"
+            />
+            <span className="text-xs text-gray-500">Lesson Grid</span>
+          </label>
         </div>
       )}
 
