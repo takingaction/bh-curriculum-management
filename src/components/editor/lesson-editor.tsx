@@ -707,27 +707,21 @@ const updateColumnWidth = (widthPercent: number) => {
   const deleteImage = () => {
     if (!editor) return;
     const { state } = editor;
-    const { selection } = state;
-    const { $from } = selection;
-
-    let imageNode = null;
-    let imagePos = 0;
-
-    const nodeAfter = $from.nodeAfter;
-    if (nodeAfter && nodeAfter.type.name === "image") {
-      imageNode = nodeAfter;
-      imagePos = $from.pos + 1;
-    } else {
-      const nodeBefore = $from.nodeBefore;
-      if (nodeBefore && nodeBefore.type.name === "image") {
-        imageNode = nodeBefore;
-        imagePos = $from.pos - nodeBefore.nodeSize;
+    
+    let deleted = false;
+    
+    state.doc.descendants((node, pos) => {
+      if (deleted) return false;
+      if (node.type.name === "image") {
+        const tr = state.tr.delete(pos, pos + node.nodeSize);
+        editor.view.dispatch(tr);
+        deleted = true;
+        return false;
       }
-    }
+      return true;
+    });
 
-    if (imageNode) {
-      const tr = state.tr.delete(imagePos, imagePos + imageNode.nodeSize);
-      editor.view.dispatch(tr);
+    if (deleted) {
       onChange(editor.getHTML());
     }
 
