@@ -362,29 +362,35 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
     const { state } = editor;
     const { selection } = state;
     const $from = selection.$from;
+    let tablePos = -1;
+    let tableNode = null;
 
     for (let depth = $from.depth; depth > 0; depth--) {
       const node = $from.node(depth);
       if (node.type.name === "table") {
-        const pos = $from.before(depth);
-        const tableNode = state.doc.nodeAt(pos);
-        if (tableNode) {
-          const newAttrs = { ...tableNode.attrs, width: widthValue, alignment };
-          let tr = state.tr.setNodeMarkup(pos, undefined, newAttrs);
-          
-          const colWidth = Math.floor(100 / cols);
-          tableNode.forEach((rowNode, rowOffset) => {
-            rowNode.forEach((cell, cellOffset) => {
-              const cellPos = pos + rowOffset + 1 + cellOffset;
-              tr = tr.setNodeAttribute(cellPos, "width", `${colWidth}%`);
-            });
-          });
-          
-          editor.view.dispatch(tr);
-        }
+        tablePos = $from.before(depth);
+        tableNode = state.doc.nodeAt(tablePos);
         break;
       }
     }
+
+    if (tableNode && tablePos >= 0) {
+      const colWidth = Math.floor(100 / cols);
+      let tr = state.tr;
+      let updated = 0;
+      
+      state.doc.nodesBetween(tablePos, tablePos + tableNode.nodeSize, (node, pos) => {
+        if (node.type.name === "tableCell" || node.type.name === "tableHeader") {
+          tr = tr.setNodeAttribute(pos, "width", `${colWidth}%`);
+          updated++;
+        }
+      });
+      
+      if (updated > 0) {
+        editor.view.dispatch(tr);
+      }
+    }
+
     setTableWidth(parseInt(widthValue) || 100);
     setTableAlignment(alignment);
     onChange(editor.getHTML());
