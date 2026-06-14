@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect } from "react";
 import { X, Move } from "lucide-react";
 
 interface SpotifyEmbedProps {
@@ -11,51 +11,61 @@ interface SpotifyEmbedProps {
 
 export function SpotifyEmbed({ open, onClose, embedCode }: SpotifyEmbedProps) {
   const [size, setSize] = useState({ width: 380, height: 450 });
-  const [position, setPosition] = useState({ x: 0, y: 0 });
-  const [isDragging, setIsDragging] = useState(false);
+  const [visible, setVisible] = useState(false);
   const nodeRef = useRef<HTMLDivElement>(null);
-  const dragStartRef = useRef({ mouseX: 0, mouseY: 0, posX: 0, posY: 0 });
+  const isDraggingRef = useRef(false);
+  const dragStartRef = useRef({ mouseX: 0, mouseY: 0, left: 0, top: 0 });
   const startSizeRef = useRef({ width: 0, height: 0 });
   const startCursorRef = useRef({ x: 0, y: 0 });
+  const currentLeftRef = useRef(0);
+  const currentTopRef = useRef(0);
 
   useEffect(() => {
-    if (open && nodeRef.current) {
+    if (open) {
       const windowWidth = window.innerWidth;
-      const newX = windowWidth - size.width - 20;
-      setPosition({ x: newX, y: 20 });
-      nodeRef.current.style.left = `${newX}px`;
-      nodeRef.current.style.top = "20px";
+      currentLeftRef.current = windowWidth - 400;
+      currentTopRef.current = 20;
+      setVisible(true);
+    } else {
+      setVisible(false);
     }
-  }, [open, size]);
+  }, [open]);
+
+  useEffect(() => {
+    if (visible && nodeRef.current) {
+      nodeRef.current.style.left = `${currentLeftRef.current}px`;
+      nodeRef.current.style.top = `${currentTopRef.current}px`;
+    }
+  }, [visible]);
 
   const handleDragStart = (e: React.MouseEvent) => {
     e.preventDefault();
-    setIsDragging(true);
+    isDraggingRef.current = true;
     dragStartRef.current = {
       mouseX: e.clientX,
       mouseY: e.clientY,
-      posX: position.x,
-      posY: position.y,
+      left: currentLeftRef.current,
+      top: currentTopRef.current,
     };
   };
 
   useEffect(() => {
-    if (!isDragging) return;
+    if (!visible) return;
 
     const handleMouseMove = (e: MouseEvent) => {
+      if (!isDraggingRef.current) return;
       const deltaX = e.clientX - dragStartRef.current.mouseX;
       const deltaY = e.clientY - dragStartRef.current.mouseY;
-      const newX = dragStartRef.current.posX + deltaX;
-      const newY = dragStartRef.current.posY + deltaY;
-      setPosition({ x: newX, y: newY });
+      currentLeftRef.current = dragStartRef.current.left + deltaX;
+      currentTopRef.current = dragStartRef.current.top + deltaY;
       if (nodeRef.current) {
-        nodeRef.current.style.left = `${newX}px`;
-        nodeRef.current.style.top = `${newY}px`;
+        nodeRef.current.style.left = `${currentLeftRef.current}px`;
+        nodeRef.current.style.top = `${currentTopRef.current}px`;
       }
     };
 
     const handleMouseUp = () => {
-      setIsDragging(false);
+      isDraggingRef.current = false;
     };
 
     document.addEventListener("mousemove", handleMouseMove);
@@ -64,7 +74,7 @@ export function SpotifyEmbed({ open, onClose, embedCode }: SpotifyEmbedProps) {
       document.removeEventListener("mousemove", handleMouseMove);
       document.removeEventListener("mouseup", handleMouseUp);
     };
-  }, [isDragging]);
+  }, [visible]);
 
   const handleResizeStart = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -75,10 +85,9 @@ export function SpotifyEmbed({ open, onClose, embedCode }: SpotifyEmbedProps) {
     const handleMouseMove = (e: MouseEvent) => {
       const deltaX = e.clientX - startCursorRef.current.x;
       const deltaY = e.clientY - startCursorRef.current.y;
-      setSize({
-        width: Math.max(300, startSizeRef.current.width + deltaX),
-        height: Math.max(300, startSizeRef.current.height + deltaY),
-      });
+      const newWidth = Math.max(300, startSizeRef.current.width + deltaX);
+      const newHeight = Math.max(300, startSizeRef.current.height + deltaY);
+      setSize({ width: newWidth, height: newHeight });
     };
 
     const handleMouseUp = () => {
@@ -94,7 +103,7 @@ export function SpotifyEmbed({ open, onClose, embedCode }: SpotifyEmbedProps) {
     document.body.style.userSelect = "none";
   };
 
-  if (!open) return null;
+  if (!visible) return null;
 
   return (
     <div
@@ -103,8 +112,8 @@ export function SpotifyEmbed({ open, onClose, embedCode }: SpotifyEmbedProps) {
       style={{
         width: size.width,
         height: size.height,
-        left: position.x,
-        top: position.y,
+        left: currentLeftRef.current,
+        top: currentTopRef.current,
       }}
     >
       <div
