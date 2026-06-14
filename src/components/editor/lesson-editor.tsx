@@ -183,7 +183,6 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
     let columnWidths = tableNode.attrs.columnWidths;
 
     if (!columnWidths || columnWidths.length === 0) {
-      console.warn("syncTableState: columnWidths missing, generating fallback");
       const firstRow = tableNode.firstChild;
       const colCount = firstRow ? firstRow.childCount : 1;
       const colWidth = Math.floor(100 / colCount);
@@ -199,7 +198,6 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
     }
 
     const colWidth = columnWidths[cellColIndex] || "";
-    console.log("syncTableState: cellColIndex=", cellColIndex, "colWidth=", colWidth, "columnWidths=", columnWidths);
     setSelectedColumnWidth(colWidth);
   };
 
@@ -247,7 +245,6 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
       let columnWidths = tableNode.attrs.columnWidths;
 
       if (!columnWidths || columnWidths.length === 0) {
-        console.warn("forceSyncTableState: columnWidths missing, generating fallback");
         const firstRow = tableNode.firstChild;
         const colCount = firstRow ? firstRow.childCount : 1;
         const colWidth = Math.floor(100 / colCount);
@@ -263,7 +260,6 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
       }
 
       const colWidth = columnWidths[cellColIndex] || "";
-      console.log("forceSyncTableState: cellColIndex=", cellColIndex, "colWidth=", colWidth, "columnWidths=", columnWidths);
       setSelectedColumnWidth(colWidth);
     }
   };
@@ -316,11 +312,9 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
       });
       
       if (!hasThisCFU) {
-        console.log("This editor doesn't contain CFU:", e.detail.cfuId);
-        return; // Don't open modal for editors that don't have this CFU
+        return;
       }
       
-      console.log("Lesson Editor: setting attrs and opening modal", e.detail.backgroundImage);
       editingCFUAttrsRef.current = e.detail;
       setEditingCFUAttrs(e.detail);
       setShowCFUModal(true);
@@ -436,7 +430,6 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
         alignment,
       });
       editor.view.dispatch(tr);
-      console.log("insertTableWithOptions: tablePos=", tablePos, "columnWidths=", columnWidths);
     }
 
     setTableWidth(parseInt(widthValue) || 100);
@@ -479,7 +472,6 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
       alert("This CFU has no unique ID. Please delete it and insert a new one.");
     } else {
       const newCfuId = Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
-      console.log("No originalAttrs, inserting new CFU with cfuId:", newCfuId);
       editor.chain().focus().insertContent({ type: "checkForUnderstanding", attrs: { ...attributes, cfuId: newCfuId } }).run();
       editingCFUAttrsRef.current = null;
       setEditingCFUAttrs(null);
@@ -606,12 +598,10 @@ const updateColumnWidth = (widthPercent: number) => {
       }
 
       if (currentWidths[cellColIndex] === `${widthPercent}%`) {
-        console.log("updateColumnWidth: column", cellColIndex, "width unchanged at", widthPercent);
         return;
       }
 
       newWidths[cellColIndex] = `${widthPercent}%`;
-      console.log("updateColumnWidth: column", cellColIndex, "before:", currentWidths, "after:", newWidths);
 
       try {
         const tr = state.tr.setNodeMarkup(tablePos, undefined, {
@@ -1140,7 +1130,6 @@ const updateColumnWidth = (widthPercent: number) => {
                     columnWidths,
                   });
                   editor.view.dispatch(tr);
-                  console.log("Table repaired: columnWidths reset to", columnWidths);
                   onChange(editor.getHTML());
                 }
               }}
@@ -1230,10 +1219,7 @@ const updateColumnWidth = (widthPercent: number) => {
             onBlur={(e) => {
               const parsed = parseInt(e.target.value);
               if (!isNaN(parsed) && parsed >= 1 && parsed <= 100) {
-                console.log("Blur: calling updateColumnWidth with", parsed);
                 updateColumnWidth(parsed);
-              } else {
-                console.log("Blur: invalid value", e.target.value, "parsed:", parsed);
               }
             }}
             onKeyDown={(e) => {

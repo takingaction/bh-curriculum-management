@@ -118,14 +118,23 @@ Click link button (chain icon) to insert hyperlink:
 - **Insert Table**: Columns (1-10), rows (1-20), width (1-100%), alignment (left/center/right), header row toggle
 - **Table Context Toolbar**: Shows when cursor is inside a table
   - Add/Remove columns and rows (+Col, -Col, +Row, -Row)
-  - Width input (1-100%)
+  - Col Width input (1-100%) - updates specific column
+  - Width input (1-100%) - updates entire table
   - Alignment buttons (left/center/right)
-- **Custom Table Extension**: `TableWithStylesExtension` with node attributes for width and alignment
-  - Attributes stored in ProseMirror model (`width`, `alignment`)
-  - `parseHTML` reads from `data-width`, `data-alignment`, and inline styles
-  - `renderHTML` generates proper inline styles
-  - No `colgroup` or `min-width` generation
-- **Default**: New tables default to 100% width, center alignment
+  - Show Grid toggle
+  - Delete Table button
+  - Repair Table button (admin only) - resets column widths to equal distribution
+- **Column Widths**: Stored in table's `columnWidths` attribute as array (e.g., `["33%", "33%", "34%"]`)
+  - Uses `<colgroup>` and `<col>` elements for proper HTML column width rendering
+  - `table-layout: fixed` ensures browser respects column widths
+  - Column index determined by node reference comparison (not position-based index)
+- **Custom Table Extension**: `TableWithStylesExtension` with node attributes:
+  - `width`: Table width percentage (default "100%")
+  - `alignment`: "left", "center", or "right"
+  - `showGrid`: Boolean for grid display (default true)
+  - `columnWidths`: Array of column width strings
+- **renderHTML**: Generates proper `<colgroup>` with `<col style="width: XX%">` elements
+- **Default**: New tables get equal column widths (e.g., 33%, 33%, 34% for 3 columns)
 
 ### Check for Understanding (CFU) Entity
 - **TipTap Block Node**: Custom `CheckForUnderstanding` extension with ReactNodeViewRenderer
