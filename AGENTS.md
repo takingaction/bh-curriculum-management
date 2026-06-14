@@ -69,11 +69,61 @@ Located in `src/components/editor/extensions/`:
 - Malformed HTML fixing (p>strong with h3 closing, h3 with stray </strong>, h3 containing PK.MU:/PK:/MU:)
 - Anchor standard removal (replacing h3.anchor-standard with plain h3)
 
+#### Check for Understanding (CFU) Entity
+- TipTap block node with ReactNodeViewRenderer
+- 7 attributes: cfuId, backgroundImage, pngImage, heading, content, alignment, width
+- 9 position options: wrap-top-left/center/right, left/center/right, wrap-bottom-left/center/right
+- Default entity width: 50%, background: contain, padding: 30px 40px
+- Text: 16px, weight 700, vertical-align middle, text-align left
+- **Click-to-edit**: Single click opens modal (with z-index, contentEditable=false fixes)
+- **Unique cfuId**: Generated on insert (Date.now().toString(36) + random)
+- **Editor isolation**: Only the editor containing the CFU opens its modal
+- **Modal uses refs**: onCloseRef, onInsertRef for stable callback references
+- **Click rate limiting**: 1-second cooldown via lastClickRef in NodeView
+
+#### Table Extensions
+**table-with-styles.ts** - Custom table extension with:
+- `columnWidths` attribute (array of percentage strings like ["33%", "33%", "34%"])
+- `tableWidth` attribute (overall width percentage)
+- `tableAlignment` attribute (left/center/right)
+- `showGrid` attribute for lesson grid toggle
+- `renderHTML` generates `<colgroup>` with proper inline styles
+- Uses `table-layout: fixed` for colgroup widths to work
+
+**table-cell-with-width.ts** - Simplified cell extension (no per-cell width attribute)
+
+**Table column index fix**: Changed from `$from.index(depth)` to node reference comparison (`row.child(i) === cellNode`) to fix always returning 0 bug
+
+#### Lesson Editor Layout (Admin)
+Two-column layout at `src/app/(dashboard)/admin/courses/[id]/lessons/[lessonId]/page.tsx`:
+
+**Left Column (280px, sticky):**
+- "General Info" button (coral when inactive, green when active)
+- "Lesson Materials" button (coral when inactive, green when active)
+- Divider
+- 15 section buttons (green when selected, light teal when not)
+
+**Right Column (flex-1):**
+- **General Info panel**: Lesson Number, Title, Total Time inputs
+- **Lesson Materials panel**: Assets panel, Presentation, Spotify
+- **Section Editor panel**: Section label + TipTap LessonEditor with sticky toolbar
+
+**State Management:**
+- `activePanel: 'general' | 'materials' | 'section'`
+- `selectedSection` tracks which content section (for section panel)
+
+**Editor Toolbar (sticky at top-14 z-40):**
+- Contains all formatting buttons (Bold, Italic, H2, H3, Lists, etc.)
+- Table context toolbar when inside table
+- Both toolbars in single sticky container
+
 ### Database Schema
 - `profiles` - User profiles with role (admin/teacher)
 - `courses` - Course information with discipline and grade
-- `lessons` - Individual lessons with content, timing, etc.
+- `lessons` - Individual lessons with content, timing, presentation, spotify, etc.
 - `teacher_assignments` - Links teachers to courses
+- `lesson_assets` - Links assets to lessons with sort_order
+- `cfu_assets` - Check for Understanding assets (admin only)
 
 ### RLS Policies
 - Profiles: Users can read all, update only own profile
@@ -99,3 +149,12 @@ Located in `src/components/editor/extensions/`:
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
+
+### Relevant Files
+- `src/app/(dashboard)/admin/courses/[id]/lessons/[lessonId]/page.tsx` - Main lesson edit page with two-column layout
+- `src/components/editor/lesson-editor.tsx` - TipTap editor with sticky toolbar
+- `src/components/editor/extensions/spell-check.ts` - Spellcheck extension
+- `src/components/editor/extensions/check-for-understanding.tsx` - CFU entity
+- `src/components/editor/extensions/table-with-styles.ts` - Custom table with column widths
+- `src/components/lesson-assets-panel.tsx` - Lesson assets management
+- `src/components/check-for-understanding-modal.tsx` - CFU edit modal
