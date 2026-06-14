@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -100,6 +100,7 @@ export default function EditLessonPage({
   const [presentationUrl, setPresentationUrl] = useState("");
   const [spotifyEmbedCode, setSpotifyEmbedCode] = useState("");
   const [selectedSection, setSelectedSection] = useState(textFields[0].name);
+  const editorSectionRef = useRef<HTMLDivElement>(null);
   const [fields, setFields] = useState<Fields>({
     lesson_number: "",
     title: "",
@@ -165,6 +166,10 @@ export default function EditLessonPage({
       }
     });
   }, []);
+
+  useEffect(() => {
+    editorSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [selectedSection]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -476,12 +481,13 @@ export default function EditLessonPage({
             </div>
 
             {/* Selected Section Editor */}
-            <div className="bg-white rounded-lg border border-[#e5e5e0] p-4">
+            <div ref={editorSectionRef} className="bg-white rounded-lg border border-[#e5e5e0] p-4">
               <div className="space-y-2">
                 <Label className="text-[#2d2d2d] font-bold text-base">
                   {textFields.find(f => f.name === selectedSection)?.label}
                 </Label>
                 <LessonEditor
+                  key={selectedSection}
                   content={fields[selectedSection as keyof Fields]}
                   onChange={(content) => handleFieldChange(selectedSection, content)}
                   placeholder={`Enter ${textFields.find(f => f.name === selectedSection)?.label.toLowerCase()}...`}
