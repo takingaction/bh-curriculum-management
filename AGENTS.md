@@ -81,6 +81,7 @@ Located in `src/components/editor/extensions/`:
 - **Editor isolation**: Only the editor containing the CFU opens its modal
 - **Modal uses refs**: onCloseRef, onInsertRef for stable callback references
 - **Click rate limiting**: 1-second cooldown via lastClickRef in NodeView
+- **Delete with confirmation**: Delete button in modal footer (when editing), confirmation modal in editor
 
 #### Table Extensions
 **table-with-styles.ts** - Custom table extension with:
