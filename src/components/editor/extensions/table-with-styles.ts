@@ -74,21 +74,14 @@ export const TableWithStylesExtension = Table.extend({
     const marginRight = alignment === "right" ? "0" : "auto";
     const columnWidths = node.attrs.columnWidths;
 
-    const colgroupContent: any[] = [];
+    const cols: any[] = [];
     if (columnWidths && columnWidths.length > 0) {
       columnWidths.forEach((w: string) => {
-        colgroupContent.push(["col", { style: `width: ${w};` }]);
+        cols.push(["col", { style: `width: ${w};` }]);
       });
     }
 
-    const children: any[] = [
-      "tbody",
-      0,
-    ];
-
-    if (colgroupContent.length > 0) {
-      children.unshift(["colgroup", 0, ...colgroupContent]);
-    }
+    const colgroup: any = ["colgroup", {}, ...cols];
 
     return [
       "table",
@@ -99,7 +92,8 @@ export const TableWithStylesExtension = Table.extend({
         "data-show-grid": showGrid ? "true" : "false",
         style: `width: ${width}; margin-left: ${marginLeft}; margin-right: ${marginRight}; table-layout: fixed;`,
       },
-      children,
+      colgroup,
+      ["tbody", 0],
     ];
   },
 });

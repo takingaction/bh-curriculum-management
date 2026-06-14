@@ -543,10 +543,15 @@ const updateColumnWidth = (widthPercent: number) => {
       const newWidths = [...currentWidths];
       newWidths[cellColIndex] = `${widthPercent}%`;
       
-      const tr = state.tr.setNodeAttribute(tablePos, "columnWidths", newWidths);
-      editor.view.dispatch(tr);
-      setSelectedColumnWidth(`${widthPercent}%`);
-      onChange(editor.getHTML());
+      try {
+        const tr = state.tr.setNodeAttribute(tablePos, "columnWidths", newWidths);
+        editor.view.dispatch(tr);
+        setSelectedColumnWidth(`${widthPercent}%`);
+      } catch (error) {
+        console.error("Error updating column width:", error);
+      } finally {
+        onChange(editor.getHTML());
+      }
     }
   };
 
