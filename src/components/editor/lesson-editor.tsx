@@ -547,17 +547,19 @@ const updateColumnWidth = (widthPercent: number) => {
     
     if (tableNode && cellColIndex >= 0) {
       const tablePos = $from.before(tableDepth);
-      console.log("tablePos:", tablePos);
+      console.log("tablePos:", tablePos, "tableNode child count:", tableNode.childCount);
       const tr = state.tr;
       let updated = 0;
       
       tableNode.forEach((rowNode, rowOffset) => {
+        console.log("Row", rowOffset, "at offset", rowOffset, "childCount:", rowNode.childCount);
         let colIndex = 0;
         rowNode.forEach((cell, cellOffset) => {
+          console.log("  Cell", colIndex, "cellOffset:", cellOffset);
           if (colIndex === cellColIndex) {
             const absolutePos = tablePos + rowOffset + 1 + cellOffset;
             const nodeAtPos = state.doc.nodeAt(absolutePos);
-            console.log("Cell node at", absolutePos, ":", nodeAtPos?.type.name, "current width:", nodeAtPos?.attrs.width);
+            console.log("  Trying pos", absolutePos, "got:", nodeAtPos?.type.name, "expected: tableCell/tableHeader");
             tr.setNodeAttribute(absolutePos, "width", `${widthPercent}%`);
             updated++;
           }
