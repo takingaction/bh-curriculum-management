@@ -483,7 +483,7 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
     }
   };
 
-  const updateColumnWidth = (widthPercent: number) => {
+const updateColumnWidth = (widthPercent: number) => {
     if (!editor) return;
     const { state } = editor;
     const { selection } = state;
@@ -525,6 +525,7 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
           if (colIndex === cellColIndex) {
             const absolutePos = tablePos + rowOffset + 1 + cellOffset;
             const newAttrs = { ...cell.attrs, width: `${widthPercent}%` };
+            console.log("Updating cell at pos", absolutePos, "with width", `${widthPercent}%`, "cell attrs before:", cell.attrs);
             tr.setNodeMarkup(absolutePos, undefined, newAttrs);
             updated++;
           }
@@ -532,8 +533,10 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
         });
       });
       
-if (updated > 0) {
+      console.log("Total cells updated:", updated, "HTML before dispatch:", editor.getHTML().substring(0, 500));
+      if (updated > 0) {
         editor.view.dispatch(tr);
+        console.log("HTML after dispatch:", editor.getHTML().substring(0, 500));
         setSelectedColumnWidth(`${widthPercent}%`);
         onChange(editor.getHTML());
       }
