@@ -550,29 +550,21 @@ const updateColumnWidth = (widthPercent: number) => {
       const tr = state.tr;
       let updated = 0;
       
+      let currentRowIndex = -1;
+      let currentColIndex = 0;
+      
       state.doc.nodesBetween(tablePos, tablePos + tableNode.nodeSize, (node, pos) => {
+        if (node.type.name === "tableRow") {
+          currentRowIndex++;
+          currentColIndex = 0;
+        }
         if ((node.type.name === "tableCell" || node.type.name === "tableHeader") && node.attrs.width !== `${widthPercent}%`) {
-          const row = node.parent;
-          let colIndex = 0;
-          let cellColIndexInRow = -1;
-          let cellIndex = 0;
-          const targetCell = node;
-          
-          row.forEach((cell, i) => {
-            if (cell === targetCell) {
-              cellColIndexInRow = colIndex;
-            }
-            colIndex += cell.attrs.colspan || 1;
-            cellIndex++;
-          });
-          
-          console.log("Found cell, calculated colIndex:", cellColIndexInRow, "target:", cellColIndex);
-          
-          if (cellColIndexInRow === cellColIndex) {
-            console.log("Updating cell at pos", pos, "with width", `${widthPercent}%`);
+          if (currentColIndex === cellColIndex) {
+            console.log("Updating row", currentRowIndex, "col", currentColIndex, "at pos", pos, "with width", `${widthPercent}%`);
             tr.setNodeAttribute(pos, "width", `${widthPercent}%`);
             updated++;
           }
+          currentColIndex += node.attrs.colspan || 1;
         }
       });
       
