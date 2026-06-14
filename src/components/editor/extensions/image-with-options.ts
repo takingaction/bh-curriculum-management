@@ -51,6 +51,7 @@ export const ImageWithOptions = Image.extend({
 
   addCommands() {
     return {
+      ...this.parent?.(),
       setImageAlign:
         (align) =>
         ({ commands }) => {
