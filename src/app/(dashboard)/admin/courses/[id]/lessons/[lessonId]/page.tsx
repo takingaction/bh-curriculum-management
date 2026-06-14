@@ -499,6 +499,7 @@ export default function EditLessonPage({
                   placeholder={`Enter ${field.label.toLowerCase()}...`}
                   lessonId={lesson.id}
                   courseId={lesson.course_id}
+                  isAdmin={true}
                 />
               </div>
             ))}

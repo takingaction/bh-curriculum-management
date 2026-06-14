@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/dialog";
 import { useEffect, useRef, useState } from "react";
 import { MediaLibrary } from "@/components/media-library";
-import { ImageIcon, CodeIcon, EyeIcon, EyeOffIcon, LinkIcon, ChevronLeft, ChevronRight, Plus, Minus, AlignLeft, AlignCenter, AlignRight, Lightbulb, Edit3 } from "lucide-react";
+import { ImageIcon, CodeIcon, EyeIcon, EyeOffIcon, LinkIcon, ChevronLeft, ChevronRight, Plus, Minus, AlignLeft, AlignCenter, AlignRight, Lightbulb, Edit3, RefreshCw } from "lucide-react";
 import { TableInsertDialog } from "@/components/ui/table-insert-dialog";
 import { SpellCheckExtension } from "./extensions/spell-check";
 import { CheckForUnderstandingModal } from "@/components/check-for-understanding-modal";
@@ -50,9 +50,10 @@ interface LessonEditorProps {
   placeholder?: string;
   lessonId?: string;
   courseId?: string;
+  isAdmin?: boolean;
 }
 
-export function LessonEditor({ content, onChange, placeholder, lessonId, courseId }: LessonEditorProps) {
+export function LessonEditor({ content, onChange, placeholder, lessonId, courseId, isAdmin }: LessonEditorProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [showMediaLibrary, setShowMediaLibrary] = useState(false);
@@ -172,12 +173,29 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
       }
     }
 
-    if (tableNode && tableNode.attrs.columnWidths) {
-      const colWidth = tableNode.attrs.columnWidths[cellColIndex] || "";
-      setSelectedColumnWidth(colWidth);
-    } else {
-      setSelectedColumnWidth("");
+    if (!tableNode) return;
+
+    let columnWidths = tableNode.attrs.columnWidths;
+
+    if (!columnWidths || columnWidths.length === 0) {
+      console.warn("syncTableState: columnWidths missing, generating fallback");
+      const firstRow = tableNode.firstChild;
+      const colCount = firstRow ? firstRow.childCount : 1;
+      const colWidth = Math.floor(100 / colCount);
+      const remainder = 100 - (colWidth * colCount);
+      columnWidths = Array(colCount).fill(null).map((_, i) =>
+        i === colCount - 1 ? `${colWidth + remainder}%` : `${colWidth}%`
+      );
+      const tr = state.tr.setNodeMarkup($from.before(tableDepth), undefined, {
+        ...tableNode.attrs,
+        columnWidths,
+      });
+      editor.view.dispatch(tr);
     }
+
+    const colWidth = columnWidths[cellColIndex] || "";
+    console.log("syncTableState: cellColIndex=", cellColIndex, "colWidth=", colWidth, "columnWidths=", columnWidths);
+    setSelectedColumnWidth(colWidth);
   };
 
   const forceSyncTableState = () => {
@@ -216,12 +234,27 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
     }
 
     if (tableNode) {
-      if (tableNode.attrs.columnWidths) {
-        const colWidth = tableNode.attrs.columnWidths[cellColIndex] || "";
-        setSelectedColumnWidth(colWidth);
-      } else {
-        setSelectedColumnWidth("");
+      let columnWidths = tableNode.attrs.columnWidths;
+
+      if (!columnWidths || columnWidths.length === 0) {
+        console.warn("forceSyncTableState: columnWidths missing, generating fallback");
+        const firstRow = tableNode.firstChild;
+        const colCount = firstRow ? firstRow.childCount : 1;
+        const colWidth = Math.floor(100 / colCount);
+        const remainder = 100 - (colWidth * colCount);
+        columnWidths = Array(colCount).fill(null).map((_, i) =>
+          i === colCount - 1 ? `${colWidth + remainder}%` : `${colWidth}%`
+        );
+        const tr = state.tr.setNodeMarkup($from.before(tableDepth), undefined, {
+          ...tableNode.attrs,
+          columnWidths,
+        });
+        editor.view.dispatch(tr);
       }
+
+      const colWidth = columnWidths[cellColIndex] || "";
+      console.log("forceSyncTableState: cellColIndex=", cellColIndex, "colWidth=", colWidth, "columnWidths=", columnWidths);
+      setSelectedColumnWidth(colWidth);
     }
   };
 
@@ -386,8 +419,14 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
         i === cols - 1 ? `${colWidth + remainder}%` : `${colWidth}%`
       );
       
-      const tr = state.tr.setNodeAttribute(tablePos, "columnWidths", columnWidths);
+      const tr = state.tr.setNodeMarkup(tablePos, undefined, {
+        ...tableNode.attrs,
+        columnWidths,
+        width: widthValue,
+        alignment,
+      });
       editor.view.dispatch(tr);
+      console.log("insertTableWithOptions: tablePos=", tablePos, "columnWidths=", columnWidths);
     }
 
     setTableWidth(parseInt(widthValue) || 100);
@@ -540,13 +579,26 @@ const updateColumnWidth = (widthPercent: number) => {
     if (tableNode && cellColIndex >= 0) {
       const tablePos = $from.before(tableDepth);
       const currentWidths = tableNode.attrs.columnWidths || [];
-      const newWidths = [...currentWidths];
+      let newWidths;
+
+      if (currentWidths.length === 0) {
+        const firstRow = tableNode.firstChild;
+        const colCount = firstRow ? firstRow.childCount : 1;
+        const colWidth = Math.floor(100 / colCount);
+        newWidths = Array(colCount).fill(`${colWidth}%`);
+      } else {
+        newWidths = [...currentWidths];
+      }
       newWidths[cellColIndex] = `${widthPercent}%`;
-      
+
       try {
-        const tr = state.tr.setNodeAttribute(tablePos, "columnWidths", newWidths);
+        const tr = state.tr.setNodeMarkup(tablePos, undefined, {
+          ...tableNode.attrs,
+          columnWidths: newWidths,
+        });
         editor.view.dispatch(tr);
         setSelectedColumnWidth(`${widthPercent}%`);
+        console.log("updateColumnWidth: cellColIndex=", cellColIndex, "before=", currentWidths, "after=", newWidths);
       } catch (error) {
         console.error("Error updating column width:", error);
       } finally {
@@ -1029,6 +1081,54 @@ const updateColumnWidth = (widthPercent: number) => {
           >
             <Minus className="w-3 h-3 mr-1" />Table
           </Button>
+
+          {isAdmin && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                if (!editor) return;
+                const { state } = editor;
+                const { selection } = state;
+                const $from = selection.$from;
+                let tableNode = null;
+                let tableDepth = 0;
+                let tablePos = -1;
+
+                for (let depth = $from.depth; depth > 0; depth--) {
+                  const node = $from.node(depth);
+                  if (node.type.name === "table") {
+                    tableNode = node;
+                    tableDepth = depth;
+                    tablePos = $from.before(depth);
+                    break;
+                  }
+                }
+
+                if (tableNode && tablePos >= 0) {
+                  const firstRow = tableNode.firstChild;
+                  const colCount = firstRow ? firstRow.childCount : 1;
+                  const colWidth = Math.floor(100 / colCount);
+                  const remainder = 100 - (colWidth * colCount);
+                  const columnWidths = Array(colCount).fill(null).map((_, i) =>
+                    i === colCount - 1 ? `${colWidth + remainder}%` : `${colWidth}%`
+                  );
+                  const tr = state.tr.setNodeMarkup(tablePos, undefined, {
+                    ...tableNode.attrs,
+                    columnWidths,
+                  });
+                  editor.view.dispatch(tr);
+                  console.log("Table repaired: columnWidths reset to", columnWidths);
+                  onChange(editor.getHTML());
+                }
+              }}
+              className="h-7 px-2 text-xs text-orange-600"
+              title="Repair Table Widths"
+            >
+              <RefreshCw className="w-3 h-3 mr-1" />Repair
+            </Button>
+          )}
 
           <div className="w-px h-5 bg-gray-300 mx-2" />
 
