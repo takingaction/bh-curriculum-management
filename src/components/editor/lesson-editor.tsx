@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/dialog";
 import { useEffect, useRef, useState } from "react";
 import { MediaLibrary } from "@/components/media-library";
-import { ImageIcon, CodeIcon, EyeIcon, EyeOffIcon, LinkIcon, ChevronLeft, ChevronRight, Plus, Minus, AlignLeft, AlignCenter, AlignRight, Lightbulb, Edit3, RefreshCw, Pin, PinOff } from "lucide-react";
+import { ImageIcon, CodeIcon, EyeIcon, EyeOffIcon, LinkIcon, ChevronLeft, ChevronRight, Plus, Minus, AlignLeft, AlignCenter, AlignRight, Lightbulb, Edit3, RefreshCw } from "lucide-react";
 import { TableInsertDialog } from "@/components/ui/table-insert-dialog";
 import { SpellCheckExtension } from "./extensions/spell-check";
 import { CheckForUnderstandingModal } from "@/components/check-for-understanding-modal";
@@ -51,11 +51,9 @@ interface LessonEditorProps {
   lessonId?: string;
   courseId?: string;
   isAdmin?: boolean;
-  isSticky?: boolean;
-  onStickyToggle?: () => void;
 }
 
-export function LessonEditor({ content, onChange, placeholder, lessonId, courseId, isAdmin, isSticky, onStickyToggle }: LessonEditorProps) {
+export function LessonEditor({ content, onChange, placeholder, lessonId, courseId, isAdmin }: LessonEditorProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [showMediaLibrary, setShowMediaLibrary] = useState(false);
@@ -725,7 +723,7 @@ const updateColumnWidth = (widthPercent: number) => {
 
   return (
     <div className="space-y-2">
-      <div className={`flex flex-wrap gap-1 border border-[#e5e5e0] rounded-lg p-2 bg-white ${isSticky ? "sticky top-0 z-50" : ""}`}>
+      <div className="flex flex-wrap gap-1 border border-[#e5e5e0] rounded-lg p-2 bg-white">
         <Button
           type="button"
           variant="ghost"
@@ -1019,19 +1017,6 @@ const updateColumnWidth = (widthPercent: number) => {
         >
           <CodeIcon className="w-4 h-4" />
         </Button>
-
-        {onStickyToggle && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={onStickyToggle}
-            className={`h-8 px-2 ${isSticky ? "text-[#0d7377]" : ""}`}
-            title={isSticky ? "Unpin Editor" : "Pin Editor"}
-          >
-            {isSticky ? <Pin className="w-4 h-4" /> : <PinOff className="w-4 h-4" />}
-          </Button>
-        )}
       </div>
 
       {isInsideTable() && tableContextKey > 0 && (

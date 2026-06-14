@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { Pin, PinOff } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
@@ -490,10 +491,25 @@ export default function EditLessonPage({
             </div>
 
             {textFields.map((field) => (
-              <div key={field.name} className="space-y-2">
-                <Label htmlFor={field.name} className="text-[#2d2d2d] font-bold text-base">
-                  {field.label}
-                </Label>
+              <div 
+                key={field.name} 
+                className={`space-y-2 ${stickySection === field.name ? "sticky top-0 z-50 bg-white pb-4" : ""}`}
+              >
+                <div className="flex items-center justify-between">
+                  <Label htmlFor={field.name} className="text-[#2d2d2d] font-bold text-base">
+                    {field.label}
+                  </Label>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setStickySection(stickySection === field.name ? null : field.name)}
+                    className={`h-7 px-2 text-xs ${stickySection === field.name ? "text-[#0d7377]" : "text-gray-400"}`}
+                    title={stickySection === field.name ? "Unpin Section" : "Pin Section"}
+                  >
+                    {stickySection === field.name ? <Pin className="w-4 h-4" /> : <PinOff className="w-4 h-4" />}
+                  </Button>
+                </div>
                 <LessonEditor
                   content={fields[field.name as keyof Fields]}
                   onChange={(content) => handleFieldChange(field.name, content)}
@@ -501,8 +517,6 @@ export default function EditLessonPage({
                   lessonId={lesson.id}
                   courseId={lesson.course_id}
                   isAdmin={true}
-                  isSticky={stickySection === field.name}
-                  onStickyToggle={() => setStickySection(stickySection === field.name ? null : field.name)}
                 />
               </div>
             ))}
