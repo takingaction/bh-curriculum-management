@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { SpotifyModal, SpotifyLink } from "@/components/spotify-modal";
+import { SpotifyEmbed } from "@/components/spotify-embed";
 
 interface CourseSpotifySectionProps {
   courseId: string;
@@ -12,6 +13,7 @@ interface CourseSpotifySectionProps {
 export function CourseSpotifySection({ courseId, initialSpotifyCode }: CourseSpotifySectionProps) {
   const [spotifyEmbedCode, setSpotifyEmbedCode] = useState(initialSpotifyCode);
   const [showSpotifyModal, setShowSpotifyModal] = useState(false);
+  const [showSpotifyPreview, setShowSpotifyPreview] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleSaveSpotify = async (embedCode: string) => {
@@ -50,7 +52,7 @@ export function CourseSpotifySection({ courseId, initialSpotifyCode }: CourseSpo
       <h3 className="text-sm font-bold text-[#2d2d2d] mb-3">Spotify Playlist</h3>
       {spotifyEmbedCode ? (
         <div className="flex items-center gap-3 py-2 px-3 bg-gray-50 rounded-lg">
-          <SpotifyLink onClick={() => {}} />
+          <SpotifyLink onClick={() => setShowSpotifyPreview(true)} />
           <button type="button" onClick={() => setShowSpotifyModal(true)} className="text-xs text-[#0d7377] hover:underline">Edit</button>
           <button type="button" onClick={handleRemoveSpotify} className="text-xs text-red-600 hover:underline">Remove</button>
         </div>
@@ -71,6 +73,11 @@ export function CourseSpotifySection({ courseId, initialSpotifyCode }: CourseSpo
         lessonId={courseId}
         existingCode={spotifyEmbedCode}
         onSave={handleSaveSpotify}
+      />
+      <SpotifyEmbed
+        open={showSpotifyPreview}
+        onClose={() => setShowSpotifyPreview(false)}
+        embedCode={spotifyEmbedCode}
       />
     </div>
   );
