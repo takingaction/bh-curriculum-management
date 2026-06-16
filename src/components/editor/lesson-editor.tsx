@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/dialog";
 import { useEffect, useRef, useState } from "react";
 import { MediaLibrary } from "@/components/media-library";
-import { ImageIcon, CodeIcon, EyeIcon, EyeOffIcon, LinkIcon, ChevronLeft, ChevronRight, Plus, Minus, AlignLeft, AlignCenter, AlignRight, Lightbulb, Edit3, RefreshCw, Trash2 } from "lucide-react";
+import { ImageIcon, CodeIcon, EyeIcon, EyeOffIcon, LinkIcon, ChevronLeft, ChevronRight, Plus, Minus, AlignLeft, AlignCenter, AlignRight, Lightbulb, Edit3, RefreshCw, Trash2, FileText, Video, Volume2 } from "lucide-react";
 import { TableInsertDialog } from "@/components/ui/table-insert-dialog";
 import { SpellCheckExtension } from "./extensions/spell-check";
 import { CheckForUnderstandingModal } from "@/components/check-for-understanding-modal";
@@ -68,6 +68,9 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
   const [linkModalOpen, setLinkModalOpen] = useState(false);
   const [linkUrl, setLinkUrl] = useState("");
   const [linkNewWindow, setLinkNewWindow] = useState(false);
+  const [linkTab, setLinkTab] = useState<"url" | "resources">("url");
+  const [isEditingLink, setIsEditingLink] = useState(false);
+  const [lessonResources, setLessonResources] = useState<any[]>([]);
   const [showTableInsertDialog, setShowTableInsertDialog] = useState(false);
   const [tableWidth, setTableWidth] = useState(100);
   const [tableAlignment, setTableAlignment] = useState("center");
@@ -760,6 +763,19 @@ const updateColumnWidth = (widthPercent: number) => {
     setExistingCFUAttrs(null);
   };
 
+  const fetchLessonResources = async () => {
+    if (!lessonId) return;
+    try {
+      const res = await fetch(`/api/lessons/${lessonId}/assets`);
+      if (res.ok) {
+        const data = await res.json();
+        setLessonResources(data.assets || []);
+      }
+    } catch (err) {
+      console.error("Failed to fetch lesson resources:", err);
+    }
+  };
+
   const getWordAtCursor = () => {
     if (!editor) return "";
     const { selection } = editor.state;
@@ -871,10 +887,13 @@ const updateColumnWidth = (widthPercent: number) => {
           onClick={() => {
             setLinkUrl("");
             setLinkNewWindow(false);
+            setLinkTab("url");
+            setIsEditingLink(false);
             if (editor.isActive("link")) {
               const attrs = editor.getAttributes("link");
               setLinkUrl(attrs.href || "");
               setLinkNewWindow(attrs.target === "_blank");
+              setIsEditingLink(true);
             }
             setLinkModalOpen(true);
           }}
@@ -1562,57 +1581,132 @@ const updateColumnWidth = (widthPercent: number) => {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={linkModalOpen} onOpenChange={setLinkModalOpen}>
+      <Dialog open={linkModalOpen} onOpenChange={(open) => { setLinkModalOpen(open); if (!open) { setLinkTab("url"); setLinkUrl(""); setLinkNewWindow(false); setIsEditingLink(false); } }}>
         <DialogContent showCloseButton={false}>
           <DialogHeader>
-            <DialogTitle>Insert Link</DialogTitle>
+            <DialogTitle>{isEditingLink ? "Edit Link" : "Insert Link"}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div>
-              <label className="text-sm font-medium mb-1 block">URL</label>
-              <input
-                type="text"
-                value={linkUrl}
-                onChange={(e) => setLinkUrl(e.target.value)}
-                placeholder="https://example.com"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                autoFocus
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="linkNewWindow"
-                checked={linkNewWindow}
-                onChange={(e) => setLinkNewWindow(e.target.checked)}
-                className="w-4 h-4"
-              />
-              <label htmlFor="linkNewWindow" className="text-sm">Open in New Window</label>
-            </div>
+
+          <div className="flex border-b border-gray-200 mb-4">
+            <button
+              type="button"
+              onClick={() => setLinkTab("url")}
+              className={`px-4 py-2 text-sm font-medium ${linkTab === "url" ? "border-b-2 border-[#0d7377] text-[#0d7377]" : "text-gray-500 hover:text-gray-700"}`}
+            >
+              URL
+            </button>
+            <button
+              type="button"
+              onClick={() => { setLinkTab("resources"); if (lessonId) { fetchLessonResources(); } }}
+              className={`px-4 py-2 text-sm font-medium ${linkTab === "resources" ? "border-b-2 border-[#0d7377] text-[#0d7377]" : "text-gray-500 hover:text-gray-700"}`}
+            >
+              Resources
+            </button>
           </div>
+
+          <div className="space-y-4 py-4">
+            {linkTab === "url" ? (
+              <>
+                <div>
+                  <label className="text-sm font-medium mb-1 block">URL</label>
+                  <input
+                    type="text"
+                    value={linkUrl}
+                    onChange={(e) => setLinkUrl(e.target.value)}
+                    placeholder="https://example.com"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                    autoFocus
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="linkNewWindow"
+                    checked={linkNewWindow}
+                    onChange={(e) => setLinkNewWindow(e.target.checked)}
+                    className="w-4 h-4"
+                  />
+                  <label htmlFor="linkNewWindow" className="text-sm">Open in New Window</label>
+                </div>
+              </>
+            ) : (
+              <div className="max-h-60 overflow-y-auto">
+                {!lessonId ? (
+                  <p className="text-sm text-gray-500">No lesson ID available</p>
+                ) : lessonResources.length === 0 ? (
+                  <p className="text-sm text-gray-500">No resources attached to this lesson</p>
+                ) : (
+                  <div className="space-y-2">
+                    {lessonResources.map((resource) => {
+                      const isAudio = ["mp3", "m4a", "wav"].includes(resource.file_type);
+                      const isVideo = ["mp4", "mov"].includes(resource.file_type);
+                      const Icon = resource.file_type === "pdf" ? FileText : isAudio ? Volume2 : isVideo ? Video : FileText;
+                      return (
+                        <button
+                          key={resource.id}
+                          type="button"
+                          onClick={() => {
+                            if (linkUrl.trim() || true) {
+                              editor?.chain().focus().extendMarkRange("link").setLink({ href: resource.public_url, class: "resource-link" }).run();
+                            }
+                            setLinkModalOpen(false);
+                            setLinkUrl("");
+                            setLinkNewWindow(false);
+                          }}
+                          className="w-full flex items-center gap-3 p-2 hover:bg-gray-50 rounded text-left"
+                        >
+                          <Icon className="w-5 h-5 text-[#0d7377]" />
+                          <span className="text-sm truncate">{resource.display_name}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           <DialogFooter>
+            {isEditingLink && (
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  editor?.chain().focus().unsetLink().run();
+                  setLinkModalOpen(false);
+                  setLinkUrl("");
+                  setLinkNewWindow(false);
+                  setIsEditingLink(false);
+                }}
+                className="mr-auto text-red-600 hover:text-red-700 hover:bg-red-50"
+              >
+                Remove Link
+              </Button>
+            )}
             <Button variant="outline" onClick={() => setLinkModalOpen(false)}>
               Cancel
             </Button>
-            <Button
-              onClick={() => {
-                if (linkUrl.trim()) {
-                  const attrs: { href: string; target?: string } = {
-                    href: linkUrl.trim(),
-                  };
-                  if (linkNewWindow) {
-                    attrs.target = "_blank";
+            {linkTab === "url" && (
+              <Button
+                onClick={() => {
+                  if (linkUrl.trim()) {
+                    const attrs: { href: string; target?: string } = {
+                      href: linkUrl.trim(),
+                    };
+                    if (linkNewWindow) {
+                      attrs.target = "_blank";
+                    }
+                    editor?.chain().focus().extendMarkRange("link").setLink(attrs).run();
                   }
-                  editor?.chain().focus().extendMarkRange("link").setLink(attrs).run();
-                }
-                setLinkModalOpen(false);
-                setLinkUrl("");
-                setLinkNewWindow(false);
-              }}
-              disabled={!linkUrl.trim()}
-            >
-              Insert Link
-            </Button>
+                  setLinkModalOpen(false);
+                  setLinkUrl("");
+                  setLinkNewWindow(false);
+                  setIsEditingLink(false);
+                }}
+                disabled={!linkUrl.trim()}
+              >
+                {isEditingLink ? "Update Link" : "Insert Link"}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

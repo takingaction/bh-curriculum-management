@@ -324,6 +324,11 @@
 .lesson-content a:hover {
   color: #0a5c5f;
 }
+.ProseMirror a.resource-link,
+.lesson-content a.resource-link {
+  color: #e85d5d;
+  text-decoration: underline;
+}
 
 /* ---- SPELL CHECK ---- */
 .ProseMirror .misspelled {

@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { CompactLessonAssets } from "@/components/lesson-assets-panel";
 import { PresentationLink } from "@/components/presentation-modal";
 import { SpotifyEmbed } from "@/components/spotify-embed";
+import { Download, X, Volume2 } from "lucide-react";
+import { FindReplacePanel } from "@/components/find-replace-panel";
 
 interface Lesson {
   id: string;
@@ -71,22 +73,31 @@ export default function LessonContentPage({
   const [error, setError] = useState("");
   const [isAdmin, setIsAdmin] = useState(false);
   const [showSpotify, setShowSpotify] = useState(false);
+  const [previewAsset, setPreviewAsset] = useState<any>(null);
+  const [lessonAssets, setLessonAssets] = useState<any[]>([]);
 
   useEffect(() => {
     params.then(async (p) => {
       try {
-        const [lessonRes, viewAsRes] = await Promise.all([
+        const [lessonRes, viewAsRes, assetsRes] = await Promise.all([
           fetch(`/api/lessons/${p.lessonId}`),
           fetch('/api/view-as'),
+          fetch(`/api/lessons/${p.lessonId}/assets`),
         ]);
         if (!lessonRes.ok) throw new Error("Lesson not found");
         const data = await lessonRes.json();
         const viewAsData = await viewAsRes.json();
         const isAdminView = viewAsData.viewAs === 'admin';
 
+        let assetsData: any = { assets: [] };
+        if (assetsRes.ok) {
+          assetsData = await assetsRes.json();
+        }
+
         setLesson(data.lesson);
         setCourse(data.course);
         setIsAdmin(isAdminView);
+        setLessonAssets(assetsData.assets || []);
       } catch (err: any) {
         setError(err.message);
       } finally {
@@ -126,6 +137,20 @@ export default function LessonContentPage({
       <div
         className="prose prose-sm max-w-none lesson-content"
         dangerouslySetInnerHTML={{ __html: content }}
+        onClick={(e) => {
+          const target = e.target as HTMLElement;
+          const anchor = target.closest("a.resource-link");
+          if (anchor) {
+            e.preventDefault();
+            const href = anchor.getAttribute("href");
+            if (href) {
+              const asset = lessonAssets.find((a) => a.public_url === href);
+              if (asset) {
+                setPreviewAsset(asset);
+              }
+            }
+          }
+        }}
       />
     );
   };
@@ -223,8 +248,15 @@ export default function LessonContentPage({
         </div>
       </div>
 
-      {/* Main Content */}
+{/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 py-2">
+        {isAdmin && (
+          <FindReplacePanel
+            lessonId={lesson.id}
+            courseId={lesson.course_id}
+            isAdmin={isAdmin}
+          />
+        )}
         <div className="flex gap-6">
           {/* Left Navigation - Sticky */}
           <div className="w-[250px] flex-shrink-0 sticky top-0 self-start">
@@ -291,6 +323,59 @@ export default function LessonContentPage({
         onClose={() => setShowSpotify(false)}
         embedCode={course?.spotify_embed_code || ""}
       />
+
+      {previewAsset && (
+        <div className="fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-8">
+          <div className="absolute top-4 right-4 flex gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                const link = document.createElement("a");
+                link.href = previewAsset.public_url;
+                link.download = previewAsset.display_name;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+              }}
+              className="p-2 bg-white rounded-full hover:bg-gray-100"
+            >
+              <Download className="w-5 h-5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setPreviewAsset(null)}
+              className="p-2 bg-white rounded-full hover:bg-gray-100"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          {previewAsset.file_type === "pdf" ? (
+            <iframe
+              src={previewAsset.public_url}
+              className="w-full h-full max-w-4xl max-h-full bg-white"
+              title={previewAsset.display_name}
+            />
+          ) : ["mp4", "mov", "m4a"].includes(previewAsset.file_type) ? (
+            <video
+              src={previewAsset.public_url}
+              controls
+              autoPlay
+              className="max-w-full max-h-full"
+            />
+          ) : ["mp3", "m4a", "wav"].includes(previewAsset.file_type) ? (
+            <div className="bg-white rounded-lg p-8 flex flex-col items-center gap-4">
+              <Volume2 className="w-16 h-16 text-gray-400" />
+              <p className="text-lg font-medium">{previewAsset.display_name}</p>
+              <audio
+                src={previewAsset.public_url}
+                controls
+                autoPlay
+                className="w-64"
+              />
+            </div>
+          ) : null}
+        </div>
+      )}
     </div>
   );
 }

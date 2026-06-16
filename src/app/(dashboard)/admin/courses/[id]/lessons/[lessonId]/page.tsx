@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { LessonEditor } from "@/components/editor/lesson-editor";
 import { LessonAssetsPanel } from "@/components/lesson-assets-panel";
+import { FindReplacePanel } from "@/components/find-replace-panel";
 import { PresentationModal, PresentationLink } from "@/components/presentation-modal";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -463,6 +464,11 @@ export default function EditLessonPage({
             {/* Section Editor Panel */}
             {activePanel === 'section' && (
               <div className="bg-white rounded-lg border border-[#e5e5e0] p-4">
+                <FindReplacePanel
+                  lessonId={lesson.id}
+                  courseId={lesson.course_id}
+                  isAdmin={true}
+                />
                 <div className="space-y-2">
                   <Label className="text-[#2d2d2d] font-bold text-base">
                     {textFields.find(f => f.name === selectedSection)?.label}

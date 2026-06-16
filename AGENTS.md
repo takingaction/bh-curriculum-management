@@ -167,6 +167,19 @@ Two-column layout at `src/app/(dashboard)/admin/courses/[id]/lessons/[lessonId]/
 - To add words temporarily: Use + button in editor
 - To add words permanently: Add to `commonWords` in spell-check.ts
 
+#### Find & Replace Feature
+- **Location**: Collapsible panel at top of lesson editor and student lesson view (admin only)
+- **Scope options**: Lesson, Course (with course dropdown), or Global
+- **Search behavior**: Case-sensitive substring match on text content (ignores HTML tags)
+- **Replace behavior**: Exact case from replacement input
+- **Key files**:
+  - `src/lib/html-utils.ts` - HTML parsing, text finding/replacing helpers
+  - `src/app/api/find-replace/route.ts` - GET (search) and PATCH (replace) API endpoints
+  - `src/components/find-replace-panel.tsx` - UI component with scope selector, results display
+- **API endpoints**:
+  - GET `/api/find-replace?search=X&scope=lesson|course|global&lessonId=X&courseId=X`
+  - PATCH `/api/find-replace` - Body: `{ search, replace, scope, lessonId?, courseId? }`
+
 ### Environment Variables Required
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
@@ -185,3 +198,6 @@ Two-column layout at `src/app/(dashboard)/admin/courses/[id]/lessons/[lessonId]/
 - `src/components/spotify-embed.tsx` - Draggable Spotify playlist modal (lesson view)
 - `src/app/(dashboard)/lessons/[lessonId]/page.tsx` - Student view with SpotifyEmbed from course
 - `src/components/check-for-understanding-modal.tsx` - CFU edit modal
+- `src/lib/html-utils.ts` - HTML parsing, text finding/replacing for Find & Replace
+- `src/app/api/find-replace/route.ts` - Find & Replace API endpoints (GET search, PATCH replace)
+- `src/components/find-replace-panel.tsx` - Find & Replace UI panel
