@@ -16,6 +16,7 @@ interface Match {
   lessonTitle: string;
   courseId: string;
   courseName: string;
+  grade: string;
   fieldName: string;
   fieldLabel: string;
   snippet: string;
@@ -357,9 +358,9 @@ export function FindReplacePanel({ lessonId, courseId, isAdmin = false }: FindRe
                 </div>
 
                 <div className="max-h-60 overflow-y-auto space-y-2">
-                  {matches.map((match, idx) => (
+                  {matches.map((match) => (
                     <div
-                      key={`${match.lessonId}-${match.fieldName}-${idx}`}
+                      key={`${match.lessonId}-${match.fieldName}`}
                       className="p-3 bg-gray-50 rounded border border-gray-200"
                     >
                       <div className="flex items-center justify-between mb-1">
@@ -370,6 +371,8 @@ export function FindReplacePanel({ lessonId, courseId, isAdmin = false }: FindRe
                           <span className="text-xs text-gray-400">-</span>
                           <span className="text-xs text-gray-600">{match.courseName}</span>
                           <span className="text-xs text-gray-400">-</span>
+                          <span className="text-xs text-gray-500">Grade {match.grade}</span>
+                          <span className="text-xs text-gray-400">-</span>
                           <span className="text-xs font-medium">{match.fieldLabel}</span>
                         </div>
                         <div className="flex items-center gap-2">
@@ -377,7 +380,7 @@ export function FindReplacePanel({ lessonId, courseId, isAdmin = false }: FindRe
                             type="button"
                             onClick={() => {
                               window.open(
-                                `/admin/courses/${match.courseId}/lessons/${match.lessonId}`,
+                                `/admin/courses/${match.courseId}/lessons/${match.lessonId}?section=${match.fieldName}`,
                                 '_blank'
                               );
                             }}

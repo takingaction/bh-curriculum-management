@@ -132,6 +132,7 @@ Two-column layout at `src/app/(dashboard)/admin/courses/[id]/lessons/[lessonId]/
 **State Management:**
 - `activePanel: 'general' | 'materials' | 'section'`
 - `selectedSection` tracks which content section (for section panel)
+- **URL param**: `?section=<fieldName>` opens directly to that section on page load
 
 **Editor Toolbar (sticky at top-14 z-40):**
 - Contains all formatting buttons (Bold, Italic, H2, H3, Lists, etc.)
@@ -174,7 +175,8 @@ Two-column layout at `src/app/(dashboard)/admin/courses/[id]/lessons/[lessonId]/
 - **Replace field**: Checkbox "Force exact case" - ON = exact replacement, OFF = preserve original case pattern (default: ON)
 - **Search behavior**: Case-sensitive or case-insensitive substring match on text content (ignores HTML tags)
 - **Replace behavior**: Exact case from replacement input (when Force exact case = ON), or preserves original case pattern (when OFF)
-- **Results**: Shows match count per lesson/field, replace individual or all at once
+- **Results**: Shows Lesson Number, Course Name, Grade, Field Label, and match snippet. Grade helps distinguish duplicate course names across different grades.
+- **View button**: Opens lesson editor directly to the matching section via `?section=<fieldName>` URL param
 - **Key files**:
   - `src/lib/html-utils.ts` - HTML parsing, text finding/replacing helpers (includes `replaceTextPreserveCase` for case-preserving replace)
   - `src/app/api/find-replace/route.ts` - GET (search) and PATCH (replace) API endpoints

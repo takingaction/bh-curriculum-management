@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -85,6 +85,7 @@ export default function EditLessonPage({
   params: Promise<{ id: string; lessonId: string }>;
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
   const [error, setError] = useState("");
@@ -156,6 +157,12 @@ export default function EditLessonPage({
         });
         setPresentationName(lessonData.presentation_name || "");
         setPresentationUrl(lessonData.presentation_url || "");
+
+        const sectionParam = searchParams.get("section");
+        if (sectionParam && textFields.some(f => f.name === sectionParam)) {
+          setSelectedSection(sectionParam);
+          setActivePanel('section');
+        }
       } catch (err: any) {
         setError(err.message);
       } finally {

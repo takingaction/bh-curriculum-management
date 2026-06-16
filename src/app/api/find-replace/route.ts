@@ -39,11 +39,14 @@ export async function GET(request: Request) {
 
     // Deduplicate lessons by ID
     const seenLessonIds = new Set();
-    const uniqueLessons = lessons.filter((l: any) => {
-      if (seenLessonIds.has(l.id)) return false;
-      seenLessonIds.add(l.id);
-      return true;
-    });
+    const uniqueLessons: any[] = [];
+    for (const l of lessons) {
+      const lessonId = l.id?.toString().trim();
+      if (lessonId && !seenLessonIds.has(lessonId)) {
+        seenLessonIds.add(lessonId);
+        uniqueLessons.push(l);
+      }
+    }
 
     const matchesMap = new Map<string, any>();
     let totalMatches = 0;
@@ -51,6 +54,7 @@ export async function GET(request: Request) {
     for (const lesson of uniqueLessons) {
       const lessonAny = lesson as any;
       const course = lessonAny.courses as any;
+      const lessonIdStr = lessonAny.id?.toString().trim() || '';
 
       for (const fieldName of TEXT_FIELDS_LIST) {
         const fieldValue = lessonAny[fieldName];
@@ -60,18 +64,19 @@ export async function GET(request: Request) {
         if (!fieldMatches || fieldMatches.matches.length === 0) continue;
 
         const snippet = generateSnippet(fieldValue, search);
-        const key = `${lesson.id}-${fieldName}`;
+        const key = `${lessonIdStr}-${fieldName}`;
 
         const existing = matchesMap.get(key);
         if (existing) {
           existing.count += fieldMatches.matches.length;
         } else {
           matchesMap.set(key, {
-            lessonId: lesson.id,
+            lessonId: lessonIdStr,
             lessonNumber: lesson.lesson_number,
             lessonTitle: lesson.title,
             courseId: lesson.course_id,
             courseName: course?.title || "Unknown Course",
+            grade: course?.grade || "",
             fieldName,
             fieldLabel: fieldMatches.fieldLabel,
             snippet,
