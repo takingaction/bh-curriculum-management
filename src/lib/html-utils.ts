@@ -81,32 +81,120 @@ function findTextMatchesInHTML(html: string, search: string, caseSensitive: bool
     });
   }
 
-  let textPosition = 0;
-  for (const segment of segments) {
-    if (segment.type === "text") {
-      const text = segment.content;
-      const textToSearch = caseSensitive ? text : text.toLowerCase();
-      let searchIdx = 0;
-
-      while (searchIdx < textToSearch.length) {
-        const foundIdx = textToSearch.indexOf(searchStr, searchIdx);
-        if (foundIdx === -1) break;
-
-        const before = text.slice(0, foundIdx);
-        const match = text.slice(foundIdx, foundIdx + search.length);
-        const after = text.slice(foundIdx + search.length);
-
-        matches.push({
-          before,
-          match,
-          after,
-          position: textPosition + foundIdx,
-        });
-
-        searchIdx = foundIdx + 1;
-      }
-      textPosition += text.length;
+  // Build flat text from all text segments concatenated together
+  // to allow finding matches that span across inline tag boundaries
+  const textSegments: { content: string; startPos: number }[] = [];
+  let flatText = "";
+  let flatPosition = 0;
+  for (const seg of segments) {
+    if (seg.type === "text") {
+      textSegments.push({ content: seg.content, startPos: flatPosition });
+      flatText += seg.content;
+      flatPosition += seg.content.length;
     }
+  }
+
+  if (flatText.length === 0) return [];
+
+  const flatToSearch = caseSensitive ? flatText : flatText.toLowerCase();
+  let searchIdx = 0;
+
+  while (searchIdx < flatToSearch.length) {
+    const foundIdx = flatToSearch.indexOf(searchStr, searchIdx);
+    if (foundIdx === -1) break;
+
+    const matchEndIdx = foundIdx + search.length;
+
+    // Check if match spans across segment boundaries
+    let spanningSegments = false;
+    for (let i = 0; i < textSegments.length - 1; i++) {
+      const segEnd = textSegments[i].startPos + textSegments[i].content.length;
+      if (foundIdx < segEnd && matchEndIdx > segEnd) {
+        spanningSegments = true;
+        break;
+      }
+    }
+
+    if (spanningSegments) {
+      // Handle cross-segment match: build before/match/after from multiple segments
+      let before = "";
+      let match = "";
+      let after = "";
+
+      for (let i = 0; i < textSegments.length; i++) {
+        const segStart = textSegments[i].startPos;
+        const segEnd = segStart + textSegments[i].content.length;
+        const segContent = textSegments[i].content;
+
+        if (matchEndIdx <= segStart) {
+          // This segment is entirely after the match
+          after += segContent;
+        } else if (foundIdx >= segEnd) {
+          // This segment is entirely before the match
+          before += segContent;
+        } else {
+          // This segment overlaps with the match
+          const localStart = Math.max(0, foundIdx - segStart);
+          const localEnd = Math.min(segContent.length, matchEndIdx - segStart);
+
+          // Before part (if any in this segment before the match)
+          if (localStart > 0) {
+            before += segContent.slice(0, localStart);
+          }
+
+          // Match part (if any in this segment)
+          if (localStart < segContent.length && localEnd > 0) {
+            match += segContent.slice(localStart, localEnd);
+          }
+
+          // After part (if any in this segment after the match)
+          if (localEnd < segContent.length) {
+            after += segContent.slice(localEnd);
+          }
+
+          // Add any subsequent segments to after
+          for (let j = i + 1; j < textSegments.length; j++) {
+            after += textSegments[j].content;
+          }
+          break;
+        }
+      }
+
+      matches.push({
+        before,
+        match,
+        after,
+        position: foundIdx,
+      });
+    } else {
+      // Match within a single segment
+      let segIdx = 0;
+      for (let i = 0; i < textSegments.length; i++) {
+        const segStart = textSegments[i].startPos;
+        const segEnd = segStart + textSegments[i].content.length;
+        if (foundIdx >= segStart && foundIdx < segEnd) {
+          segIdx = i;
+          break;
+        }
+      }
+
+      const segStart = textSegments[segIdx].startPos;
+      const segContent = textSegments[segIdx].content;
+      const localIdx = foundIdx - segStart;
+
+      const before = segContent.slice(0, localIdx);
+      const match = segContent.slice(localIdx, localIdx + search.length);
+      const after = segContent.slice(localIdx + search.length);
+
+      matches.push({
+        before,
+        match,
+        after,
+        position: foundIdx,
+      });
+    }
+
+    searchIdx = foundIdx + 1;
   }
 
   return matches;
@@ -145,33 +233,88 @@ export function replaceTextInHTML(html: string, search: string, replace: string,
     });
   }
 
-  const result: { type: "text" | "tag"; content: string }[] = [];
+  // Build flat text and segment info
+  const textSegments: { content: string; startPos: number }[] = [];
+  let flatText = "";
+  let flatPosition = 0;
+  for (const seg of segments) {
+    if (seg.type === "text") {
+      textSegments.push({ content: seg.content, startPos: flatPosition });
+      flatText += seg.content;
+      flatPosition += seg.content.length;
+    }
+  }
 
-  for (const segment of segments) {
-    if (segment.type === "tag") {
-      result.push(segment);
-    } else {
-      let text = segment.content;
-      const textToSearch = caseSensitive ? text : text.toLowerCase();
-      let searchIdx = 0;
-      let newText = "";
+  if (flatText.length === 0) return html;
 
-      while (searchIdx < textToSearch.length) {
-        const foundIdx = textToSearch.indexOf(searchStr, searchIdx);
-        if (foundIdx === -1) {
-          newText += text.slice(searchIdx);
-          break;
+  const flatToSearch = caseSensitive ? flatText : flatText.toLowerCase();
+
+  // Find all match positions in flat text
+  const matchPositions: { start: number; end: number; segIdx: number; localStart: number }[] = [];
+  let searchIdx = 0;
+  while (searchIdx < flatToSearch.length) {
+    const foundIdx = flatToSearch.indexOf(searchStr, searchIdx);
+    if (foundIdx === -1) break;
+
+    // Find which segment this match starts in
+    for (let i = 0; i < textSegments.length; i++) {
+      const segStart = textSegments[i].startPos;
+      const segEnd = segStart + textSegments[i].content.length;
+      if (foundIdx >= segStart && foundIdx < segEnd) {
+        const localStart = foundIdx - segStart;
+        const matchEnd = foundIdx + search.length;
+        // Only include matches that stay within the same segment
+        if (matchEnd <= segEnd) {
+          matchPositions.push({ start: foundIdx, end: matchEnd, segIdx: i, localStart });
         }
+        break;
+      }
+    }
+    searchIdx = foundIdx + 1;
+  }
 
-        newText += text.slice(searchIdx, foundIdx);
-        newText += replace;
-        searchIdx = foundIdx + search.length;
+  // Build result by reconstructing HTML with replacements
+  const result: { type: "text" | "tag"; content: string }[] = [];
+  let matchPosIdx = 0;
+
+  for (const seg of segments) {
+    if (seg.type === "tag") {
+      result.push(seg);
+    } else {
+      let newText = "";
+      let localIdx = 0;
+
+      while (localIdx < seg.content.length) {
+        // Check if there's a match starting at current position in this segment
+        if (matchPosIdx < matchPositions.length &&
+            matchPositions[matchPosIdx].segIdx === textSegments.findIndex(ts => ts.content === seg.content) &&
+            matchPositions[matchPosIdx].localStart === localIdx) {
+          // Apply replacement
+          newText += replace;
+          localIdx += search.length;
+          matchPosIdx++;
+        } else {
+          // Check if we're inside a match (shouldn't happen with above logic, but safety check)
+          let inMatch = false;
+          const segIdx = textSegments.findIndex(ts => ts.content === seg.content);
+          for (const mp of matchPositions) {
+            if (mp.segIdx === segIdx &&
+                localIdx >= mp.localStart &&
+                localIdx < mp.localStart + search.length) {
+              inMatch = true;
+              break;
+            }
+          }
+          if (inMatch) {
+            localIdx++;
+          } else {
+            newText += seg.content[localIdx];
+            localIdx++;
+          }
+        }
       }
 
-      result.push({
-        type: "text",
-        content: newText,
-      });
+      result.push({ type: "text", content: newText });
     }
   }
 
@@ -211,35 +354,90 @@ export function replaceTextPreserveCase(html: string, search: string, replace: s
     });
   }
 
-  const result: { type: "text" | "tag"; content: string }[] = [];
+  // Build flat text and segment info
+  const textSegments: { content: string; startPos: number }[] = [];
+  let flatText = "";
+  let flatPosition = 0;
+  for (const seg of segments) {
+    if (seg.type === "text") {
+      textSegments.push({ content: seg.content, startPos: flatPosition });
+      flatText += seg.content;
+      flatPosition += seg.content.length;
+    }
+  }
 
-  for (const segment of segments) {
-    if (segment.type === "tag") {
-      result.push(segment);
-    } else {
-      let text = segment.content;
-      const textToSearch = caseSensitive ? text : text.toLowerCase();
-      let searchIdx = 0;
-      let newText = "";
+  if (flatText.length === 0) return html;
 
-      while (searchIdx < textToSearch.length) {
-        const foundIdx = textToSearch.indexOf(searchStr, searchIdx);
-        if (foundIdx === -1) {
-          newText += text.slice(searchIdx);
-          break;
+  const flatToSearch = caseSensitive ? flatText : flatText.toLowerCase();
+
+  // Find all match positions in flat text
+  const matchPositions: { start: number; end: number; segIdx: number; localStart: number }[] = [];
+  let searchIdx = 0;
+  while (searchIdx < flatToSearch.length) {
+    const foundIdx = flatToSearch.indexOf(searchStr, searchIdx);
+    if (foundIdx === -1) break;
+
+    // Find which segment this match starts in
+    for (let i = 0; i < textSegments.length; i++) {
+      const segStart = textSegments[i].startPos;
+      const segEnd = segStart + textSegments[i].content.length;
+      if (foundIdx >= segStart && foundIdx < segEnd) {
+        const localStart = foundIdx - segStart;
+        const matchEnd = foundIdx + search.length;
+        // Only include matches that stay within the same segment
+        if (matchEnd <= segEnd) {
+          matchPositions.push({ start: foundIdx, end: matchEnd, segIdx: i, localStart });
         }
+        break;
+      }
+    }
+    searchIdx = foundIdx + 1;
+  }
 
-        const originalMatch = text.slice(foundIdx, foundIdx + search.length);
-        const replacementWithCase = applyCase(originalMatch, replace);
-        newText += text.slice(searchIdx, foundIdx);
-        newText += replacementWithCase;
-        searchIdx = foundIdx + search.length;
+  // Build result by reconstructing HTML with replacements
+  const result: { type: "text" | "tag"; content: string }[] = [];
+  let matchPosIdx = 0;
+
+  for (const seg of segments) {
+    if (seg.type === "tag") {
+      result.push(seg);
+    } else {
+      let newText = "";
+      let localIdx = 0;
+      const segIdx = textSegments.findIndex(ts => ts.content === seg.content);
+
+      while (localIdx < seg.content.length) {
+        // Check if there's a match starting at current position in this segment
+        if (matchPosIdx < matchPositions.length &&
+            matchPositions[matchPosIdx].segIdx === segIdx &&
+            matchPositions[matchPosIdx].localStart === localIdx) {
+          // Apply replacement with case preserved
+          const originalMatch = seg.content.slice(localIdx, localIdx + search.length);
+          const replacementWithCase = applyCase(originalMatch, replace);
+          newText += replacementWithCase;
+          localIdx += search.length;
+          matchPosIdx++;
+        } else {
+          // Check if we're inside a match
+          let inMatch = false;
+          for (const mp of matchPositions) {
+            if (mp.segIdx === segIdx &&
+                localIdx >= mp.localStart &&
+                localIdx < mp.localStart + search.length) {
+              inMatch = true;
+              break;
+            }
+          }
+          if (inMatch) {
+            localIdx++;
+          } else {
+            newText += seg.content[localIdx];
+            localIdx++;
+          }
+        }
       }
 
-      result.push({
-        type: "text",
-        content: newText,
-      });
+      result.push({ type: "text", content: newText });
     }
   }
 

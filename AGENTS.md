@@ -56,6 +56,7 @@ Located in `src/components/editor/extensions/`:
   - e.g., `we've` → preserves `'ve` → checks `we` → found ✓
 - **Custom words**: Added via + button in editor toolbar, persisted to localStorage key `spellcheck-custom-words`
 - **+ / - buttons**: Add or remove custom words, only removes words added via +, not base dictionary
+- **Cross-node boundary check**: Flags text ending with `:` when followed by text starting with a letter across inline tags (e.g., `<strong>Content:</strong>Students` - flags "Content:" as potentially having missing space after colon)
 
 #### Show Invisibles Feature
 - Uses official `@tiptap/extension-invisible-characters` extension
@@ -173,8 +174,8 @@ Two-column layout at `src/app/(dashboard)/admin/courses/[id]/lessons/[lessonId]/
 - **Scope options**: Lesson, Course (with course dropdown), or Global
 - **Find field**: Checkbox below "Match case exactly" - ON = case sensitive, OFF = case insensitive (default: OFF)
 - **Replace field**: Checkbox "Force exact case" - ON = exact replacement, OFF = preserve original case pattern (default: ON)
-- **Search behavior**: Case-sensitive or case-insensitive substring match on text content (ignores HTML tags)
-- **Replace behavior**: Exact case from replacement input (when Force exact case = ON), or preserves original case pattern (when OFF)
+- **Search behavior**: Case-sensitive or case-insensitive substring match on text content (ignores HTML tags). Can find text that spans across inline tag boundaries (e.g., `<strong>Content:</strong>Students` - can find "Content:Students")
+- **Replace behavior**: Exact case from replacement input (when Force exact case = ON), or preserves original case pattern (when OFF). Replacements only within single text segments (cross-segment matches are skipped)
 - **Results**: Shows Lesson Number, Course Name, Grade, Field Label, and match snippet. Grade helps distinguish duplicate course names across different grades.
 - **View button**: Opens lesson editor directly to the matching section via `?section=<fieldName>` URL param
 - **Key files**:

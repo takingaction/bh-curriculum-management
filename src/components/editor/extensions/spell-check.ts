@@ -296,6 +296,40 @@ export const SpellCheckExtension = Extension.create({
 
                 
 
+                // Check for text ending with : followed by next text node starting with letter (cross-node pattern)
+                // e.g., <strong>Content:</strong>Students should be "Content: Students"
+                if (i < textNodes.length - 1) {
+                  const nextNode = textNodes[i + 1];
+                  const nextText = nextNode.node.text || "";
+
+                  // Check if current text ends with : and next node starts with letter (no space between)
+                  const currentText = node.text;
+                  if (currentText && /:$/.test(currentText) && /^[A-Za-z]/.test(nextText)) {
+                    // Flag the last word in current text (e.g., "Content" in "Content:")
+                    const lastWordMatch = currentText.match(/(\S+):\s*$/);
+                    if (lastWordMatch) {
+                      const lastWord = lastWordMatch[1];
+                      const lastWordStart = currentText.lastIndexOf(lastWord);
+                      decorations.push(
+                        Decoration.inline(pos + lastWordStart, pos + lastWordStart + lastWord.length, {
+                          class: "misspelled",
+                        })
+                      );
+                    } else {
+                      // Flag just the colon position
+                      const colonIdx = currentText.lastIndexOf(':');
+                      if (colonIdx !== -1) {
+                        decorations.push(
+                          Decoration.inline(pos + colonIdx, pos + colonIdx + 1, {
+                            class: "misspelled",
+                          })
+                        );
+                      }
+                    }
+                    continue;
+                  }
+                }
+
                 // Check for invalid apostrophe (not a contraction)
                 if (/['\u2019\u0027]/.test(word) && !isValidContraction(word)) {
                   // Check if it's a "word'nextword" pattern
