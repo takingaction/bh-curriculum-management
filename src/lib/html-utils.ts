@@ -234,12 +234,13 @@ export function replaceTextInHTML(html: string, search: string, replace: string,
   }
 
   // Build flat text and segment info
-  const textSegments: { content: string; startPos: number }[] = [];
+  const textSegments: { content: string; startPos: number; segArrayIdx: number }[] = [];
   let flatText = "";
   let flatPosition = 0;
-  for (const seg of segments) {
+  for (let i = 0; i < segments.length; i++) {
+    const seg = segments[i];
     if (seg.type === "text") {
-      textSegments.push({ content: seg.content, startPos: flatPosition });
+      textSegments.push({ content: seg.content, startPos: flatPosition, segArrayIdx: i });
       flatText += seg.content;
       flatPosition += seg.content.length;
     }
@@ -250,23 +251,23 @@ export function replaceTextInHTML(html: string, search: string, replace: string,
   const flatToSearch = caseSensitive ? flatText : flatText.toLowerCase();
 
   // Find all match positions in flat text
-  const matchPositions: { start: number; end: number; segIdx: number; localStart: number }[] = [];
+  const matchPositions: { start: number; end: number; segIdx: number; localStart: number; crossSegment: boolean; charsToSkipInNextSeg: number }[] = [];
   let searchIdx = 0;
   while (searchIdx < flatToSearch.length) {
     const foundIdx = flatToSearch.indexOf(searchStr, searchIdx);
     if (foundIdx === -1) break;
 
-    // Find which segment this match starts in
+    // Find which text segment this match starts in
     for (let i = 0; i < textSegments.length; i++) {
       const segStart = textSegments[i].startPos;
       const segEnd = segStart + textSegments[i].content.length;
       if (foundIdx >= segStart && foundIdx < segEnd) {
         const localStart = foundIdx - segStart;
         const matchEnd = foundIdx + search.length;
-        // Only include matches that stay within the same segment
-        if (matchEnd <= segEnd) {
-          matchPositions.push({ start: foundIdx, end: matchEnd, segIdx: i, localStart });
-        }
+        const crossSegment = matchEnd > segEnd;
+        // For cross-segment matches, calculate how many chars to skip in the next text segment
+        const charsToSkipInNextSeg = crossSegment ? matchEnd - segEnd : 0;
+        matchPositions.push({ start: foundIdx, end: matchEnd, segIdx: i, localStart, crossSegment, charsToSkipInNextSeg });
         break;
       }
     }
@@ -276,41 +277,53 @@ export function replaceTextInHTML(html: string, search: string, replace: string,
   // Build result by reconstructing HTML with replacements
   const result: { type: "text" | "tag"; content: string }[] = [];
   let matchPosIdx = 0;
+  let charsToSkip = 0;
+  let nextMatchCrossesHere = false;
 
-  for (const seg of segments) {
+  for (let segArrayIdx = 0; segArrayIdx < segments.length; segArrayIdx++) {
+    const seg = segments[segArrayIdx];
+
     if (seg.type === "tag") {
       result.push(seg);
     } else {
       let newText = "";
       let localIdx = 0;
+      const textSegIdx = textSegments.findIndex(ts => ts.segArrayIdx === segArrayIdx);
+
+      // Check if this segment needs to skip chars due to cross-segment match from previous text segment
+      if (charsToSkip > 0 && textSegIdx !== -1) {
+        // Check if previous match crosses into this segment
+        if (matchPosIdx > 0) {
+          const prevMatch = matchPositions[matchPosIdx - 1];
+          if (prevMatch.crossSegment && textSegIdx === prevMatch.segIdx + 1) {
+            // Skip characters at the start of this segment
+            localIdx = charsToSkip;
+            charsToSkip = 0;
+          }
+        }
+      }
 
       while (localIdx < seg.content.length) {
         // Check if there's a match starting at current position in this segment
         if (matchPosIdx < matchPositions.length &&
-            matchPositions[matchPosIdx].segIdx === textSegments.findIndex(ts => ts.content === seg.content) &&
+            matchPositions[matchPosIdx].segIdx === textSegIdx &&
             matchPositions[matchPosIdx].localStart === localIdx) {
-          // Apply replacement
-          newText += replace;
-          localIdx += search.length;
-          matchPosIdx++;
-        } else {
-          // Check if we're inside a match (shouldn't happen with above logic, but safety check)
-          let inMatch = false;
-          const segIdx = textSegments.findIndex(ts => ts.content === seg.content);
-          for (const mp of matchPositions) {
-            if (mp.segIdx === segIdx &&
-                localIdx >= mp.localStart &&
-                localIdx < mp.localStart + search.length) {
-              inMatch = true;
-              break;
-            }
-          }
-          if (inMatch) {
-            localIdx++;
+
+          if (matchPositions[matchPosIdx].crossSegment) {
+            // Cross-segment match: add replacement, consume rest of segment, track chars to skip
+            newText += replace;
+            charsToSkip = matchPositions[matchPosIdx].charsToSkipInNextSeg;
+            localIdx = seg.content.length;
+            matchPosIdx++;
           } else {
-            newText += seg.content[localIdx];
-            localIdx++;
+            // Normal within-segment match
+            newText += replace;
+            localIdx += search.length;
+            matchPosIdx++;
           }
+        } else {
+          newText += seg.content[localIdx];
+          localIdx++;
         }
       }
 
@@ -355,12 +368,13 @@ export function replaceTextPreserveCase(html: string, search: string, replace: s
   }
 
   // Build flat text and segment info
-  const textSegments: { content: string; startPos: number }[] = [];
+  const textSegments: { content: string; startPos: number; segArrayIdx: number }[] = [];
   let flatText = "";
   let flatPosition = 0;
-  for (const seg of segments) {
+  for (let i = 0; i < segments.length; i++) {
+    const seg = segments[i];
     if (seg.type === "text") {
-      textSegments.push({ content: seg.content, startPos: flatPosition });
+      textSegments.push({ content: seg.content, startPos: flatPosition, segArrayIdx: i });
       flatText += seg.content;
       flatPosition += seg.content.length;
     }
@@ -371,23 +385,23 @@ export function replaceTextPreserveCase(html: string, search: string, replace: s
   const flatToSearch = caseSensitive ? flatText : flatText.toLowerCase();
 
   // Find all match positions in flat text
-  const matchPositions: { start: number; end: number; segIdx: number; localStart: number }[] = [];
+  const matchPositions: { start: number; end: number; segIdx: number; localStart: number; crossSegment: boolean; charsToSkipInNextSeg: number }[] = [];
   let searchIdx = 0;
   while (searchIdx < flatToSearch.length) {
     const foundIdx = flatToSearch.indexOf(searchStr, searchIdx);
     if (foundIdx === -1) break;
 
-    // Find which segment this match starts in
+    // Find which text segment this match starts in
     for (let i = 0; i < textSegments.length; i++) {
       const segStart = textSegments[i].startPos;
       const segEnd = segStart + textSegments[i].content.length;
       if (foundIdx >= segStart && foundIdx < segEnd) {
         const localStart = foundIdx - segStart;
         const matchEnd = foundIdx + search.length;
-        // Only include matches that stay within the same segment
-        if (matchEnd <= segEnd) {
-          matchPositions.push({ start: foundIdx, end: matchEnd, segIdx: i, localStart });
-        }
+        const crossSegment = matchEnd > segEnd;
+        // For cross-segment matches, calculate how many chars to skip in the next text segment
+        const charsToSkipInNextSeg = crossSegment ? matchEnd - segEnd : 0;
+        matchPositions.push({ start: foundIdx, end: matchEnd, segIdx: i, localStart, crossSegment, charsToSkipInNextSeg });
         break;
       }
     }
@@ -397,43 +411,54 @@ export function replaceTextPreserveCase(html: string, search: string, replace: s
   // Build result by reconstructing HTML with replacements
   const result: { type: "text" | "tag"; content: string }[] = [];
   let matchPosIdx = 0;
+  let charsToSkip = 0;
 
-  for (const seg of segments) {
+  for (let segArrayIdx = 0; segArrayIdx < segments.length; segArrayIdx++) {
+    const seg = segments[segArrayIdx];
+
     if (seg.type === "tag") {
       result.push(seg);
     } else {
       let newText = "";
       let localIdx = 0;
-      const segIdx = textSegments.findIndex(ts => ts.content === seg.content);
+      const textSegIdx = textSegments.findIndex(ts => ts.segArrayIdx === segArrayIdx);
+
+      // Check if this segment needs to skip chars due to cross-segment match from previous text segment
+      if (charsToSkip > 0 && textSegIdx !== -1) {
+        if (matchPosIdx > 0) {
+          const prevMatch = matchPositions[matchPosIdx - 1];
+          if (prevMatch.crossSegment && textSegIdx === prevMatch.segIdx + 1) {
+            localIdx = charsToSkip;
+            charsToSkip = 0;
+          }
+        }
+      }
 
       while (localIdx < seg.content.length) {
         // Check if there's a match starting at current position in this segment
         if (matchPosIdx < matchPositions.length &&
-            matchPositions[matchPosIdx].segIdx === segIdx &&
+            matchPositions[matchPosIdx].segIdx === textSegIdx &&
             matchPositions[matchPosIdx].localStart === localIdx) {
-          // Apply replacement with case preserved
-          const originalMatch = seg.content.slice(localIdx, localIdx + search.length);
-          const replacementWithCase = applyCase(originalMatch, replace);
-          newText += replacementWithCase;
-          localIdx += search.length;
-          matchPosIdx++;
-        } else {
-          // Check if we're inside a match
-          let inMatch = false;
-          for (const mp of matchPositions) {
-            if (mp.segIdx === segIdx &&
-                localIdx >= mp.localStart &&
-                localIdx < mp.localStart + search.length) {
-              inMatch = true;
-              break;
-            }
-          }
-          if (inMatch) {
-            localIdx++;
+
+          if (matchPositions[matchPosIdx].crossSegment) {
+            // Cross-segment match: add replacement with case preserved
+            const originalMatch = seg.content.slice(localIdx, localIdx + search.length);
+            const replacementWithCase = applyCase(originalMatch, replace);
+            newText += replacementWithCase;
+            charsToSkip = matchPositions[matchPosIdx].charsToSkipInNextSeg;
+            localIdx = seg.content.length;
+            matchPosIdx++;
           } else {
-            newText += seg.content[localIdx];
-            localIdx++;
+            // Normal within-segment match
+            const originalMatch = seg.content.slice(localIdx, localIdx + search.length);
+            const replacementWithCase = applyCase(originalMatch, replace);
+            newText += replacementWithCase;
+            localIdx += search.length;
+            matchPosIdx++;
           }
+        } else {
+          newText += seg.content[localIdx];
+          localIdx++;
         }
       }
 
