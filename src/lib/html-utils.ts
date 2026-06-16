@@ -1,3 +1,6 @@
+import { Parser } from "htmlparser2";
+import { DomHandler, Text } from "domhandler";
+
 export interface TextMatch {
   fieldName: string;
   fieldLabel: string;
@@ -200,273 +203,269 @@ function findTextMatchesInHTML(html: string, search: string, caseSensitive: bool
   return matches;
 }
 
-export function replaceTextInHTML(html: string, search: string, replace: string, caseSensitive: boolean = true): string {
-  if (!html || !search) return html;
+function collectTextNodes(html: string): { data: string; startIndex: number; endIndex: number }[] {
+  const textNodes: { data: string; startIndex: number; endIndex: number }[] = [];
 
-  const searchStr = caseSensitive ? search : search.toLowerCase();
+  const handler = new DomHandler(undefined, { withStartIndices: true, withEndIndices: true });
+  const parser = new Parser(handler);
+  parser.parseComplete(html);
 
-  const allTagsRegex = /<[^>]+>/g;
-  const segments: { type: "text" | "tag"; content: string }[] = [];
-
-  let lastIndex = 0;
-  let tagMatch;
-
-  allTagsRegex.lastIndex = 0;
-  while ((tagMatch = allTagsRegex.exec(html)) !== null) {
-    if (tagMatch.index > lastIndex) {
-      segments.push({
-        type: "text",
-        content: html.slice(lastIndex, tagMatch.index),
-      });
-    }
-    segments.push({
-      type: "tag",
-      content: tagMatch[0],
-    });
-    lastIndex = tagMatch.index + tagMatch[0].length;
-  }
-
-  if (lastIndex < html.length) {
-    segments.push({
-      type: "text",
-      content: html.slice(lastIndex),
-    });
-  }
-
-  // Build flat text and segment info
-  const textSegments: { content: string; startPos: number; segArrayIdx: number }[] = [];
-  let flatText = "";
-  let flatPosition = 0;
-  for (let i = 0; i < segments.length; i++) {
-    const seg = segments[i];
-    if (seg.type === "text") {
-      textSegments.push({ content: seg.content, startPos: flatPosition, segArrayIdx: i });
-      flatText += seg.content;
-      flatPosition += seg.content.length;
-    }
-  }
-
-  if (flatText.length === 0) return html;
-
-  const flatToSearch = caseSensitive ? flatText : flatText.toLowerCase();
-
-  // Find all match positions in flat text
-  const matchPositions: { start: number; end: number; segIdx: number; localStart: number; crossSegment: boolean; charsToSkipInNextSeg: number }[] = [];
-  let searchIdx = 0;
-  while (searchIdx < flatToSearch.length) {
-    const foundIdx = flatToSearch.indexOf(searchStr, searchIdx);
-    if (foundIdx === -1) break;
-
-    // Find which text segment this match starts in
-    for (let i = 0; i < textSegments.length; i++) {
-      const segStart = textSegments[i].startPos;
-      const segEnd = segStart + textSegments[i].content.length;
-      if (foundIdx >= segStart && foundIdx < segEnd) {
-        const localStart = foundIdx - segStart;
-        const matchEnd = foundIdx + search.length;
-        const crossSegment = matchEnd > segEnd;
-        // For cross-segment matches, calculate how many chars to skip in the next text segment
-        const charsToSkipInNextSeg = crossSegment ? matchEnd - segEnd : 0;
-        matchPositions.push({ start: foundIdx, end: matchEnd, segIdx: i, localStart, crossSegment, charsToSkipInNextSeg });
-        break;
-      }
-    }
-    searchIdx = foundIdx + 1;
-  }
-
-  // Build result by reconstructing HTML with replacements
-  const result: { type: "text" | "tag"; content: string }[] = [];
-  let matchPosIdx = 0;
-  let charsToSkip = 0;
-  let nextMatchCrossesHere = false;
-
-  for (let segArrayIdx = 0; segArrayIdx < segments.length; segArrayIdx++) {
-    const seg = segments[segArrayIdx];
-
-    if (seg.type === "tag") {
-      result.push(seg);
-    } else {
-      let newText = "";
-      let localIdx = 0;
-      const textSegIdx = textSegments.findIndex(ts => ts.segArrayIdx === segArrayIdx);
-
-      // Check if this segment needs to skip chars due to cross-segment match from previous text segment
-      if (charsToSkip > 0 && textSegIdx !== -1) {
-        // Check if previous match crosses into this segment
-        if (matchPosIdx > 0) {
-          const prevMatch = matchPositions[matchPosIdx - 1];
-          if (prevMatch.crossSegment && textSegIdx === prevMatch.segIdx + 1) {
-            // Skip characters at the start of this segment
-            localIdx = charsToSkip;
-            charsToSkip = 0;
-          }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const walk = (nodes: any[]) => {
+    for (const node of nodes) {
+      if (node instanceof Text) {
+        if (node.startIndex !== null && node.endIndex !== null && node.data) {
+          textNodes.push({
+            data: node.data,
+            startIndex: node.startIndex,
+            endIndex: node.endIndex,
+          });
         }
       }
-
-      while (localIdx < seg.content.length) {
-        // Check if there's a match starting at current position in this segment
-        if (matchPosIdx < matchPositions.length &&
-            matchPositions[matchPosIdx].segIdx === textSegIdx &&
-            matchPositions[matchPosIdx].localStart === localIdx) {
-
-          if (matchPositions[matchPosIdx].crossSegment) {
-            // Cross-segment match: add replacement, consume rest of segment, track chars to skip
-            newText += replace;
-            charsToSkip = matchPositions[matchPosIdx].charsToSkipInNextSeg;
-            localIdx = seg.content.length;
-            matchPosIdx++;
-          } else {
-            // Normal within-segment match
-            newText += replace;
-            localIdx += search.length;
-            matchPosIdx++;
-          }
-        } else {
-          newText += seg.content[localIdx];
-          localIdx++;
-        }
+      if ('children' in node && node.children) {
+        walk(node.children);
       }
-
-      result.push({ type: "text", content: newText });
     }
-  }
+  };
 
-  return result.map(r => r.content).join("");
+  walk(handler.root.children);
+  return textNodes;
 }
 
-export function replaceTextPreserveCase(html: string, search: string, replace: string, caseSensitive: boolean = true): string {
-  if (!html || !search) return html;
+function buildCharMap(textNodes: { data: string; startIndex: number; endIndex: number }[]) {
+  const charMap: { nodeIdx: number; offsetInNode: number; htmlIndex: number }[] = [];
 
-  const searchStr = caseSensitive ? search : search.toLowerCase();
-
-  const allTagsRegex = /<[^>]+>/g;
-  const segments: { type: "text" | "tag"; content: string }[] = [];
-
-  let lastIndex = 0;
-  let tagMatch;
-
-  allTagsRegex.lastIndex = 0;
-  while ((tagMatch = allTagsRegex.exec(html)) !== null) {
-    if (tagMatch.index > lastIndex) {
-      segments.push({
-        type: "text",
-        content: html.slice(lastIndex, tagMatch.index),
+  for (let i = 0; i < textNodes.length; i++) {
+    const tn = textNodes[i];
+    for (let j = 0; j < tn.data.length; j++) {
+      charMap.push({
+        nodeIdx: i,
+        offsetInNode: j,
+        htmlIndex: tn.startIndex + j,
       });
     }
-    segments.push({
-      type: "tag",
-      content: tagMatch[0],
-    });
-    lastIndex = tagMatch.index + tagMatch[0].length;
   }
 
-  if (lastIndex < html.length) {
-    segments.push({
-      type: "text",
-      content: html.slice(lastIndex),
-    });
-  }
+  return charMap;
+}
 
-  // Build flat text and segment info
-  const textSegments: { content: string; startPos: number; segArrayIdx: number }[] = [];
-  let flatText = "";
-  let flatPosition = 0;
-  for (let i = 0; i < segments.length; i++) {
-    const seg = segments[i];
-    if (seg.type === "text") {
-      textSegments.push({ content: seg.content, startPos: flatPosition, segArrayIdx: i });
-      flatText += seg.content;
-      flatPosition += seg.content.length;
-    }
-  }
+export function replaceTextInHTML(
+  html: string,
+  search: string,
+  replace: string,
+  caseSensitive: boolean = true
+): string {
+  if (!html || !search) return html;
 
-  if (flatText.length === 0) return html;
+  try {
+    const textNodes = collectTextNodes(html);
+    if (textNodes.length === 0) return html;
 
-  const flatToSearch = caseSensitive ? flatText : flatText.toLowerCase();
+    const charMap = buildCharMap(textNodes);
+    if (charMap.length === 0) return html;
 
-  // Find all match positions in flat text
-  const matchPositions: { start: number; end: number; segIdx: number; localStart: number; crossSegment: boolean; charsToSkipInNextSeg: number }[] = [];
-  let searchIdx = 0;
-  while (searchIdx < flatToSearch.length) {
-    const foundIdx = flatToSearch.indexOf(searchStr, searchIdx);
-    if (foundIdx === -1) break;
+    const fullText = textNodes.map(tn => tn.data).join('');
+    const escapedSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const searchRegex = new RegExp(escapedSearch, caseSensitive ? 'g' : 'gi');
 
-    // Find which text segment this match starts in
-    for (let i = 0; i < textSegments.length; i++) {
-      const segStart = textSegments[i].startPos;
-      const segEnd = segStart + textSegments[i].content.length;
-      if (foundIdx >= segStart && foundIdx < segEnd) {
-        const localStart = foundIdx - segStart;
-        const matchEnd = foundIdx + search.length;
-        const crossSegment = matchEnd > segEnd;
-        // For cross-segment matches, calculate how many chars to skip in the next text segment
-        const charsToSkipInNextSeg = crossSegment ? matchEnd - segEnd : 0;
-        matchPositions.push({ start: foundIdx, end: matchEnd, segIdx: i, localStart, crossSegment, charsToSkipInNextSeg });
-        break;
-      }
-    }
-    searchIdx = foundIdx + 1;
-  }
+    type MatchSegment = { nodeIdx: number; flatStart: number; flatEnd: number; htmlPosStart: number; htmlPosEnd: number };
+    type Match = { segments: MatchSegment[]; crossSegment: boolean };
 
-  // Build result by reconstructing HTML with replacements
-  const result: { type: "text" | "tag"; content: string }[] = [];
-  let matchPosIdx = 0;
-  let charsToSkip = 0;
+    const matches: Match[] = [];
+    let m: RegExpExecArray | null;
 
-  for (let segArrayIdx = 0; segArrayIdx < segments.length; segArrayIdx++) {
-    const seg = segments[segArrayIdx];
+    while ((m = searchRegex.exec(fullText)) !== null) {
+      const flatStart = m.index;
+      const flatEnd = m.index + m[0].length - 1;
 
-    if (seg.type === "tag") {
-      result.push(seg);
-    } else {
-      let newText = "";
-      let localIdx = 0;
-      const textSegIdx = textSegments.findIndex(ts => ts.segArrayIdx === segArrayIdx);
+      const segments: MatchSegment[] = [];
+      let currentNodeIdx = -1;
+      let segmentFlatStart = -1;
+      let segmentHtmlStart = -1;
 
-      // Check if this segment needs to skip chars due to cross-segment match from previous text segment
-      if (charsToSkip > 0 && textSegIdx !== -1) {
-        if (matchPosIdx > 0) {
-          const prevMatch = matchPositions[matchPosIdx - 1];
-          if (prevMatch.crossSegment && textSegIdx === prevMatch.segIdx + 1) {
-            localIdx = charsToSkip;
-            charsToSkip = 0;
-          }
-        }
-      }
-
-      while (localIdx < seg.content.length) {
-        // Check if there's a match starting at current position in this segment
-        if (matchPosIdx < matchPositions.length &&
-            matchPositions[matchPosIdx].segIdx === textSegIdx &&
-            matchPositions[matchPosIdx].localStart === localIdx) {
-
-          if (matchPositions[matchPosIdx].crossSegment) {
-            // Cross-segment match: add replacement with case preserved
-            const originalMatch = seg.content.slice(localIdx, localIdx + search.length);
-            const replacementWithCase = applyCase(originalMatch, replace);
-            newText += replacementWithCase;
-            charsToSkip = matchPositions[matchPosIdx].charsToSkipInNextSeg;
-            localIdx = seg.content.length;
-            matchPosIdx++;
-          } else {
-            // Normal within-segment match
-            const originalMatch = seg.content.slice(localIdx, localIdx + search.length);
-            const replacementWithCase = applyCase(originalMatch, replace);
-            newText += replacementWithCase;
-            localIdx += search.length;
-            matchPosIdx++;
+      for (let flatPos = flatStart; flatPos <= flatEnd; flatPos++) {
+        const entry = charMap[flatPos];
+        if (flatPos === flatStart || entry.nodeIdx === currentNodeIdx) {
+          if (entry.nodeIdx !== currentNodeIdx) {
+            currentNodeIdx = entry.nodeIdx;
+            segmentFlatStart = flatPos;
+            segmentHtmlStart = entry.htmlIndex;
           }
         } else {
-          newText += seg.content[localIdx];
-          localIdx++;
+          segments.push({
+            nodeIdx: currentNodeIdx,
+            flatStart: segmentFlatStart,
+            flatEnd: flatPos - 1,
+            htmlPosStart: segmentHtmlStart,
+            htmlPosEnd: charMap[flatPos - 1].htmlIndex,
+          });
+          currentNodeIdx = entry.nodeIdx;
+          segmentFlatStart = flatPos;
+          segmentHtmlStart = entry.htmlIndex;
         }
       }
 
-      result.push({ type: "text", content: newText });
-    }
-  }
+      if (segmentFlatStart !== -1) {
+        segments.push({
+          nodeIdx: currentNodeIdx,
+          flatStart: segmentFlatStart,
+          flatEnd: flatEnd,
+          htmlPosStart: segmentHtmlStart,
+          htmlPosEnd: charMap[flatEnd].htmlIndex,
+        });
+      }
 
-  return result.map(r => r.content).join("");
+      matches.push({
+        segments,
+        crossSegment: segments.length > 1,
+      });
+    }
+
+    if (matches.length === 0) return html;
+
+    let result = html;
+
+    for (const match of matches.reverse()) {
+      if (match.crossSegment) {
+        const segmentLengths = match.segments.map(seg => seg.flatEnd - seg.flatStart + 1);
+
+        for (let i = match.segments.length - 1; i >= 0; i--) {
+          const seg = match.segments[i];
+          const segMatchedLength = segmentLengths[i];
+
+          const replaceStart = segmentLengths.slice(0, i).reduce((a, b) => a + b, 0);
+          const replaceEnd = replaceStart + segMatchedLength;
+
+          const segReplacement = i === match.segments.length - 1
+            ? replace.slice(replaceStart)
+            : replace.slice(replaceStart, replaceEnd);
+
+          result = result.slice(0, seg.htmlPosStart) + segReplacement + result.slice(seg.htmlPosEnd + 1);
+        }
+      } else {
+        const seg = match.segments[0];
+        result = result.slice(0, seg.htmlPosStart) + replace + result.slice(seg.htmlPosEnd + 1);
+      }
+    }
+
+    return result;
+  } catch (error) {
+    console.error('replaceTextInHTML error:', error);
+    return html;
+  }
+}
+
+export function replaceTextPreserveCase(
+  html: string,
+  search: string,
+  replace: string,
+  caseSensitive: boolean = true
+): string {
+  if (!html || !search) return html;
+
+  try {
+    const textNodes = collectTextNodes(html);
+    if (textNodes.length === 0) return html;
+
+    const charMap = buildCharMap(textNodes);
+    if (charMap.length === 0) return html;
+
+    const fullText = textNodes.map(tn => tn.data).join('');
+    const escapedSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const searchRegex = new RegExp(escapedSearch, caseSensitive ? 'g' : 'gi');
+
+    type MatchSegment = { nodeIdx: number; flatStart: number; flatEnd: number; htmlPosStart: number; htmlPosEnd: number };
+    type Match = { segments: MatchSegment[]; crossSegment: boolean; originalText: string };
+
+    const matches: Match[] = [];
+    let m: RegExpExecArray | null;
+
+    while ((m = searchRegex.exec(fullText)) !== null) {
+      const flatStart = m.index;
+      const flatEnd = m.index + m[0].length - 1;
+
+      const segments: MatchSegment[] = [];
+      let currentNodeIdx = -1;
+      let segmentFlatStart = -1;
+      let segmentHtmlStart = -1;
+
+      for (let flatPos = flatStart; flatPos <= flatEnd; flatPos++) {
+        const entry = charMap[flatPos];
+        if (flatPos === flatStart || entry.nodeIdx === currentNodeIdx) {
+          if (entry.nodeIdx !== currentNodeIdx) {
+            currentNodeIdx = entry.nodeIdx;
+            segmentFlatStart = flatPos;
+            segmentHtmlStart = entry.htmlIndex;
+          }
+        } else {
+          segments.push({
+            nodeIdx: currentNodeIdx,
+            flatStart: segmentFlatStart,
+            flatEnd: flatPos - 1,
+            htmlPosStart: segmentHtmlStart,
+            htmlPosEnd: charMap[flatPos - 1].htmlIndex,
+          });
+          currentNodeIdx = entry.nodeIdx;
+          segmentFlatStart = flatPos;
+          segmentHtmlStart = entry.htmlIndex;
+        }
+      }
+
+      if (segmentFlatStart !== -1) {
+        segments.push({
+          nodeIdx: currentNodeIdx,
+          flatStart: segmentFlatStart,
+          flatEnd: flatEnd,
+          htmlPosStart: segmentHtmlStart,
+          htmlPosEnd: charMap[flatEnd].htmlIndex,
+        });
+      }
+
+      matches.push({
+        segments,
+        crossSegment: segments.length > 1,
+        originalText: m[0],
+      });
+    }
+
+    if (matches.length === 0) return html;
+
+    let result = html;
+    for (const match of matches.reverse()) {
+      if (match.crossSegment) {
+        const segmentLengths = match.segments.map(seg => seg.flatEnd - seg.flatStart + 1);
+
+        for (let i = match.segments.length - 1; i >= 0; i--) {
+          const seg = match.segments[i];
+          const segMatchedLength = segmentLengths[i];
+
+          const replaceStart = segmentLengths.slice(0, i).reduce((a, b) => a + b, 0);
+          const replaceEnd = replaceStart + segMatchedLength;
+
+          const segReplacementRaw = i === match.segments.length - 1
+            ? replace.slice(replaceStart)
+            : replace.slice(replaceStart, replaceEnd);
+
+          const origStart = segmentLengths.slice(0, i).reduce((a, b) => a + b, 0);
+          const origEnd = origStart + segMatchedLength;
+          const origPortion = match.originalText.slice(origStart, origEnd);
+
+          const segReplacement = applyCase(origPortion, segReplacementRaw);
+
+          result = result.slice(0, seg.htmlPosStart) + segReplacement + result.slice(seg.htmlPosEnd + 1);
+        }
+      } else {
+        const seg = match.segments[0];
+        const replacementWithCase = applyCase(match.originalText, replace);
+        result = result.slice(0, seg.htmlPosStart) + replacementWithCase + result.slice(seg.htmlPosEnd + 1);
+      }
+    }
+
+    return result;
+  } catch (error) {
+    console.error('replaceTextPreserveCase error:', error);
+    return html;
+  }
 }
 
 function applyCase(original: string, replacement: string): string {
