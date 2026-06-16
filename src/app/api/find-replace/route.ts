@@ -37,10 +37,18 @@ export async function GET(request: Request) {
       return NextResponse.json({ matches: [], totalMatches: 0, totalLessons: 0 });
     }
 
+    // Deduplicate lessons by ID
+    const seenLessonIds = new Set();
+    const uniqueLessons = lessons.filter((l: any) => {
+      if (seenLessonIds.has(l.id)) return false;
+      seenLessonIds.add(l.id);
+      return true;
+    });
+
     const matchesMap = new Map<string, any>();
     let totalMatches = 0;
 
-    for (const lesson of lessons) {
+    for (const lesson of uniqueLessons) {
       const lessonAny = lesson as any;
       const course = lessonAny.courses as any;
 
@@ -85,7 +93,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       matches,
       totalMatches,
-      totalLessons: lessons.length,
+      totalLessons: uniqueLessons.length,
     });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });

@@ -363,23 +363,39 @@ export function FindReplacePanel({ lessonId, courseId, isAdmin = false }: FindRe
                       className="p-3 bg-gray-50 rounded border border-gray-200"
                     >
                       <div className="flex items-center justify-between mb-1">
-                        <div>
+                        <div className="flex items-center gap-2">
                           <span className="text-xs font-medium text-[#0d7377]">
                             Lesson {match.lessonNumber}
                           </span>
-                          <span className="text-xs text-gray-500 mx-2">-</span>
+                          <span className="text-xs text-gray-400">-</span>
+                          <span className="text-xs text-gray-600">{match.courseName}</span>
+                          <span className="text-xs text-gray-400">-</span>
                           <span className="text-xs font-medium">{match.fieldLabel}</span>
                         </div>
-                        {replaceText && (
+                        <div className="flex items-center gap-2">
                           <button
                             type="button"
-                            onClick={() => handleReplaceOne(match)}
-                            disabled={isReplacing}
-                            className="text-xs px-2 py-1 bg-white border border-[#0d7377] text-[#0d7377] rounded hover:bg-[#d7ffef] disabled:bg-gray-100"
+                            onClick={() => {
+                              window.open(
+                                `/admin/courses/${match.courseId}/lessons/${match.lessonId}`,
+                                '_blank'
+                              );
+                            }}
+                            className="text-xs px-2 py-1 bg-white border border-[#0d7377] text-[#0d7377] rounded hover:bg-[#d7ffef]"
                           >
-                            Replace
+                            View →
                           </button>
-                        )}
+                          {replaceText && (
+                            <button
+                              type="button"
+                              onClick={() => handleReplaceOne(match)}
+                              disabled={isReplacing}
+                              className="text-xs px-2 py-1 bg-white border border-[#0d7377] text-[#0d7377] rounded hover:bg-[#d7ffef] disabled:bg-gray-100"
+                            >
+                              Replace
+                            </button>
+                          )}
+                        </div>
                       </div>
                       <p
                         className="text-sm text-gray-600"
