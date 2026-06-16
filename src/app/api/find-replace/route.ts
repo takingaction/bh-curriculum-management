@@ -1,6 +1,6 @@
 import { createServiceClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
-import { replaceTextInHTML, findMatchesInContent, generateSnippet, TEXT_FIELDS_LIST } from "@/lib/html-utils";
+import { replaceTextInHTML, findMatchesInContent, generateSnippet, TEXT_FIELDS_LIST, replaceTextPreserveCase } from "@/lib/html-utils";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -8,6 +8,7 @@ export async function GET(request: Request) {
   const scope = searchParams.get("scope") as "lesson" | "course" | "global";
   const lessonId = searchParams.get("lessonId");
   const courseId = searchParams.get("courseId");
+  const caseSensitive = searchParams.get("caseSensitive") !== "false";
 
   if (!search || !scope) {
     return NextResponse.json({ error: "Missing search or scope" }, { status: 400 });
@@ -47,7 +48,7 @@ export async function GET(request: Request) {
         const fieldValue = lessonAny[fieldName];
         if (!fieldValue || typeof fieldValue !== "string") continue;
 
-        const fieldMatches = findMatchesInContent(fieldValue, search, fieldName);
+        const fieldMatches = findMatchesInContent(fieldValue, search, fieldName, caseSensitive);
         if (!fieldMatches || fieldMatches.matches.length === 0) continue;
 
         const snippet = generateSnippet(fieldValue, search);
@@ -94,7 +95,7 @@ export async function GET(request: Request) {
 export async function PATCH(request: Request) {
   try {
     const body = await request.json();
-    const { search, replace, scope, lessonId, courseId } = body;
+    const { search, replace, scope, lessonId, courseId, caseSensitive = true, forceExactCase = true } = body;
 
     if (!search || replace === undefined || !scope) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
@@ -134,7 +135,13 @@ export async function PATCH(request: Request) {
         const fieldValue = lessonAny[fieldName];
         if (!fieldValue || typeof fieldValue !== "string") continue;
 
-        const newContent = replaceTextInHTML(fieldValue, search, replace);
+        let newContent: string;
+        if (forceExactCase) {
+          newContent = replaceTextInHTML(fieldValue, search, replace, caseSensitive);
+        } else {
+          newContent = replaceTextPreserveCase(fieldValue, search, replace, caseSensitive);
+        }
+
         if (newContent !== fieldValue) {
           updates[fieldName] = newContent;
           updatedCount++;

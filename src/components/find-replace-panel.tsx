@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Search, X, ChevronDown, ChevronUp, RefreshCw } from "lucide-react";
+import { Search, X, ChevronDown, ChevronUp, RefreshCw, CheckCircle } from "lucide-react";
 
 interface Course {
   id: string;
@@ -35,12 +35,15 @@ export function FindReplacePanel({ lessonId, courseId, isAdmin = false }: FindRe
   const [courses, setCourses] = useState<Course[]>([]);
   const [searchText, setSearchText] = useState("");
   const [replaceText, setReplaceText] = useState("");
+  const [caseSensitive, setCaseSensitive] = useState(true);
+  const [forceExactCase, setForceExactCase] = useState(false);
   const [matches, setMatches] = useState<Match[]>([]);
   const [totalMatches, setTotalMatches] = useState(0);
   const [totalLessons, setTotalLessons] = useState(0);
   const [isSearching, setIsSearching] = useState(false);
   const [isReplacing, setIsReplacing] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen && scope === "global" && courses.length === 0) {
@@ -70,10 +73,12 @@ export function FindReplacePanel({ lessonId, courseId, isAdmin = false }: FindRe
     if (!searchText.trim()) return;
 
     setIsSearching(true);
+    setSuccessMessage(null);
     try {
       const params = new URLSearchParams({
         search: searchText,
         scope,
+        caseSensitive: caseSensitive.toString(),
       });
 
       if (scope === "lesson" && lessonId) {
@@ -108,6 +113,8 @@ export function FindReplacePanel({ lessonId, courseId, isAdmin = false }: FindRe
         search: searchText,
         replace: replaceText,
         scope,
+        caseSensitive,
+        forceExactCase,
       };
 
       if (scope === "lesson" && lessonId) {
@@ -127,10 +134,8 @@ export function FindReplacePanel({ lessonId, courseId, isAdmin = false }: FindRe
       if (res.ok) {
         setTotalMatches(0);
         setMatches([]);
-        setSearchText("");
         setReplaceText("");
-        alert(`Replaced ${data.updatedCount} instances across ${data.lessonsUpdated} lessons.`);
-        window.location.reload();
+        setSuccessMessage(`Replaced ${data.updatedCount} instance${data.updatedCount !== 1 ? "s" : ""} across ${data.lessonsUpdated} lesson${data.lessonsUpdated !== 1 ? "s" : ""}.`);
       } else {
         console.error("Replace failed:", data.error);
       }
@@ -155,6 +160,8 @@ export function FindReplacePanel({ lessonId, courseId, isAdmin = false }: FindRe
           replace: replaceText,
           scope: "lesson",
           lessonId: match.lessonId,
+          caseSensitive,
+          forceExactCase,
         }),
       });
 
@@ -163,9 +170,7 @@ export function FindReplacePanel({ lessonId, courseId, isAdmin = false }: FindRe
       if (res.ok) {
         setTotalMatches(prev => prev - match.count);
         setMatches(prev => prev.filter(m => !(m.lessonId === match.lessonId && m.fieldName === match.fieldName)));
-        if (replaceText) {
-          window.location.reload();
-        }
+        setSuccessMessage(`Replaced ${match.count} instance${match.count !== 1 ? "s" : ""} in Lesson ${match.lessonNumber}.`);
       }
     } catch (err) {
       console.error("Replace error:", err);
@@ -178,21 +183,30 @@ export function FindReplacePanel({ lessonId, courseId, isAdmin = false }: FindRe
 
   return (
     <div className="bg-white border border-[#e5e5e0] rounded-lg mb-4">
-      <button
-        type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors"
-      >
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors">
+        <button
+          type="button"
+          onClick={() => setIsOpen(!isOpen)}
+          className="flex items-center gap-2"
+        >
           <Search className="w-4 h-4 text-[#0d7377]" />
           <span className="font-medium text-sm">Find & Replace</span>
-        </div>
-        {isOpen ? (
-          <ChevronUp className="w-4 h-4 text-gray-400" />
-        ) : (
-          <ChevronDown className="w-4 h-4 text-gray-400" />
+          {isOpen ? (
+            <ChevronUp className="w-4 h-4 text-gray-400" />
+          ) : (
+            <ChevronDown className="w-4 h-4 text-gray-400" />
+          )}
+        </button>
+        {isOpen && (
+          <button
+            type="button"
+            onClick={() => setIsOpen(false)}
+            className="p-1 hover:bg-gray-100 rounded"
+          >
+            <X className="w-4 h-4 text-gray-400" />
+          </button>
         )}
-      </button>
+      </div>
 
       {isOpen && (
         <div className="px-4 pb-4 border-t border-[#e5e5e0] pt-4">
@@ -279,6 +293,62 @@ export function FindReplacePanel({ lessonId, courseId, isAdmin = false }: FindRe
               </div>
             </div>
 
+            <div className="flex flex-wrap gap-6">
+              <div className="flex items-center gap-4">
+                <span className="text-xs text-gray-500">Match case:</span>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    id="case-sensitive"
+                    checked={caseSensitive}
+                    onChange={() => setCaseSensitive(true)}
+                    className="w-4 h-4"
+                  />
+                  <label htmlFor="case-sensitive" className="text-sm">Sensitive</label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    id="case-insensitive"
+                    checked={!caseSensitive}
+                    onChange={() => setCaseSensitive(false)}
+                    className="w-4 h-4"
+                  />
+                  <label htmlFor="case-insensitive" className="text-sm">Insensitive</label>
+                </div>
+              </div>
+
+              {!caseSensitive && (
+                <div className="flex items-center gap-4">
+                  <span className="text-xs text-gray-500">Force exact case:</span>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      id="force-exact-yes"
+                      checked={forceExactCase}
+                      onChange={() => setForceExactCase(true)}
+                      className="w-4 h-4"
+                    />
+                    <label htmlFor="force-exact-yes" className="text-sm">Yes</label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      id="force-exact-no"
+                      checked={!forceExactCase}
+                      onChange={() => setForceExactCase(false)}
+                      className="w-4 h-4"
+                    />
+                    <label htmlFor="force-exact-no" className="text-sm">No</label>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="text-xs text-gray-400">
+              Replacement matches case exactly
+            </div>
+
             <div className="flex gap-2">
               <button
                 type="button"
@@ -294,6 +364,13 @@ export function FindReplacePanel({ lessonId, courseId, isAdmin = false }: FindRe
                 Search
               </button>
             </div>
+
+            {successMessage && (
+              <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded text-sm text-green-700">
+                <CheckCircle className="w-4 h-4" />
+                {successMessage}
+              </div>
+            )}
 
             {totalMatches > 0 && (
               <div className="border-t border-gray-200 pt-4">

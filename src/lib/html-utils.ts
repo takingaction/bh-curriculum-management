@@ -47,20 +47,15 @@ function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-function findTextMatchesInHTML(html: string, search: string): { before: string; match: string; after: string; position: number }[] {
+function findTextMatchesInHTML(html: string, search: string, caseSensitive: boolean = true): { before: string; match: string; after: string; position: number }[] {
   if (!html || !search) return [];
 
   const matches: { before: string; match: string; after: string; position: number }[] = [];
-  const searchLower = search;
-  let pos = 0;
-  let htmlPos = 0;
+  const searchStr = caseSensitive ? search : search.toLowerCase();
 
-  const openTagRegex = /<[^>]+>/g;
-  const closeTagRegex = /<\/[^>]+>/g;
+  const segments: { type: "text" | "tag"; content: string }[] = [];
+
   const allTagsRegex = /<[^>]+>/g;
-
-  const segments: { type: "text" | "tag"; content: string; htmlStart: number; htmlEnd: number }[] = [];
-
   let lastIndex = 0;
   let tagMatch;
 
@@ -70,15 +65,11 @@ function findTextMatchesInHTML(html: string, search: string): { before: string; 
       segments.push({
         type: "text",
         content: html.slice(lastIndex, tagMatch.index),
-        htmlStart: lastIndex,
-        htmlEnd: tagMatch.index,
       });
     }
     segments.push({
       type: "tag",
       content: tagMatch[0],
-      htmlStart: tagMatch.index,
-      htmlEnd: tagMatch.index + tagMatch[0].length,
     });
     lastIndex = tagMatch.index + tagMatch[0].length;
   }
@@ -87,8 +78,6 @@ function findTextMatchesInHTML(html: string, search: string): { before: string; 
     segments.push({
       type: "text",
       content: html.slice(lastIndex),
-      htmlStart: lastIndex,
-      htmlEnd: html.length,
     });
   }
 
@@ -96,10 +85,11 @@ function findTextMatchesInHTML(html: string, search: string): { before: string; 
   for (const segment of segments) {
     if (segment.type === "text") {
       const text = segment.content;
+      const textToSearch = caseSensitive ? text : text.toLowerCase();
       let searchIdx = 0;
 
-      while (searchIdx < text.length) {
-        const foundIdx = text.indexOf(searchLower, searchIdx);
+      while (searchIdx < textToSearch.length) {
+        const foundIdx = textToSearch.indexOf(searchStr, searchIdx);
         if (foundIdx === -1) break;
 
         const before = text.slice(0, foundIdx);
@@ -116,18 +106,16 @@ function findTextMatchesInHTML(html: string, search: string): { before: string; 
         searchIdx = foundIdx + 1;
       }
       textPosition += text.length;
-    } else {
     }
   }
 
   return matches;
 }
 
-export function replaceTextInHTML(html: string, search: string, replace: string): string {
+export function replaceTextInHTML(html: string, search: string, replace: string, caseSensitive: boolean = true): string {
   if (!html || !search) return html;
 
-  const searchLower = search.toLowerCase();
-  const replaceLen = replace.length;
+  const searchStr = caseSensitive ? search : search.toLowerCase();
 
   const allTagsRegex = /<[^>]+>/g;
   const segments: { type: "text" | "tag"; content: string }[] = [];
@@ -164,11 +152,12 @@ export function replaceTextInHTML(html: string, search: string, replace: string)
       result.push(segment);
     } else {
       let text = segment.content;
+      const textToSearch = caseSensitive ? text : text.toLowerCase();
       let searchIdx = 0;
       let newText = "";
 
-      while (searchIdx < text.length) {
-        const foundIdx = text.toLowerCase().indexOf(searchLower, searchIdx);
+      while (searchIdx < textToSearch.length) {
+        const foundIdx = textToSearch.indexOf(searchStr, searchIdx);
         if (foundIdx === -1) {
           newText += text.slice(searchIdx);
           break;
@@ -189,10 +178,96 @@ export function replaceTextInHTML(html: string, search: string, replace: string)
   return result.map(r => r.content).join("");
 }
 
-export function findMatchesInContent(html: string, search: string, fieldName: string): TextMatch | null {
+export function replaceTextPreserveCase(html: string, search: string, replace: string, caseSensitive: boolean = true): string {
+  if (!html || !search) return html;
+
+  const searchStr = caseSensitive ? search : search.toLowerCase();
+
+  const allTagsRegex = /<[^>]+>/g;
+  const segments: { type: "text" | "tag"; content: string }[] = [];
+
+  let lastIndex = 0;
+  let tagMatch;
+
+  allTagsRegex.lastIndex = 0;
+  while ((tagMatch = allTagsRegex.exec(html)) !== null) {
+    if (tagMatch.index > lastIndex) {
+      segments.push({
+        type: "text",
+        content: html.slice(lastIndex, tagMatch.index),
+      });
+    }
+    segments.push({
+      type: "tag",
+      content: tagMatch[0],
+    });
+    lastIndex = tagMatch.index + tagMatch[0].length;
+  }
+
+  if (lastIndex < html.length) {
+    segments.push({
+      type: "text",
+      content: html.slice(lastIndex),
+    });
+  }
+
+  const result: { type: "text" | "tag"; content: string }[] = [];
+
+  for (const segment of segments) {
+    if (segment.type === "tag") {
+      result.push(segment);
+    } else {
+      let text = segment.content;
+      const textToSearch = caseSensitive ? text : text.toLowerCase();
+      let searchIdx = 0;
+      let newText = "";
+
+      while (searchIdx < textToSearch.length) {
+        const foundIdx = textToSearch.indexOf(searchStr, searchIdx);
+        if (foundIdx === -1) {
+          newText += text.slice(searchIdx);
+          break;
+        }
+
+        const originalMatch = text.slice(foundIdx, foundIdx + search.length);
+        const replacementWithCase = applyCase(originalMatch, replace);
+        newText += text.slice(searchIdx, foundIdx);
+        newText += replacementWithCase;
+        searchIdx = foundIdx + search.length;
+      }
+
+      result.push({
+        type: "text",
+        content: newText,
+      });
+    }
+  }
+
+  return result.map(r => r.content).join("");
+}
+
+function applyCase(original: string, replacement: string): string {
+  if (!original) return replacement;
+
+  const isAllUpper = original === original.toUpperCase();
+  const isAllLower = original === original.toLowerCase();
+  const isTitleCase = original[0] === original[0].toUpperCase() && original.slice(1) === original.slice(1).toLowerCase();
+
+  if (isAllUpper) {
+    return replacement.toUpperCase();
+  } else if (isAllLower) {
+    return replacement.toLowerCase();
+  } else if (isTitleCase) {
+    return replacement.charAt(0).toUpperCase() + replacement.slice(1).toLowerCase();
+  } else {
+    return replacement;
+  }
+}
+
+export function findMatchesInContent(html: string, search: string, fieldName: string, caseSensitive: boolean = true): TextMatch | null {
   if (!html || !search) return null;
 
-  const matches = findTextMatchesInHTML(html, search);
+  const matches = findTextMatchesInHTML(html, search, caseSensitive);
   if (matches.length === 0) return null;
 
   return {
@@ -254,57 +329,6 @@ export function generateSnippet(html: string, search: string, maxLength: number 
   }
 
   return snippet;
-}
-
-export async function findAndReplaceInLessons(
-  lessons: any[],
-  search: string,
-  replace: string,
-  db: any
-): Promise<{ updatedCount: number; lessonsUpdated: number }> {
-  let updatedCount = 0;
-  const updatedLessonIds = new Set<string>();
-
-  const TEXT_FIELDS = [
-    "lesson_outline", "learning_objectives", "vocabulary", "materials",
-    "vapa_text_block", "ncas_text_block", "welcome_opening",
-    "actual_class_expectations", "warm_up", "lesson_hook",
-    "main_activity", "instrument_expectations", "reflection",
-    "closing_ceremony", "assessment"
-  ];
-
-  for (const lesson of lessons) {
-    let lessonUpdated = false;
-
-    const updates: Record<string, string> = {};
-
-    for (const field of TEXT_FIELDS) {
-      if (lesson[field] && typeof lesson[field] === "string") {
-        const newContent = replaceTextInHTML(lesson[field], search, replace);
-        if (newContent !== lesson[field]) {
-          updates[field] = newContent;
-          updatedCount += countMatchesInHTML(lesson[field], search);
-          lessonUpdated = true;
-        }
-      }
-    }
-
-    if (lessonUpdated) {
-      const { error } = await db
-        .from("lessons")
-        .update(updates)
-        .eq("id", lesson.id);
-
-      if (!error) {
-        updatedLessonIds.add(lesson.id);
-      }
-    }
-  }
-
-  return {
-    updatedCount,
-    lessonsUpdated: updatedLessonIds.size,
-  };
 }
 
 function countMatchesInHTML(html: string, search: string): number {

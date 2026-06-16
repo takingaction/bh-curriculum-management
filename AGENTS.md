@@ -170,15 +170,18 @@ Two-column layout at `src/app/(dashboard)/admin/courses/[id]/lessons/[lessonId]/
 #### Find & Replace Feature
 - **Location**: Collapsible panel at top of lesson editor and student lesson view (admin only)
 - **Scope options**: Lesson, Course (with course dropdown), or Global
-- **Search behavior**: Case-sensitive substring match on text content (ignores HTML tags)
-- **Replace behavior**: Exact case from replacement input
+- **Case sensitivity**: Sensitive (default) or Insensitive radio buttons
+- **Force exact case**: Only shown when case insensitive - Yes (replacement is exact) or No (preserves original case pattern)
+- **Search behavior**: Case-sensitive or case-insensitive substring match on text content (ignores HTML tags)
+- **Replace behavior**: Exact case from replacement input (when Force Exact Case = Yes), or preserves original case pattern (when Force Exact Case = No)
+- **Results**: Shows match count per lesson/field, replace individual or all at once
 - **Key files**:
-  - `src/lib/html-utils.ts` - HTML parsing, text finding/replacing helpers
+  - `src/lib/html-utils.ts` - HTML parsing, text finding/replacing helpers (includes `replaceTextPreserveCase` for case-preserving replace)
   - `src/app/api/find-replace/route.ts` - GET (search) and PATCH (replace) API endpoints
-  - `src/components/find-replace-panel.tsx` - UI component with scope selector, results display
+  - `src/components/find-replace-panel.tsx` - UI component with scope selector, case options, results display
 - **API endpoints**:
-  - GET `/api/find-replace?search=X&scope=lesson|course|global&lessonId=X&courseId=X`
-  - PATCH `/api/find-replace` - Body: `{ search, replace, scope, lessonId?, courseId? }`
+  - GET `/api/find-replace?search=X&scope=lesson|course|global&lessonId=X&courseId=X&caseSensitive=true|false`
+  - PATCH `/api/find-replace` - Body: `{ search, replace, scope, lessonId?, courseId?, caseSensitive, forceExactCase }`
 
 ### Environment Variables Required
 - `NEXT_PUBLIC_SUPABASE_URL`
