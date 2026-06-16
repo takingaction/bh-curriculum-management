@@ -35,8 +35,8 @@ export function FindReplacePanel({ lessonId, courseId, isAdmin = false }: FindRe
   const [courses, setCourses] = useState<Course[]>([]);
   const [searchText, setSearchText] = useState("");
   const [replaceText, setReplaceText] = useState("");
-  const [caseSensitive, setCaseSensitive] = useState(true);
-  const [forceExactCase, setForceExactCase] = useState(false);
+  const [caseSensitive, setCaseSensitive] = useState(false);
+  const [forceExactCase, setForceExactCase] = useState(true);
   const [matches, setMatches] = useState<Match[]>([]);
   const [totalMatches, setTotalMatches] = useState(0);
   const [totalLessons, setTotalLessons] = useState(0);
@@ -274,6 +274,17 @@ export function FindReplacePanel({ lessonId, courseId, isAdmin = false }: FindRe
                     }
                   }}
                 />
+                <div className="mt-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={caseSensitive}
+                      onChange={(e) => setCaseSensitive(e.target.checked)}
+                      className="w-4 h-4"
+                    />
+                    <span className="text-sm">Match case exactly</span>
+                  </label>
+                </div>
               </div>
               <div className="flex-1">
                 <label className="text-xs text-gray-500 mb-1 block">Replace</label>
@@ -290,63 +301,18 @@ export function FindReplacePanel({ lessonId, courseId, isAdmin = false }: FindRe
                     }
                   }}
                 />
-              </div>
-            </div>
-
-            <div className="flex flex-wrap gap-6">
-              <div className="flex items-center gap-4">
-                <span className="text-xs text-gray-500">Match case:</span>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="radio"
-                    id="case-sensitive"
-                    checked={caseSensitive}
-                    onChange={() => setCaseSensitive(true)}
-                    className="w-4 h-4"
-                  />
-                  <label htmlFor="case-sensitive" className="text-sm">Sensitive</label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="radio"
-                    id="case-insensitive"
-                    checked={!caseSensitive}
-                    onChange={() => setCaseSensitive(false)}
-                    className="w-4 h-4"
-                  />
-                  <label htmlFor="case-insensitive" className="text-sm">Insensitive</label>
-                </div>
-              </div>
-
-              {!caseSensitive && (
-                <div className="flex items-center gap-4">
-                  <span className="text-xs text-gray-500">Force exact case:</span>
-                  <div className="flex items-center gap-2">
+                <div className="mt-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
                     <input
-                      type="radio"
-                      id="force-exact-yes"
+                      type="checkbox"
                       checked={forceExactCase}
-                      onChange={() => setForceExactCase(true)}
+                      onChange={(e) => setForceExactCase(e.target.checked)}
                       className="w-4 h-4"
                     />
-                    <label htmlFor="force-exact-yes" className="text-sm">Yes</label>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="radio"
-                      id="force-exact-no"
-                      checked={!forceExactCase}
-                      onChange={() => setForceExactCase(false)}
-                      className="w-4 h-4"
-                    />
-                    <label htmlFor="force-exact-no" className="text-sm">No</label>
-                  </div>
+                    <span className="text-sm">Force exact case</span>
+                  </label>
                 </div>
-              )}
-            </div>
-
-            <div className="text-xs text-gray-400">
-              Replacement matches case exactly
+              </div>
             </div>
 
             <div className="flex gap-2">

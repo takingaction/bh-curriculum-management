@@ -37,7 +37,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ matches: [], totalMatches: 0, totalLessons: 0 });
     }
 
-    const matches: any[] = [];
+    const matchesMap = new Map<string, any>();
     let totalMatches = 0;
 
     for (const lesson of lessons) {
@@ -52,15 +52,13 @@ export async function GET(request: Request) {
         if (!fieldMatches || fieldMatches.matches.length === 0) continue;
 
         const snippet = generateSnippet(fieldValue, search);
+        const key = `${lesson.id}-${fieldName}`;
 
-        const existingMatch = matches.find(
-          m => m.lessonId === lesson.id && m.fieldName === fieldName
-        );
-
-        if (existingMatch) {
-          existingMatch.count += fieldMatches.matches.length;
+        const existing = matchesMap.get(key);
+        if (existing) {
+          existing.count += fieldMatches.matches.length;
         } else {
-          matches.push({
+          matchesMap.set(key, {
             lessonId: lesson.id,
             lessonNumber: lesson.lesson_number,
             lessonTitle: lesson.title,
@@ -75,6 +73,8 @@ export async function GET(request: Request) {
         }
       }
     }
+
+    const matches = Array.from(matchesMap.values());
 
     matches.sort((a, b) => {
       if (a.courseName !== b.courseName) return a.courseName.localeCompare(b.courseName);

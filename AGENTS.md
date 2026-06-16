@@ -170,10 +170,10 @@ Two-column layout at `src/app/(dashboard)/admin/courses/[id]/lessons/[lessonId]/
 #### Find & Replace Feature
 - **Location**: Collapsible panel at top of lesson editor and student lesson view (admin only)
 - **Scope options**: Lesson, Course (with course dropdown), or Global
-- **Case sensitivity**: Sensitive (default) or Insensitive radio buttons
-- **Force exact case**: Only shown when case insensitive - Yes (replacement is exact) or No (preserves original case pattern)
+- **Find field**: Checkbox below "Match case exactly" - ON = case sensitive, OFF = case insensitive (default: OFF)
+- **Replace field**: Checkbox "Force exact case" - ON = exact replacement, OFF = preserve original case pattern (default: ON)
 - **Search behavior**: Case-sensitive or case-insensitive substring match on text content (ignores HTML tags)
-- **Replace behavior**: Exact case from replacement input (when Force Exact Case = Yes), or preserves original case pattern (when Force Exact Case = No)
+- **Replace behavior**: Exact case from replacement input (when Force exact case = ON), or preserves original case pattern (when OFF)
 - **Results**: Shows match count per lesson/field, replace individual or all at once
 - **Key files**:
   - `src/lib/html-utils.ts` - HTML parsing, text finding/replacing helpers (includes `replaceTextPreserveCase` for case-preserving replace)
