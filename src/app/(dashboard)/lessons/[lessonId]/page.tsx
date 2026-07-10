@@ -127,7 +127,8 @@ export default function LessonContentPage({
     if (loading) return;
     const handleScroll = () => {
       const scrollPosition = window.scrollY + 200;
-      for (const section of contentSections) {
+      for (const section of sections) {
+        if (!lesson?.[section.key as keyof Lesson]) continue;
         const element = document.getElementById(section.key);
         if (element) {
           const { offsetTop, offsetHeight } = element;
@@ -140,7 +141,7 @@ export default function LessonContentPage({
     };
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
-  }, [loading, contentSections]);
+  }, [loading, lesson]);
 
   if (loading) {
     return (
