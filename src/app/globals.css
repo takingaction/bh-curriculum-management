@@ -329,6 +329,11 @@
   color: #e85d5d;
   text-decoration: underline;
 }
+.ProseMirror a.section-link,
+.lesson-content a.section-link {
+  color: #0d7377;
+  text-decoration: underline;
+}
 
 /* ---- SPELL CHECK ---- */
 .ProseMirror .misspelled {

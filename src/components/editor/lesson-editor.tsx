@@ -68,7 +68,7 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
   const [linkModalOpen, setLinkModalOpen] = useState(false);
   const [linkUrl, setLinkUrl] = useState("");
   const [linkNewWindow, setLinkNewWindow] = useState(false);
-  const [linkTab, setLinkTab] = useState<"url" | "resources">("url");
+  const [linkTab, setLinkTab] = useState<"url" | "resources" | "sections">("url");
   const [isEditingLink, setIsEditingLink] = useState(false);
   const [lessonResources, setLessonResources] = useState<any[]>([]);
   const [showTableInsertDialog, setShowTableInsertDialog] = useState(false);
@@ -1602,6 +1602,13 @@ const updateColumnWidth = (widthPercent: number) => {
             >
               Resources
             </button>
+            <button
+              type="button"
+              onClick={() => setLinkTab("sections")}
+              className={`px-4 py-2 text-sm font-medium ${linkTab === "sections" ? "border-b-2 border-[#0d7377] text-[#0d7377]" : "text-gray-500 hover:text-gray-700"}`}
+            >
+              Sections
+            </button>
           </div>
 
           <div className="space-y-4 py-4">
@@ -1629,7 +1636,7 @@ const updateColumnWidth = (widthPercent: number) => {
                   <label htmlFor="linkNewWindow" className="text-sm">Open in New Window</label>
                 </div>
               </>
-            ) : (
+            ) : linkTab === "resources" ? (
               <div className="max-h-60 overflow-y-auto">
                 {!lessonId ? (
                   <p className="text-sm text-gray-500">No lesson ID available</p>
@@ -1662,6 +1669,43 @@ const updateColumnWidth = (widthPercent: number) => {
                     })}
                   </div>
                 )}
+              </div>
+            ) : (
+              <div className="max-h-60 overflow-y-auto">
+                <div className="space-y-2">
+                  {[
+                    { key: "lesson_outline", label: "Lesson Outline" },
+                    { key: "learning_objectives", label: "Learning Objectives" },
+                    { key: "vocabulary", label: "Vocabulary" },
+                    { key: "materials", label: "Materials" },
+                    { key: "vapa_text_block", label: "VAPA Standards" },
+                    { key: "ncas_text_block", label: "NCAS Standards" },
+                    { key: "welcome_opening", label: "Welcome and Opening Check-In" },
+                    { key: "actual_class_expectations", label: "Class Expectations and Procedures" },
+                    { key: "warm_up", label: "Warm Up" },
+                    { key: "lesson_hook", label: 'Lesson "Hook"' },
+                    { key: "main_activity", label: "Main Activity" },
+                    { key: "instrument_expectations", label: "Instrument Expectations" },
+                    { key: "reflection", label: "Reflection" },
+                    { key: "closing_ceremony", label: "Closing Ceremony" },
+                    { key: "assessment", label: "Assessment" },
+                  ].map((section) => (
+                    <button
+                      key={section.key}
+                      type="button"
+                      onClick={() => {
+                        editor?.chain().focus().extendMarkRange("link").setLink({ href: `#${section.key}`, class: "section-link" }).run();
+                        setLinkModalOpen(false);
+                        setLinkUrl("");
+                        setLinkNewWindow(false);
+                      }}
+                      className="w-full flex items-center gap-3 p-2 hover:bg-gray-50 rounded text-left"
+                    >
+                      <LinkIcon className="w-5 h-5 text-[#0d7377]" />
+                      <span className="text-sm">{section.label}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
           </div>

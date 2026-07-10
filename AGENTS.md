@@ -186,6 +186,14 @@ Two-column layout at `src/app/(dashboard)/admin/courses/[id]/lessons/[lessonId]/
   - GET `/api/find-replace?search=X&scope=lesson|course|global&lessonId=X&courseId=X&caseSensitive=true|false`
   - PATCH `/api/find-replace` - Body: `{ search, replace, scope, lessonId?, courseId?, caseSensitive, forceExactCase }`
 
+#### Internal Section Links
+- **Purpose**: Link text within one lesson section to another section of the same lesson (e.g., "Lesson Hook" text linking to the "Lesson Hook" section)
+- **Implementation**: Uses anchor links with `#section_key` format (e.g., `#lesson_hook`)
+- **Link Modal**: Added "Sections" tab showing all 15 lesson sections
+- **Insert behavior**: Clicking a section inserts link with `href="#section_key"` and `class="section-link"`
+- **Visual styling**: Section links styled in teal (`#0d7377`) to distinguish from external links (red) and resource links
+- **Student view**: Each section renders with `id={section.key}`, so clicking section links scrolls to that section
+
 ### Environment Variables Required
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
