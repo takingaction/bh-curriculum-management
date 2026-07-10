@@ -75,6 +75,7 @@ export default function LessonContentPage({
   const [showSpotify, setShowSpotify] = useState(false);
   const [previewAsset, setPreviewAsset] = useState<any>(null);
   const [lessonAssets, setLessonAssets] = useState<any[]>([]);
+  const [activeSection, setActiveSection] = useState<string | null>(null);
 
   useEffect(() => {
     params.then(async (p) => {
@@ -105,6 +106,41 @@ export default function LessonContentPage({
       }
     });
   }, []);
+
+  useEffect(() => {
+    if (!loading && typeof window !== 'undefined') {
+      const hash = window.location.hash;
+      if (hash) {
+        const sectionKey = hash.replace('#', '');
+        setActiveSection(sectionKey);
+        const element = document.getElementById(sectionKey);
+        if (element) {
+          setTimeout(() => {
+            element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }, 100);
+        }
+      }
+    }
+  }, [loading]);
+
+  useEffect(() => {
+    if (loading) return;
+    const handleScroll = () => {
+      const scrollPosition = window.scrollY + 200;
+      for (const section of contentSections) {
+        const element = document.getElementById(section.key);
+        if (element) {
+          const { offsetTop, offsetHeight } = element;
+          if (scrollPosition >= offsetTop && scrollPosition < offsetTop + offsetHeight) {
+            setActiveSection(section.key);
+            break;
+          }
+        }
+      }
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [loading, contentSections]);
 
   if (loading) {
     return (
@@ -139,14 +175,25 @@ export default function LessonContentPage({
         dangerouslySetInnerHTML={{ __html: content }}
         onClick={(e) => {
           const target = e.target as HTMLElement;
-          const anchor = target.closest("a.resource-link");
+          const anchor = target.closest("a");
           if (anchor) {
-            e.preventDefault();
             const href = anchor.getAttribute("href");
-            if (href) {
+            if (!href) return;
+
+            if (anchor.classList.contains("resource-link")) {
+              e.preventDefault();
               const asset = lessonAssets.find((a) => a.public_url === href);
               if (asset) {
                 setPreviewAsset(asset);
+              }
+            } else if (anchor.classList.contains("section-link") && href.startsWith("#")) {
+              e.preventDefault();
+              const sectionKey = href.replace('#', '');
+              setActiveSection(sectionKey);
+              const element = document.getElementById(sectionKey);
+              if (element) {
+                element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                window.history.pushState(null, '', href);
               }
             }
           }
@@ -265,7 +312,20 @@ export default function LessonContentPage({
                 <a
                   key={section.key}
                   href={`#${section.key}`}
-                  className="block px-2 py-1 text-xs font-medium bg-[#d7ffef] text-black hover:bg-[#c7efe0] transition-colors"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setActiveSection(section.key);
+                    const element = document.getElementById(section.key);
+                    if (element) {
+                      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                      window.history.pushState(null, '', `#${section.key}`);
+                    }
+                  }}
+                  className={`block px-2 py-1 text-xs font-medium transition-colors ${
+                    activeSection === section.key
+                      ? 'bg-[#0d7377] text-white'
+                      : 'bg-[#d7ffef] text-black hover:bg-[#c7efe0]'
+                  }`}
                 >
                   {section.label}
                 </a>
