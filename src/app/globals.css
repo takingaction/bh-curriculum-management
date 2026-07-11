@@ -378,11 +378,17 @@
   vertical-align: middle;
 }
 
-.cfu-text-cell h4,
-.cfu-text-cell p {
+.cfu-text-cell h4 {
   margin: 0;
   font-size: 16px;
   font-weight: 700;
+  color: #333;
+}
+
+.cfu-text-cell p {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 400;
   color: #333;
 }
 
