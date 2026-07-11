@@ -327,18 +327,19 @@ export function replaceTextInHTML(
 
     for (const match of matches.reverse()) {
       if (match.crossSegment) {
-        const segmentLengths = match.segments.map(seg => seg.flatEnd - seg.flatStart + 1);
+        const numSegments = match.segments.length;
+        const replaceLength = replace.length;
+        const basePortion = Math.floor(replaceLength / numSegments);
+        const remainder = replaceLength % numSegments;
 
-        for (let i = match.segments.length - 1; i >= 0; i--) {
+        for (let i = numSegments - 1; i >= 0; i--) {
           const seg = match.segments[i];
-          const segMatchedLength = segmentLengths[i];
-
-          const replaceStart = segmentLengths.slice(0, i).reduce((a, b) => a + b, 0);
-          const replaceEnd = replaceStart + segMatchedLength;
-
-          const segReplacement = i === match.segments.length - 1
-            ? replace.slice(replaceStart)
-            : replace.slice(replaceStart, replaceEnd);
+          const segPortion = i === numSegments - 1
+            ? basePortion + remainder
+            : basePortion;
+          const replaceStart = i * basePortion + Math.min(i, remainder);
+          const replaceEnd = replaceStart + segPortion;
+          const segReplacement = replace.slice(replaceStart, replaceEnd);
 
           result = result.slice(0, seg.htmlPosStart) + segReplacement + result.slice(seg.htmlPosEnd + 1);
         }
@@ -433,21 +434,29 @@ export function replaceTextPreserveCase(
     let result = html;
     for (const match of matches.reverse()) {
       if (match.crossSegment) {
-        const segmentLengths = match.segments.map(seg => seg.flatEnd - seg.flatStart + 1);
+        const numSegments = match.segments.length;
+        const replaceLength = replace.length;
+        const basePortion = Math.floor(replaceLength / numSegments);
+        const remainder = replaceLength % numSegments;
 
-        for (let i = match.segments.length - 1; i >= 0; i--) {
+        const origLength = match.originalText.length;
+        const origBasePortion = Math.floor(origLength / numSegments);
+        const origRemainder = origLength % numSegments;
+
+        for (let i = numSegments - 1; i >= 0; i--) {
           const seg = match.segments[i];
-          const segMatchedLength = segmentLengths[i];
+          const segPortion = i === numSegments - 1
+            ? basePortion + remainder
+            : basePortion;
+          const replaceStart = i * basePortion + Math.min(i, remainder);
+          const replaceEnd = replaceStart + segPortion;
+          const segReplacementRaw = replace.slice(replaceStart, replaceEnd);
 
-          const replaceStart = segmentLengths.slice(0, i).reduce((a, b) => a + b, 0);
-          const replaceEnd = replaceStart + segMatchedLength;
-
-          const segReplacementRaw = i === match.segments.length - 1
-            ? replace.slice(replaceStart)
-            : replace.slice(replaceStart, replaceEnd);
-
-          const origStart = segmentLengths.slice(0, i).reduce((a, b) => a + b, 0);
-          const origEnd = origStart + segMatchedLength;
+          const origSegPortion = i === numSegments - 1
+            ? origBasePortion + origRemainder
+            : origBasePortion;
+          const origStart = i * origBasePortion + Math.min(i, origRemainder);
+          const origEnd = origStart + origSegPortion;
           const origPortion = match.originalText.slice(origStart, origEnd);
 
           const segReplacement = applyCase(origPortion, segReplacementRaw);

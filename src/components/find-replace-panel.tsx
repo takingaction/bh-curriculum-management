@@ -137,6 +137,9 @@ export function FindReplacePanel({ lessonId, courseId, isAdmin = false }: FindRe
         setMatches([]);
         setReplaceText("");
         setSuccessMessage(`Replaced ${data.updatedCount} instance${data.updatedCount !== 1 ? "s" : ""} across ${data.lessonsUpdated} lesson${data.lessonsUpdated !== 1 ? "s" : ""}.`);
+        if (data.lessonsUpdated > 0) {
+          window.location.reload();
+        }
       } else {
         console.error("Replace failed:", data.error);
       }
@@ -172,6 +175,9 @@ export function FindReplacePanel({ lessonId, courseId, isAdmin = false }: FindRe
         setTotalMatches(prev => prev - match.count);
         setMatches(prev => prev.filter(m => !(m.lessonId === match.lessonId && m.fieldName === match.fieldName)));
         setSuccessMessage(`Replaced ${match.count} instance${match.count !== 1 ? "s" : ""} in Lesson ${match.lessonNumber}.`);
+        if (match.lessonId === lessonId) {
+          window.location.reload();
+        }
       }
     } catch (err) {
       console.error("Replace error:", err);
@@ -258,6 +264,10 @@ export function FindReplacePanel({ lessonId, courseId, isAdmin = false }: FindRe
                 <label htmlFor="scope-global" className="text-sm">Global</label>
               </div>
             </div>
+
+            <p className="text-xs text-amber-600">
+              Please make sure to save your current changes before running find and replace.
+            </p>
 
             <div className="flex gap-4">
               <div className="flex-1">
