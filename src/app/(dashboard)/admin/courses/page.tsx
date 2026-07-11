@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { ManageImagesButton } from "@/components/manage-images-button";
 
 const gradeOrder = ["PK", "K", "1", "2", "3", "4", "5", "6"];
 
@@ -26,7 +27,7 @@ export default async function AdminCoursesPage({
 
   let coursesQuery = supabase
     .from("courses")
-    .select("*, lessons(count)")
+    .select("*, lessons(count), course_images(count)")
     .order("discipline", { ascending: true })
     .order("grade", { ascending: true });
 
@@ -41,7 +42,7 @@ export default async function AdminCoursesPage({
     if (!acc[discipline]) acc[discipline] = [];
     acc[discipline].push(course);
     return acc;
-  }, {} as Record<string, { id: string; title: string; discipline: string; grade: string; lessons?: { count: number }[] }[]>);
+  }, {} as Record<string, { id: string; title: string; discipline: string; grade: string; lessons?: { count: number }[]; course_images?: { count: number }[] }[]>);
 
   const disciplines = ["Music", "Dance", "Theatre"].filter(d => groupedCourses?.[d]?.length);
 
@@ -83,9 +84,12 @@ export default async function AdminCoursesPage({
                         </p>
                       </CardHeader>
                       <CardContent>
-                        <p className="text-sm text-gray-600 mb-4">
-                          {course.lessons?.[0]?.count || 0} lessons
-                        </p>
+                        <div className="flex items-center justify-between mb-4">
+                          <p className="text-sm text-gray-600">
+                            {course.lessons?.[0]?.count || 0} lessons
+                          </p>
+                          <ManageImagesButton courseId={course.id} imageCount={course.course_images?.[0]?.count} />
+                        </div>
                         <div className="flex gap-2">
                           <Link href={`/admin/courses/${course.id}`}>
                             <Button variant="outline" size="sm">Manage</Button>
