@@ -92,7 +92,7 @@ function CheckForUnderstandingNodeView({ node, getPos }: NodeViewProps) {
                   </h4>
                 )}
                 {content && (
-                  <p style={{ margin: "4px 0 0 0", fontSize: "16px", fontWeight: "700", color: "#333" }}>{content}</p>
+                  <p style={{ margin: "4px 0 0 0", fontSize: "16px", color: "#333" }}>{content}</p>
                 )}
               </td>
             </tr>
