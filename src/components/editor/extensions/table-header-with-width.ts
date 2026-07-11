@@ -1,6 +1,6 @@
-import { TableCell } from "@tiptap/extension-table-cell";
+import { TableHeader } from "@tiptap/extension-table-header";
 
-export const TableCellWithWidth = TableCell.extend({
+export const TableHeaderWithWidth = TableHeader.extend({
   addAttributes() {
     return {
       ...this.parent?.(),

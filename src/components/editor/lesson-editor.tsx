@@ -6,7 +6,7 @@ import { TableWithStyles, TableWithStylesExtension } from "./extensions/table-wi
 import { CheckForUnderstanding } from "./extensions/check-for-understanding";
 import { TableRow } from "@tiptap/extension-table-row";
 import { TableCellWithWidth } from "./extensions/table-cell-with-width";
-import { TableHeader } from "@tiptap/extension-table-header";
+import { TableHeaderWithWidth } from "./extensions/table-header-with-width";
 import { ImageWithOptions } from "./extensions/image-with-options";
 import Link from "@tiptap/extension-link";
 import { Paragraph } from "@tiptap/extension-paragraph";
@@ -74,6 +74,7 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
   const [showTableInsertDialog, setShowTableInsertDialog] = useState(false);
   const [tableWidth, setTableWidth] = useState(100);
   const [tableAlignment, setTableAlignment] = useState("center");
+  const [cellAlignment, setCellAlignment] = useState("left");
   const [tableContextKey, setTableContextKey] = useState(0);
   const [widthInputFocused, setWidthInputFocused] = useState(false);
   const [selectedColumnWidth, setSelectedColumnWidth] = useState<string>("");
@@ -105,7 +106,7 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
       CheckForUnderstanding,
       TableRow,
       TableCellWithWidth,
-      TableHeader,
+      TableHeaderWithWidth,
       ImageWithOptions,
       Link.configure({
         openOnClick: false,
@@ -197,6 +198,7 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
     let tableNode = null;
     let tableDepth = 0;
     let cellColIndex = 0;
+    let currentCellAlignment = "left";
 
     for (let depth = $from.depth; depth > 0; depth--) {
       const node = $from.node(depth);
@@ -226,6 +228,7 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
             }
             colIndex += row.child(i).attrs.colspan || 1;
           }
+          currentCellAlignment = cellNode.attrs.alignment || "left";
         }
       }
     }
@@ -251,6 +254,7 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
 
     const colWidth = columnWidths[cellColIndex] || "";
     setSelectedColumnWidth(colWidth);
+    setCellAlignment(currentCellAlignment);
   };
 
   const forceSyncTableState = () => {
@@ -262,6 +266,7 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
     let tableNode = null;
     let tableDepth = 0;
     let cellColIndex = 0;
+    let currentCellAlignment = "left";
 
     for (let depth = $from.depth; depth > 0; depth--) {
       const node = $from.node(depth);
@@ -289,6 +294,7 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
             }
             colIndex += row.child(i).attrs.colspan || 1;
           }
+          currentCellAlignment = cellNode.attrs.alignment || "left";
         }
       }
     }
@@ -313,6 +319,7 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
 
       const colWidth = columnWidths[cellColIndex] || "";
       setSelectedColumnWidth(colWidth);
+      setCellAlignment(currentCellAlignment);
     }
   };
 
@@ -612,7 +619,14 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
     }
   };
 
-const updateColumnWidth = (widthPercent: number) => {
+  const updateCellAlignment = (alignment: string) => {
+    if (!editor) return;
+    editor.chain().focus().setCellAttribute('alignment', alignment).run();
+    setCellAlignment(alignment);
+    onChange(editor.getHTML());
+  };
+
+  const updateColumnWidth = (widthPercent: number) => {
     if (!editor) return;
     const { state } = editor;
     const { selection } = state;
@@ -1327,6 +1341,34 @@ const updateColumnWidth = (widthPercent: number) => {
             onClick={() => updateTableAlignment("right")}
             className={`h-7 px-1.5 rounded ${tableAlignment === "right" ? "bg-gray-200" : ""}`}
             title="Align Right"
+          >
+            <AlignRight className="w-4 h-4" />
+          </button>
+
+          <div className="w-px h-5 bg-gray-300 mx-2" />
+
+          <span className="text-xs text-gray-500">Cell Align:</span>
+          <button
+            type="button"
+            onClick={() => updateCellAlignment("left")}
+            className={`h-7 px-1.5 rounded ${cellAlignment === "left" ? "bg-gray-200" : ""}`}
+            title="Cell Align Left"
+          >
+            <AlignLeft className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => updateCellAlignment("center")}
+            className={`h-7 px-1.5 rounded ${cellAlignment === "center" ? "bg-gray-200" : ""}`}
+            title="Cell Align Center"
+          >
+            <AlignCenter className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => updateCellAlignment("right")}
+            className={`h-7 px-1.5 rounded ${cellAlignment === "right" ? "bg-gray-200" : ""}`}
+            title="Cell Align Right"
           >
             <AlignRight className="w-4 h-4" />
           </button>
