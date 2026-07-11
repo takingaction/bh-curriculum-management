@@ -8,7 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { UploadIcon, TrashIcon, ImageIcon, X } from "lucide-react";
+import { UploadIcon, TrashIcon, ImageIcon, X, Eye, RefreshCw } from "lucide-react";
 import Image from "next/image";
 
 interface CourseImage {
@@ -39,7 +39,11 @@ export function MediaLibrary({
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [selectedImage, setSelectedImage] = useState<CourseImage | null>(null);
+  const [replaceImage, setReplaceImage] = useState<CourseImage | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
+  const [notification, setNotification] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const replaceFileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
 
   const fetchImages = useCallback(async () => {
@@ -108,6 +112,40 @@ export function MediaLibrary({
     }
   };
 
+  const handleReplace = async (files: FileList | null) => {
+    if (!files || files.length === 0 || !replaceImage) return;
+
+    const file = files[0];
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("courseId", courseId);
+
+    try {
+      const res = await fetch("/api/upload/lesson-image", {
+        method: "POST",
+        body: formData,
+      });
+      if (res.ok) {
+        setNotification(`"${replaceImage.filename}" replaced successfully`);
+        setTimeout(() => setNotification(null), 3000);
+        fetchImages();
+      }
+    } catch (error) {
+      console.error("Replace failed:", error);
+    }
+    setReplaceImage(null);
+  };
+
+  const openReplaceDialog = (image: CourseImage) => {
+    setReplaceImage(image);
+    replaceFileInputRef.current?.click();
+  };
+
+  const openPreview = (image: CourseImage) => {
+    setSelectedImage(image);
+    setShowPreview(true);
+  };
+
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(true);
@@ -128,8 +166,6 @@ export function MediaLibrary({
     if (selectMode && onImageSelect) {
       onImageSelect(image.public_url);
       onClose();
-    } else {
-      setSelectedImage(image);
     }
   };
 
@@ -202,18 +238,47 @@ export function MediaLibrary({
                     alt={image.filename}
                     className="w-full h-full object-cover"
                   />
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
+                  {/* Filename at bottom */}
+                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2">
+                    <p className="text-white text-xs truncate">{image.filename}</p>
+                  </div>
+                  {/* Icon buttons at top-right */}
                   {!selectMode && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDelete(image);
-                      }}
-                      className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <TrashIcon className="w-4 h-4" />
-                    </button>
+                    <div className="absolute top-1 right-1 flex gap-1">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openPreview(image);
+                        }}
+                        className="p-1 bg-black/50 text-white rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="Preview"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openReplaceDialog(image);
+                        }}
+                        className="p-1 bg-black/50 text-white rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="Replace"
+                      >
+                        <RefreshCw className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(image);
+                        }}
+                        className="p-1 bg-red-500 text-white rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="Delete"
+                      >
+                        <TrashIcon className="w-4 h-4" />
+                      </button>
+                    </div>
                   )}
                 </div>
               ))}
@@ -221,12 +286,21 @@ export function MediaLibrary({
           )}
         </div>
 
-        {selectedImage && (
-          <div className="fixed inset-0 z-[60] bg-white flex items-center justify-center p-8">
+        {selectedImage && showPreview && (
+          <div
+            className="fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-8"
+            onClick={() => {
+              setShowPreview(false);
+              setSelectedImage(null);
+            }}
+          >
             <button
               type="button"
-              onClick={() => setSelectedImage(null)}
-              className="absolute top-4 right-4 p-2 bg-gray-100 hover:bg-gray-200 rounded-full text-gray-700 z-10"
+              onClick={() => {
+                setShowPreview(false);
+                setSelectedImage(null);
+              }}
+              className="absolute top-4 right-4 p-2 bg-white hover:bg-gray-200 rounded-full text-gray-700 z-10"
             >
               <X className="w-6 h-6" />
             </button>
@@ -234,13 +308,27 @@ export function MediaLibrary({
               src={selectedImage.public_url}
               alt={selectedImage.filename}
               className="max-w-full max-h-full object-contain bg-white"
-              onClick={() => setSelectedImage(null)}
+              onClick={(e) => e.stopPropagation()}
             />
-            {!selectMode && (
-              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-gray-100 rounded-lg px-4 py-2 text-sm text-gray-700">
-                {selectedImage.filename}
-              </div>
-            )}
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-white rounded-lg px-4 py-2 text-sm text-gray-700">
+              {selectedImage.filename}
+            </div>
+          </div>
+        )}
+
+        {/* Hidden file input for replace */}
+        <input
+          ref={replaceFileInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => handleReplace(e.target.files)}
+        />
+
+        {/* Notification toast */}
+        {notification && (
+          <div className="fixed bottom-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-[100]">
+            {notification}
           </div>
         )}
       </DialogContent>
