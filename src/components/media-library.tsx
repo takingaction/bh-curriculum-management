@@ -26,6 +26,8 @@ interface MediaLibraryProps {
   onClose: () => void;
   onImageSelect?: (imageUrl: string) => void;
   selectMode?: boolean;
+  preSelectedImage?: CourseImage | null;
+  onReplaceComplete?: () => void;
 }
 
 export function MediaLibrary({
@@ -34,6 +36,8 @@ export function MediaLibrary({
   onClose,
   onImageSelect,
   selectMode = false,
+  preSelectedImage,
+  onReplaceComplete,
 }: MediaLibraryProps) {
   const [images, setImages] = useState<CourseImage[]>([]);
   const [loading, setLoading] = useState(false);
@@ -155,6 +159,7 @@ export function MediaLibrary({
         setNotification(`"${oldImage.filename}" replaced successfully`);
         setTimeout(() => setNotification(null), 3000);
         fetchImages();
+        onReplaceComplete?.();
       }
     } catch (error) {
       console.error("Replace failed:", error);
@@ -269,43 +274,41 @@ export function MediaLibrary({
                     <p className="text-white text-xs truncate">{image.filename}</p>
                   </div>
                   {/* Icon buttons at top-right */}
-                  {!selectMode && (
-                    <div className="absolute top-1 right-1 flex gap-1">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openPreview(image);
-                        }}
-                        className="p-1 bg-black/50 text-white rounded opacity-0 group-hover:opacity-100 transition-opacity"
-                        title="Preview"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openReplaceDialog(image);
-                        }}
-                        className="p-1 bg-black/50 text-white rounded opacity-0 group-hover:opacity-100 transition-opacity"
-                        title="Replace"
-                      >
-                        <RefreshCw className="w-4 h-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDelete(image);
-                        }}
-                        className="p-1 bg-red-500 text-white rounded opacity-0 group-hover:opacity-100 transition-opacity"
-                        title="Delete"
-                      >
-                        <TrashIcon className="w-4 h-4" />
-                      </button>
-                    </div>
-                  )}
+                  <div className="absolute top-1 right-1 flex gap-1">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openPreview(image);
+                      }}
+                      className="p-1 bg-black/50 text-white rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                      title="Preview"
+                    >
+                      <Eye className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openReplaceDialog(image);
+                      }}
+                      className="p-1 bg-black/50 text-white rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                      title="Replace"
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDelete(image);
+                      }}
+                      className="p-1 bg-red-500 text-white rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                      title="Delete"
+                    >
+                      <TrashIcon className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
