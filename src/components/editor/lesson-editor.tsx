@@ -1110,7 +1110,7 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
           className="h-8 px-2 text-xs"
           title="Insert Spotify Playlist Link"
         >
-          🎵
+          ᯤ
         </Button>
 
         <div className="w-px h-6 bg-[#e5e5e0] mx-1 self-center" />
