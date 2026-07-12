@@ -49,7 +49,9 @@ export function MediaLibrary({
   const fetchImages = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/course-images/${courseId}`);
+      const res = await fetch(`/api/course-images/${courseId}?t=${Date.now()}`, {
+        cache: "no-store",
+      });
       const data = await res.json();
       if (data.images) {
         setImages(data.images);
@@ -116,9 +118,33 @@ export function MediaLibrary({
     if (!files || files.length === 0 || !replaceImage) return;
 
     const file = files[0];
+    const oldImage = replaceImage;
+
+    // Delete old image from storage using REST API
+    try {
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      if (supabaseUrl && supabaseServiceKey) {
+        await fetch(
+          `${supabaseUrl}/storage/v1/object/course-images/${oldImage.storage_path}`,
+          {
+            method: "DELETE",
+            headers: {
+              "Authorization": `Bearer ${supabaseServiceKey}`,
+              "apikey": supabaseServiceKey,
+            },
+          }
+        );
+      }
+    } catch (error) {
+      console.error("Delete from storage failed:", error);
+    }
+
+    // Upload new image with existingImageId to update the record
     const formData = new FormData();
     formData.append("file", file);
     formData.append("courseId", courseId);
+    formData.append("existingImageId", oldImage.id);
 
     try {
       const res = await fetch("/api/upload/lesson-image", {
@@ -126,7 +152,7 @@ export function MediaLibrary({
         body: formData,
       });
       if (res.ok) {
-        setNotification(`"${replaceImage.filename}" replaced successfully`);
+        setNotification(`"${oldImage.filename}" replaced successfully`);
         setTimeout(() => setNotification(null), 3000);
         fetchImages();
       }
@@ -234,7 +260,7 @@ export function MediaLibrary({
                   onClick={() => handleImageClick(image)}
                 >
                   <img
-                    src={image.public_url}
+                    src={`${image.public_url}${image.public_url.includes('?') ? '&' : '?'}cb=${Date.now()}`}
                     alt={image.filename}
                     className="w-full h-full object-cover"
                   />
@@ -305,7 +331,7 @@ export function MediaLibrary({
               <X className="w-6 h-6" />
             </button>
             <img
-              src={selectedImage.public_url}
+              src={`${selectedImage.public_url}${selectedImage.public_url.includes('?') ? '&' : '?'}cb=${Date.now()}`}
               alt={selectedImage.filename}
               className="max-w-full max-h-full object-contain bg-white"
               onClick={(e) => e.stopPropagation()}
