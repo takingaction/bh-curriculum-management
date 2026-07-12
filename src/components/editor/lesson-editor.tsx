@@ -1098,6 +1098,21 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
           {uploading ? "..." : "Upload"}
         </Button>
 
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            editor?.chain().focus().insertContent(
+              '<a href="#spotify-playlist" class="spotify-playlist-link">ᯤ</a>'
+            ).run();
+          }}
+          className="h-8 px-2 text-xs"
+          title="Insert Spotify Playlist Link"
+        >
+          🎵
+        </Button>
+
         <div className="w-px h-6 bg-[#e5e5e0] mx-1 self-center" />
 
         <Button

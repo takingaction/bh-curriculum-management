@@ -8,6 +8,7 @@ import { PresentationLink } from "@/components/presentation-modal";
 import { SpotifyEmbed } from "@/components/spotify-embed";
 import { Download, X, Volume2 } from "lucide-react";
 import { FindReplacePanel } from "@/components/find-replace-panel";
+import { LessonNavigation } from "@/components/lesson-navigation";
 
 interface Lesson {
   id: string;
@@ -181,7 +182,10 @@ export default function LessonContentPage({
             const href = anchor.getAttribute("href");
             if (!href) return;
 
-            if (anchor.classList.contains("resource-link")) {
+            if (anchor.classList.contains("spotify-playlist-link")) {
+              e.preventDefault();
+              setShowSpotify(true);
+            } else if (anchor.classList.contains("resource-link")) {
               e.preventDefault();
               const asset = lessonAssets.find((a) => a.public_url === href);
               if (asset) {
@@ -265,6 +269,13 @@ export default function LessonContentPage({
                     Edit Lesson
                   </Link>
                 )}
+              </div>
+              <div className="mt-4">
+                <LessonNavigation
+                  courseId={course.id}
+                  currentLessonId={lesson.id}
+                  admin={false}
+                />
               </div>
             </div>
 

@@ -10,6 +10,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { LessonEditor } from "@/components/editor/lesson-editor";
 import { LessonAssetsPanel } from "@/components/lesson-assets-panel";
 import { FindReplacePanel } from "@/components/find-replace-panel";
+import { LessonNavigation } from "@/components/lesson-navigation";
 import { PresentationModal, PresentationLink } from "@/components/presentation-modal";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -314,7 +315,12 @@ export default function EditLessonPage({
                 View Lesson ↗
               </Link>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
+              <LessonNavigation
+                courseId={lesson?.course_id}
+                currentLessonId={lesson?.id}
+                admin={true}
+              />
               <Button
                 type="button"
                 onClick={() => handleSubmit({ preventDefault: () => {} } as React.FormEvent)}

@@ -334,6 +334,12 @@
   color: #0d7377;
   text-decoration: underline;
 }
+.ProseMirror a.spotify-playlist-link,
+.lesson-content a.spotify-playlist-link {
+  color: #1DB954 !important;
+  text-decoration: none !important;
+  cursor: pointer;
+}
 
 /* ---- SPELL CHECK ---- */
 .ProseMirror .misspelled {
