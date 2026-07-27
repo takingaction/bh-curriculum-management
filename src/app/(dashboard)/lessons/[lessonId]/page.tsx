@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { CompactLessonAssets } from "@/components/lesson-assets-panel";
 import { PresentationLink } from "@/components/presentation-modal";
 import { SpotifyEmbed } from "@/components/spotify-embed";
-import { Download, X, Volume2 } from "lucide-react";
+import { Download, X, Volume2, EyeIcon, FileTextIcon, VideoIcon, DownloadIcon } from "lucide-react";
 import { FindReplacePanel } from "@/components/find-replace-panel";
 import { LessonNavigation } from "@/components/lesson-navigation";
 
@@ -76,6 +76,7 @@ export default function LessonContentPage({
   const [showSpotify, setShowSpotify] = useState(false);
   const [previewAsset, setPreviewAsset] = useState<any>(null);
   const [lessonAssets, setLessonAssets] = useState<any[]>([]);
+  const [courseAssets, setCourseAssets] = useState<any[]>([]);
   const [activeSection, setActiveSection] = useState<string | null>(null);
 
   useEffect(() => {
@@ -107,6 +108,21 @@ export default function LessonContentPage({
       }
     });
   }, []);
+
+  useEffect(() => {
+    if (lesson?.course_id) {
+      fetch(`/api/courses/${lesson.course_id}/assets`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.assets) {
+            setCourseAssets(data.assets);
+          }
+        })
+        .catch((error) => {
+          console.error("Failed to fetch course assets:", error);
+        });
+    }
+  }, [lesson]);
 
   useEffect(() => {
     if (!loading && typeof window !== 'undefined') {
@@ -303,6 +319,50 @@ export default function LessonContentPage({
                 </div>
               )}
             </div>
+
+            {/* Course Materials */}
+            {courseAssets.length > 0 && (
+              <div className="mt-4 pt-4 border-t border-gray-200">
+                <h3 className="text-sm font-semibold text-gray-700 mb-2">Course Materials</h3>
+                <div className="space-y-0">
+                  {courseAssets.slice(0, 6).map((asset) => {
+                    const Icon = asset.file_type === 'pdf' ? FileTextIcon :
+                      ['mp4', 'mov'].includes(asset.file_type) ? VideoIcon :
+                      ['mp3', 'm4a', 'wav'].includes(asset.file_type) ? Volume2 :
+                      FileTextIcon;
+                    return (
+                      <div key={asset.id} className="flex items-center gap-2 py-0.5">
+                        <Icon className="w-3 h-3 text-gray-500 flex-shrink-0" />
+                        <span className="text-xs text-black truncate" title={asset.display_name}>
+                          {asset.display_name}
+                        </span>
+                        <div className="flex items-center gap-0.5 ml-auto">
+                          <button
+                            type="button"
+                            onClick={() => setPreviewAsset(asset)}
+                            className="p-1 hover:bg-gray-200 rounded text-gray-500"
+                            title="Preview"
+                          >
+                            <EyeIcon className="w-3 h-3" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => window.open(asset.public_url, "_blank")}
+                            className="p-1 hover:bg-gray-200 rounded text-gray-500"
+                            title="Download"
+                          >
+                            <DownloadIcon className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {courseAssets.length > 6 && (
+                    <p className="text-xs text-gray-500 py-1">+{courseAssets.length - 6} more</p>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

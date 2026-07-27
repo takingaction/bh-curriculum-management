@@ -9,6 +9,7 @@ import { CourseImageUpload } from "@/components/course-image-upload";
 import { ManageImagesButton } from "@/components/manage-images-button";
 import { DeleteCourseButton } from "@/components/delete-course-button";
 import { CourseSpotifySection } from "@/components/course-spotify-section";
+import { CourseAssetsPanel } from "@/components/course-assets-panel";
 
 export default async function CourseDetailPage({
   params,
@@ -54,6 +55,12 @@ export default async function CourseDetailPage({
       </div>
 
       <CourseSpotifySection courseId={course.id} initialSpotifyCode={course.spotify_embed_code || ""} />
+
+      <Card className="mb-8">
+        <CardContent className="pt-6">
+          <CourseAssetsPanel courseId={course.id} canEdit={true} />
+        </CardContent>
+      </Card>
 
       <Card className="mb-8">
         <CardHeader>
@@ -104,7 +111,7 @@ export default async function CourseDetailPage({
   );
 }
 
-function CourseEditForm({ course }: { course: { id: string; title: string; discipline: string; grade: string } }) {
+function CourseEditForm({ course }: { course: { id: string; title: string; discipline: string; grade: string; summary?: string } }) {
   return (
     <Card>
       <CardContent className="pt-6">
@@ -118,31 +125,40 @@ function CourseEditForm({ course }: { course: { id: string; title: string; disci
                 title: formData.get("title"),
                 discipline: formData.get("discipline"),
                 grade: formData.get("grade"),
+                summary: formData.get("summary") || null,
                 updated_at: new Date().toISOString(),
               })
               .eq("id", course.id);
             redirect(`/admin/courses/${course.id}`);
           }}
-          className="flex gap-2"
+          className="flex flex-col gap-2"
         >
           <input type="hidden" name="id" value={course.id} />
-          <input
-            name="title"
-            defaultValue={course.title}
-            className="border rounded px-2 py-1"
-            required
-          />
-          <input
-            name="discipline"
-            defaultValue={course.discipline}
-            className="border rounded px-2 py-1"
-            required
-          />
-          <input
-            name="grade"
-            defaultValue={course.grade}
-            className="border rounded px-2 py-1 w-20"
-            required
+          <div className="flex gap-2">
+            <input
+              name="title"
+              defaultValue={course.title}
+              className="border rounded px-2 py-1"
+              required
+            />
+            <input
+              name="discipline"
+              defaultValue={course.discipline}
+              className="border rounded px-2 py-1"
+              required
+            />
+            <input
+              name="grade"
+              defaultValue={course.grade}
+              className="border rounded px-2 py-1 w-20"
+              required
+            />
+          </div>
+          <textarea
+            name="summary"
+            defaultValue={course.summary || ""}
+            placeholder="Course summary..."
+            className="border rounded px-2 py-1 min-h-[60px]"
           />
           <Button type="submit" size="sm">Save</Button>
         </form>

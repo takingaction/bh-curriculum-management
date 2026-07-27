@@ -30,6 +30,10 @@ export async function PUT(
       updateData.grade = body.grade;
     }
 
+    if (body.summary !== undefined) {
+      updateData.summary = body.summary;
+    }
+
     const { data, error } = await supabase
       .from("courses")
       .update(updateData)
