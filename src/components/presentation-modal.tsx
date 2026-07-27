@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, Play } from "lucide-react";
 
 interface PresentationModalProps {
   open: boolean;
@@ -93,16 +93,39 @@ interface PresentationLinkProps {
   url: string;
 }
 
+function getGoogleSlidesPresentUrl(url: string): string | null {
+  const match = url.match(/docs\.google\.com\/presentation\/d\/([a-zA-Z0-9_-]+)/);
+  if (match) {
+    return `https://docs.google.com/presentation/d/${match[1]}/present`;
+  }
+  return null;
+}
+
 export function PresentationLink({ name, url }: PresentationLinkProps) {
+  const presentUrl = getGoogleSlidesPresentUrl(url);
+
   return (
-    <a
-      href={url}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="flex items-center gap-1.5 text-xs text-[#0d7377] hover:underline"
-    >
-      <ExternalLink className="w-3 h-3" />
-      {name}
-    </a>
+    <div className="flex items-center gap-2">
+      <a
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-center gap-1.5 text-xs text-[#0d7377] hover:underline"
+      >
+        <ExternalLink className="w-3 h-3" />
+        {name}
+      </a>
+      {presentUrl && (
+        <a
+          href={presentUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Open in presentation mode"
+          className="flex items-center text-xs text-[#0d7377] hover:underline"
+        >
+          <Play className="w-3 h-3" fill="#0d7377" />
+        </a>
+      )}
+    </div>
   );
 }
