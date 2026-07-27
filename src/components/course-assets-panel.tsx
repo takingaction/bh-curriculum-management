@@ -311,6 +311,7 @@ export function CourseAssetsPanel({ courseId, canEdit = false }: CourseAssetsPan
         onClose={() => setShowLibrary(false)}
         onAssetSelect={handleAddAsset}
         onAddSuccess={fetchAssets}
+        selectMode={true}
       />
 
       {previewAsset && (
