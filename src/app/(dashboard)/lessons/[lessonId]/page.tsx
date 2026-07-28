@@ -78,6 +78,15 @@ export default function LessonContentPage({
   const [lessonAssets, setLessonAssets] = useState<any[]>([]);
   const [courseAssets, setCourseAssets] = useState<any[]>([]);
   const [activeSection, setActiveSection] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'materials' | 'pdf'>('materials');
+  const [pdfInfo, setPdfInfo] = useState<{
+    exists: boolean;
+    generated_at?: string;
+    file_size?: number;
+    filename?: string;
+  } | null>(null);
+  const [pdfLoading, setPdfLoading] = useState(false);
+  const [pdfError, setPdfError] = useState<string | null>(null);
 
   useEffect(() => {
     params.then(async (p) => {
@@ -159,6 +168,44 @@ export default function LessonContentPage({
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, [loading, lesson]);
+
+  useEffect(() => {
+    if (lesson?.id) {
+      fetch(`/api/lessons/${lesson.id}/pdf/info`)
+        .then((res) => res.json())
+        .then((data) => setPdfInfo(data))
+        .catch(() => setPdfInfo({ exists: false }));
+    }
+  }, [lesson?.id]);
+
+  const handleGeneratePDF = async () => {
+    if (!lesson) return;
+    setPdfLoading(true);
+    setPdfError(null);
+
+    try {
+      const res = await fetch(`/api/lessons/${lesson.id}/pdf/generate`, {
+        method: 'POST',
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to generate PDF');
+      }
+
+      const data = await res.json();
+      setPdfInfo({
+        exists: true,
+        generated_at: data.generated_at,
+        file_size: data.file_size,
+        filename: data.filename,
+      });
+    } catch (err: any) {
+      setPdfError(err.message);
+    } finally {
+      setPdfLoading(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -367,15 +414,102 @@ export default function LessonContentPage({
         </div>
       </div>
 
+      {/* Tab Navigation */}
+      <div className="max-w-7xl mx-auto px-4">
+        <div className="flex border-b border-gray-200">
+          <button
+            onClick={() => setActiveTab('materials')}
+            className={`px-4 py-2 text-sm font-medium transition-colors ${
+              activeTab === 'materials'
+                ? 'border-b-2 border-[#0d7377] text-[#0d7377]'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            Lesson Materials
+          </button>
+          <button
+            onClick={() => setActiveTab('pdf')}
+            className={`px-4 py-2 text-sm font-medium transition-colors ${
+              activeTab === 'pdf'
+                ? 'border-b-2 border-[#0d7377] text-[#0d7377]'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            PDF
+          </button>
+        </div>
+      </div>
+
 {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 py-2">
-        {isAdmin && (
+        {activeTab === 'pdf' && (
+          <div className="py-6">
+            {pdfLoading ? (
+              <div className="text-center py-12">
+                <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-[#0d7377] border-t-transparent"></div>
+                <p className="mt-4 text-gray-600">Generating PDF...</p>
+              </div>
+            ) : pdfInfo?.exists ? (
+              <div className="space-y-4">
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <p className="text-sm text-gray-600">
+                    <strong>Current PDF:</strong> {pdfInfo.filename}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Generated: {pdfInfo.generated_at && new Date(pdfInfo.generated_at).toLocaleString()}
+                    {pdfInfo.file_size && ` • ${(pdfInfo.file_size / 1024).toFixed(1)} KB`}
+                  </p>
+                </div>
+                <div className="flex gap-4">
+                  <a
+                    href={`/api/lessons/${lesson.id}/pdf?download=false`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-4 py-2 bg-white border border-[#0d7377] text-[#0d7377] rounded hover:bg-[#0d7377] hover:text-white transition-colors"
+                  >
+                    View PDF
+                  </a>
+                  <a
+                    href={`/api/lessons/${lesson.id}/pdf?download=true`}
+                    className="px-4 py-2 bg-white border border-[#0d7377] text-[#0d7377] rounded hover:bg-[#0d7377] hover:text-white transition-colors"
+                  >
+                    Download PDF
+                  </a>
+                </div>
+                {isAdmin && (
+                  <div className="pt-4 border-t">
+                    <button
+                      onClick={handleGeneratePDF}
+                      className="px-4 py-2 bg-[#0d7377] text-white rounded hover:bg-[#0a5c5f] transition-colors"
+                    >
+                      Generate New PDF
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <p className="text-gray-500 mb-4">No PDF has been generated yet</p>
+                {isAdmin && (
+                  <button
+                    onClick={handleGeneratePDF}
+                    className="px-4 py-2 bg-[#0d7377] text-white rounded hover:bg-[#0a5c5f] transition-colors"
+                  >
+                    Generate PDF
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+        {activeTab === 'materials' && isAdmin && (
           <FindReplacePanel
             lessonId={lesson.id}
             courseId={lesson.course_id}
             isAdmin={isAdmin}
           />
         )}
+        {activeTab === 'materials' && (
         <div className="flex gap-6">
           {/* Left Navigation - Sticky */}
           <div className="w-[250px] flex-shrink-0 sticky top-0 self-start">
@@ -448,7 +582,23 @@ export default function LessonContentPage({
             ))}
           </div>
         </div>
+        )}
       </div>
+
+      {pdfError && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md shadow-xl">
+            <h3 className="text-lg font-bold text-[#e85d5d] mb-2">PDF Generation Failed</h3>
+            <p className="text-gray-600 mb-4">{pdfError}</p>
+            <button
+              onClick={() => setPdfError(null)}
+              className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 transition-colors"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
 
       <SpotifyEmbed
         open={showSpotify}

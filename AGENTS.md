@@ -235,6 +235,7 @@ Two-column layout at `src/app/(dashboard)/admin/courses/[id]/lessons/[lessonId]/
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
+- `NEXT_PUBLIC_PDF_SERVICE_URL` - URL for PDF generation service (e.g., `https://pdf-service-m3mc.onrender.com`)
 
 ### Relevant Files
 - `src/app/(dashboard)/admin/courses/[id]/page.tsx` - Course edit page with Spotify section
@@ -247,9 +248,12 @@ Two-column layout at `src/app/(dashboard)/admin/courses/[id]/lessons/[lessonId]/
 - `src/components/editor/extensions/image-with-options.ts` - Custom image with align/width
 - `src/components/lesson-assets-panel.tsx` - Lesson assets management
 - `src/components/spotify-embed.tsx` - Draggable Spotify playlist modal (lesson view)
-- `src/app/(dashboard)/lessons/[lessonId]/page.tsx` - Student view with SpotifyEmbed from course
-- `src/components/check-for-understanding-modal.tsx` - CFU edit modal
+- `src/app/(dashboard)/lessons/[lessonId]/page.tsx` - Student/teacher view with tabbed interface (Lesson Materials / PDF)
+- `src/components/check-for-underunderstanding-modal.tsx` - CFU edit modal
 - `src/lib/html-utils.ts` - HTML parsing, text finding/replacing for Find & Replace
 - `src/app/api/find-replace/route.ts` - Find & Replace API endpoints (GET search, PATCH replace)
 - `src/components/find-replace-panel.tsx` - Find & Replace UI panel
+- `src/app/api/lessons/[id]/pdf/info/route.ts` - GET PDF metadata (exists, generated_at, file_size)
+- `src/app/api/lessons/[id]/pdf/route.ts` - GET PDF (view or download)
+- `src/app/api/lessons/[id]/pdf/generate/route.ts` - POST to generate PDF
 - `pdf-service/` - External Puppeteer PDF generation microservice (see PDF Generation section)
