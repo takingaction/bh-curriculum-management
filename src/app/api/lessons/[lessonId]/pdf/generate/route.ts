@@ -136,6 +136,13 @@ export async function POST(
 
     // Upload to Supabase Storage
     console.log("Uploading PDF to storage:", storagePath, "Size:", fileSize);
+
+    // Delete existing file first to ensure replacement
+    await supabaseAdmin.storage
+      .from("lesson-pdfs")
+      .remove([storagePath])
+      .catch(() => {}); // Ignore if doesn't exist
+
     const { error: uploadError } = await supabaseAdmin.storage
       .from("lesson-pdfs")
       .upload(storagePath, pdfBuffer, {
@@ -151,19 +158,6 @@ export async function POST(
         storagePath,
         fileSize
       }, { status: 500 });
-    }
-
-    // Delete old PDF if exists and different path
-    const { data: oldPdf } = await supabase
-      .from("lesson_pdfs")
-      .select("storage_path")
-      .eq("lesson_id", lessonId)
-      .single();
-
-    if (oldPdf && oldPdf.storage_path !== storagePath) {
-      await supabaseAdmin.storage
-        .from("lesson-pdfs")
-        .remove([oldPdf.storage_path]);
     }
 
     // Upsert record in lesson_pdfs table
