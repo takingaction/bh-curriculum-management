@@ -129,6 +129,7 @@ export async function POST(
     }
 
     // Upload to Supabase Storage
+    console.log("Uploading PDF to storage:", storagePath, "Size:", fileSize);
     const { error: uploadError } = await supabaseAdmin.storage
       .from("lesson-pdfs")
       .upload(storagePath, pdfBuffer, {
@@ -138,7 +139,12 @@ export async function POST(
 
     if (uploadError) {
       console.error("Storage upload error:", uploadError);
-      return NextResponse.json({ error: "Failed to upload PDF to storage" }, { status: 500 });
+      return NextResponse.json({
+        error: "Failed to upload PDF to storage",
+        details: uploadError.message,
+        storagePath,
+        fileSize
+      }, { status: 500 });
     }
 
     // Delete old PDF if exists and different path
