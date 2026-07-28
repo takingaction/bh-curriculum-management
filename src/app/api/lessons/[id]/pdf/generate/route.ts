@@ -52,7 +52,7 @@ export async function POST(
     // Fetch course data
     const { data: course, error: courseError } = await supabase
       .from("courses")
-      .select("title, discipline, grade")
+      .select("title, discipline, grade, image_url")
       .eq("id", lesson.course_id)
       .single();
 

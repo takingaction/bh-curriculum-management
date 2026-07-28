@@ -219,13 +219,19 @@ Two-column layout at `src/app/(dashboard)/admin/courses/[id]/lessons/[lessonId]/
   13. Reflection
   14. Closing Ceremony
   15. Assessment
+- **PDF Layout**:
+  - **Page 1 (Title Page)**: "PERFORMERS READY!" in teal (#0d7377), course name and grade centered, course hero image fills remainder of page
+  - **Page 2 (Two-Column)**: Left column = Lesson Outline; Right column = Learning Objectives, Vocabulary, Materials (stacked vertically)
+  - **Pages 3+ (Full-Width)**: All remaining sections (Welcome, Warm Up, Hook, etc.) in full-width stacked layout
+  - **Section Headers**: Coral (#e37c64) background with white uppercase text
+  - **Footer**: Left = "COURSE NAME | GRADE | LESSON X"; Right = "PAGE X OF Y"
 - **PDF features**:
-  - Letter size with 0.75in margins
-  - Header with lesson number, title, course, grade, discipline, time
+  - Uses existing `courses.image_url` field for title page hero image
+  - Letter size with 0.5in margins (0.6in bottom for footer)
   - Sections only included if content exists (not null/empty)
   - CSS support for tables, images (alignment), lists, bold/italic
   - CFU blocks rendered with gray background and left border
-  - `@page` rules for print styling
+  - Puppeteer footer template for page numbers
 - **Key files in pdf-service**:
   - `src/index.js` - Express server with Puppeteer PDF generation
   - `src/template.js` - HTML template builder for lesson PDFs
