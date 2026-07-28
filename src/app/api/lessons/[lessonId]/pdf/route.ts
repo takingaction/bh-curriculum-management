@@ -4,10 +4,10 @@ import { createServiceClient } from "@/lib/supabase/server";
 
 export async function GET(
   request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ lessonId: string }> }
 ) {
   try {
-    const { id: lessonId } = await params;
+    const { lessonId } = await params;
     const { searchParams } = new URL(request.url);
     const download = searchParams.get("download") === "true";
 

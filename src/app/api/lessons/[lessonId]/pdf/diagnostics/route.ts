@@ -3,7 +3,7 @@ import { createClient, createServiceClient } from "@/lib/supabase/server";
 
 export async function GET(
   request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ lessonId: string }> }
 ) {
   const diagnostics: Record<string, any> = {
     timestamp: new Date().toISOString(),
@@ -48,7 +48,7 @@ export async function GET(
     diagnostics.auth.isAdmin = profile?.role === "admin";
 
     // Get lesson ID from params
-    const { id: lessonId } = await params;
+    const { lessonId } = await params;
     diagnostics.lessonId = lessonId;
 
     if (!lessonId) {
