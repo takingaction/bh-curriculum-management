@@ -109,6 +109,7 @@ export default function EditLessonPage({
   } | null>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [pdfError, setPdfError] = useState<{ message: string; diagnostics?: any } | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
   const [fields, setFields] = useState<Fields>({
     lesson_number: "",
     title: "",
@@ -188,6 +189,13 @@ export default function EditLessonPage({
         .catch(() => setPdfInfo({ exists: false }));
     }
   }, [lesson?.id]);
+
+  useEffect(() => {
+    fetch("/api/debug-auth")
+      .then((res) => res.json())
+      .then((data) => setUserEmail(data.authUserEmail))
+      .catch(() => setUserEmail(null));
+  }, []);
 
   const handleGeneratePDF = async () => {
     if (!lesson) return;
@@ -432,17 +440,19 @@ export default function EditLessonPage({
               >
                 Lesson Materials
               </button>
-              <button
-                type="button"
-                onClick={() => setActivePanel('pdf')}
-                className={`w-full text-left px-2 py-1.5 text-xs font-medium transition-colors truncate ${
-                  activePanel === 'pdf'
-                    ? "bg-[#0d7377] text-white"
-                    : "bg-[#e85d5d] text-white"
-                }`}
-              >
-                PDF
-              </button>
+              {userEmail === 'ron@myherocreative.com' && (
+                <button
+                  type="button"
+                  onClick={() => setActivePanel('pdf')}
+                  className={`w-full text-left px-2 py-1.5 text-xs font-medium transition-colors truncate ${
+                    activePanel === 'pdf'
+                      ? "bg-[#0d7377] text-white"
+                      : "bg-[#e85d5d] text-white"
+                  }`}
+                >
+                  PDF
+                </button>
+              )}
             </div>
             <div className="w-full h-px bg-[#e5e5e0] my-2" />
             {/* Section buttons */}
@@ -535,7 +545,7 @@ export default function EditLessonPage({
             )}
 
             {/* PDF Panel */}
-            {activePanel === 'pdf' && (
+            {activePanel === 'pdf' && userEmail === 'ron@myherocreative.com' && (
               <div className="bg-white rounded-lg border border-[#e5e5e0] p-4 space-y-4">
                 <h3 className="text-lg font-semibold text-[#2d2d2d]">PDF Generation</h3>
                 {pdfLoading ? (
