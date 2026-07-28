@@ -240,7 +240,7 @@ Two-column layout at `src/app/(dashboard)/admin/courses/[id]/lessons/[lessonId]/
 ### Relevant Files
 - `src/app/(dashboard)/admin/courses/[id]/page.tsx` - Course edit page with Spotify section
 - `src/components/course-spotify-section.tsx` - Course-level Spotify modal and controls (includes SpotifyEmbed preview)
-- `src/app/(dashboard)/admin/courses/[id]/lessons/[lessonId]/page.tsx` - Main lesson edit page with two-column layout
+- `src/app/(dashboard)/admin/courses/[id]/lessons/[lessonId]/page.tsx` - Main lesson edit page with two-column layout and PDF tab
 - `src/components/editor/lesson-editor.tsx` - TipTap editor with sticky toolbar
 - `src/components/editor/extensions/spell-check.ts` - Spellcheck extension
 - `src/components/editor/extensions/check-for-understanding.tsx` - CFU entity
@@ -248,7 +248,7 @@ Two-column layout at `src/app/(dashboard)/admin/courses/[id]/lessons/[lessonId]/
 - `src/components/editor/extensions/image-with-options.ts` - Custom image with align/width
 - `src/components/lesson-assets-panel.tsx` - Lesson assets management
 - `src/components/spotify-embed.tsx` - Draggable Spotify playlist modal (lesson view)
-- `src/app/(dashboard)/lessons/[lessonId]/page.tsx` - Student/teacher view with tabbed interface (Lesson Materials / PDF)
+- `src/app/(dashboard)/lessons/[lessonId]/page.tsx` - Student/teacher view with SpotifyEmbed from course
 - `src/components/check-for-underunderstanding-modal.tsx` - CFU edit modal
 - `src/lib/html-utils.ts` - HTML parsing, text finding/replacing for Find & Replace
 - `src/app/api/find-replace/route.ts` - Find & Replace API endpoints (GET search, PATCH replace)

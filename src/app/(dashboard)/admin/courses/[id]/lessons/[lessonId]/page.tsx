@@ -100,7 +100,15 @@ export default function EditLessonPage({
   const [presentationUrl, setPresentationUrl] = useState("");
   const [selectedSection, setSelectedSection] = useState(textFields[0].name);
   const editorSectionRef = useRef<HTMLDivElement>(null);
-  const [activePanel, setActivePanel] = useState<'general' | 'materials' | 'section'>('general');
+  const [activePanel, setActivePanel] = useState<'general' | 'materials' | 'section' | 'pdf'>('general');
+  const [pdfInfo, setPdfInfo] = useState<{
+    exists: boolean;
+    generated_at?: string;
+    file_size?: number;
+    filename?: string;
+  } | null>(null);
+  const [pdfLoading, setPdfLoading] = useState(false);
+  const [pdfError, setPdfError] = useState<string | null>(null);
   const [fields, setFields] = useState<Fields>({
     lesson_number: "",
     title: "",
@@ -171,6 +179,44 @@ export default function EditLessonPage({
       }
     });
   }, []);
+
+  useEffect(() => {
+    if (lesson?.id) {
+      fetch(`/api/lessons/${lesson.id}/pdf/info`)
+        .then((res) => res.json())
+        .then((data) => setPdfInfo(data))
+        .catch(() => setPdfInfo({ exists: false }));
+    }
+  }, [lesson?.id]);
+
+  const handleGeneratePDF = async () => {
+    if (!lesson) return;
+    setPdfLoading(true);
+    setPdfError(null);
+
+    try {
+      const res = await fetch(`/api/lessons/${lesson.id}/pdf/generate`, {
+        method: 'POST',
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to generate PDF');
+      }
+
+      const data = await res.json();
+      setPdfInfo({
+        exists: true,
+        generated_at: data.generated_at,
+        file_size: data.file_size,
+        filename: data.filename,
+      });
+    } catch (err: any) {
+      setPdfError(err.message);
+    } finally {
+      setPdfLoading(false);
+    }
+  };
 
   useEffect(() => {
     setTimeout(() => {
@@ -383,6 +429,17 @@ export default function EditLessonPage({
               >
                 Lesson Materials
               </button>
+              <button
+                type="button"
+                onClick={() => setActivePanel('pdf')}
+                className={`w-full text-left px-2 py-1.5 text-xs font-medium transition-colors truncate ${
+                  activePanel === 'pdf'
+                    ? "bg-[#0d7377] text-white"
+                    : "bg-[#e85d5d] text-white"
+                }`}
+              >
+                PDF
+              </button>
             </div>
             <div className="w-full h-px bg-[#e5e5e0] my-2" />
             {/* Section buttons */}
@@ -469,6 +526,76 @@ export default function EditLessonPage({
                     <PresentationLink name={presentationName} url={presentationUrl} />
                     <button type="button" onClick={() => setShowPresentationModal(true)} className="text-xs text-[#0d7377] hover:underline">Edit</button>
                     <button type="button" onClick={handleRemovePresentation} className="text-xs text-red-600 hover:underline">Remove</button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* PDF Panel */}
+            {activePanel === 'pdf' && (
+              <div className="bg-white rounded-lg border border-[#e5e5e0] p-4 space-y-4">
+                <h3 className="text-lg font-semibold text-[#2d2d2d]">PDF Generation</h3>
+                {pdfLoading ? (
+                  <div className="text-center py-8">
+                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-[#0d7377] border-t-transparent"></div>
+                    <p className="mt-4 text-gray-600">Generating PDF...</p>
+                  </div>
+                ) : pdfInfo?.exists ? (
+                  <div className="space-y-4">
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <p className="text-sm text-gray-600">
+                        <strong>Current PDF:</strong> {pdfInfo.filename}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Generated: {pdfInfo.generated_at && new Date(pdfInfo.generated_at).toLocaleString()}
+                        {pdfInfo.file_size && ` • ${(pdfInfo.file_size / 1024).toFixed(1)} KB`}
+                      </p>
+                    </div>
+                    <div className="flex gap-4">
+                      <a
+                        href={`/api/lessons/${lesson.id}/pdf?download=false`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-4 py-2 bg-white border border-[#0d7377] text-[#0d7377] rounded hover:bg-[#0d7377] hover:text-white transition-colors"
+                      >
+                        View PDF
+                      </a>
+                      <a
+                        href={`/api/lessons/${lesson.id}/pdf?download=true`}
+                        className="px-4 py-2 bg-white border border-[#0d7377] text-[#0d7377] rounded hover:bg-[#0d7377] hover:text-white transition-colors"
+                      >
+                        Download PDF
+                      </a>
+                    </div>
+                    <div className="pt-4 border-t">
+                      <button
+                        onClick={handleGeneratePDF}
+                        className="px-4 py-2 bg-[#0d7377] text-white rounded hover:bg-[#0a5c5f] transition-colors"
+                      >
+                        Generate New PDF
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <p className="text-gray-500 mb-4">No PDF has been generated yet</p>
+                    <button
+                      onClick={handleGeneratePDF}
+                      className="px-4 py-2 bg-[#0d7377] text-white rounded hover:bg-[#0a5c5f] transition-colors"
+                    >
+                      Generate PDF
+                    </button>
+                  </div>
+                )}
+                {pdfError && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-4 mt-4">
+                    <p className="text-sm text-red-600"><strong>Error:</strong> {pdfError}</p>
+                    <button
+                      onClick={() => setPdfError(null)}
+                      className="mt-2 text-xs text-red-600 hover:underline"
+                    >
+                      Dismiss
+                    </button>
                   </div>
                 )}
               </div>
