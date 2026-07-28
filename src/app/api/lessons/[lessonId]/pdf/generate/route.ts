@@ -65,7 +65,7 @@ export async function POST(
     const storagePath = `${lessonId}/${filename}`;
 
     // Call Render PDF service
-    const pdfServiceUrl = process.env.NEXT_PUBLIC_PDF_SERVICE_URL;
+    const pdfServiceUrl = process.env.PDF_SERVICE_URL;
 
     if (!pdfServiceUrl) {
       return NextResponse.json({ error: "PDF service not configured" }, { status: 500 });

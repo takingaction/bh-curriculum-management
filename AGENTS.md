@@ -247,7 +247,7 @@ Two-column layout at `src/app/(dashboard)/admin/courses/[id]/lessons/[lessonId]/
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
-- `NEXT_PUBLIC_PDF_SERVICE_URL` - URL for PDF generation service (e.g., `https://pdf-service-m3mc.onrender.com`)
+- `PDF_SERVICE_URL` - URL for PDF generation service (e.g., `https://pdf-service-m3mc.onrender.com`)
 
 ### Relevant Files
 - `src/app/(dashboard)/admin/courses/[id]/page.tsx` - Course edit page with Spotify section

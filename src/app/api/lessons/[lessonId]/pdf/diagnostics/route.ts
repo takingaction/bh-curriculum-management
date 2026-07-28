@@ -102,7 +102,7 @@ export async function GET(
     }
 
     // Test PDF service connection
-    const pdfServiceUrl = process.env.NEXT_PUBLIC_PDF_SERVICE_URL;
+    const pdfServiceUrl = process.env.PDF_SERVICE_URL;
     diagnostics.pdfService.url = pdfServiceUrl;
     diagnostics.pdfService.urlExists = !!pdfServiceUrl;
 
