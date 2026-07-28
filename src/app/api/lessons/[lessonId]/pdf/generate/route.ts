@@ -71,6 +71,12 @@ export async function POST(
       return NextResponse.json({ error: "PDF service not configured" }, { status: 500 });
     }
 
+    // Debug: log what's being sent
+    const payloadSize = JSON.stringify({ lesson, course }).length;
+    console.log("PDF payload size:", payloadSize, "bytes");
+    console.log("Course image_url:", course?.image_url || "none");
+    console.log("Lesson has images:", lesson && Object.values(lesson).some(v => typeof v === 'string' && v.includes('<img')));
+
     const renderResponse = await fetch(`${pdfServiceUrl}/lesson-pdf`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -123,7 +129,7 @@ export async function POST(
     // Check file size limit
     if (fileSize > MAX_FILE_SIZE) {
       return NextResponse.json(
-        { error: `PDF file too large (max ${MAX_FILE_SIZE / 1024 / 1024}MB)` },
+        { error: `PDF file too large (max ${MAX_FILE_SIZE / 1024 / 1024}MB)`, actualSize: fileSize },
         { status: 400 }
       );
     }
