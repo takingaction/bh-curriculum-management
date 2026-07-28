@@ -194,6 +194,43 @@ Two-column layout at `src/app/(dashboard)/admin/courses/[id]/lessons/[lessonId]/
 - **Visual styling**: Section links styled in teal (`#0d7377`) to distinguish from external links (red) and resource links
 - **Student view**: Each section renders with `id={section.key}`, so clicking section links scrolls to that section
 
+#### PDF Generation
+- **Architecture**: Dedicated Puppeteer service on Render.com, separate from Vercel (Vercel's 250MB serverless limit can't accommodate Puppeteer's ~170MB Chromium)
+- **GitHub repo**: `https://github.com/takingaction/pdf-service`
+- **Render service**: `https://pdf-service-m3mc.onrender.com` (Free tier - may have cold start latency)
+- **API endpoints**:
+  - `POST /pdf` - Accepts `{ html: string, filename?: string }` → returns `application/pdf`
+  - `POST /lesson-pdf` - Accepts `{ lesson: object, course: object, filename?: string }` → returns `application/pdf`
+  - `POST /debug-html` - Returns rendered HTML for testing
+  - `GET /health` - Health check
+- **Lesson PDF sections** (in order):
+  1. Lesson Outline
+  2. Learning Objectives
+  3. Vocabulary
+  4. Materials
+  5. Welcome and Opening Check-In
+  6. Class Expectations and Procedures
+  7. Warm Up
+  8. Lesson "Hook"
+  9. Main Activity
+  10. Instrument Expectations
+  11. VAPA Standards
+  12. NCAS Standards
+  13. Reflection
+  14. Closing Ceremony
+  15. Assessment
+- **PDF features**:
+  - Letter size with 0.75in margins
+  - Header with lesson number, title, course, grade, discipline, time
+  - Sections only included if content exists (not null/empty)
+  - CSS support for tables, images (alignment), lists, bold/italic
+  - CFU blocks rendered with gray background and left border
+  - `@page` rules for print styling
+- **Key files in pdf-service**:
+  - `src/index.js` - Express server with Puppeteer PDF generation
+  - `src/template.js` - HTML template builder for lesson PDFs
+  - `render.yaml` - Render deployment configuration
+
 ### Environment Variables Required
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
@@ -201,7 +238,7 @@ Two-column layout at `src/app/(dashboard)/admin/courses/[id]/lessons/[lessonId]/
 
 ### Relevant Files
 - `src/app/(dashboard)/admin/courses/[id]/page.tsx` - Course edit page with Spotify section
-- `src/components/course-spotify-section.tsx` - Course-level Spotify modal and controls
+- `src/components/course-spotify-section.tsx` - Course-level Spotify modal and controls (includes SpotifyEmbed preview)
 - `src/app/(dashboard)/admin/courses/[id]/lessons/[lessonId]/page.tsx` - Main lesson edit page with two-column layout
 - `src/components/editor/lesson-editor.tsx` - TipTap editor with sticky toolbar
 - `src/components/editor/extensions/spell-check.ts` - Spellcheck extension
@@ -215,3 +252,4 @@ Two-column layout at `src/app/(dashboard)/admin/courses/[id]/lessons/[lessonId]/
 - `src/lib/html-utils.ts` - HTML parsing, text finding/replacing for Find & Replace
 - `src/app/api/find-replace/route.ts` - Find & Replace API endpoints (GET search, PATCH replace)
 - `src/components/find-replace-panel.tsx` - Find & Replace UI panel
+- `pdf-service/` - External Puppeteer PDF generation microservice (see PDF Generation section)
