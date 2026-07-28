@@ -230,6 +230,12 @@ Two-column layout at `src/app/(dashboard)/admin/courses/[id]/lessons/[lessonId]/
   - `src/index.js` - Express server with Puppeteer PDF generation
   - `src/template.js` - HTML template builder for lesson PDFs
   - `render.yaml` - Render deployment configuration
+- **PDF API endpoints** (Next.js):
+  - `GET /api/lessons/[id]/pdf/info` - Get PDF metadata (exists, generated_at, file_size, filename)
+  - `GET /api/lessons/[id]/pdf` - View or download PDF (via ?download=true/false)
+  - `POST /api/lessons/[id]/pdf/generate` - Generate PDF, upload to Supabase Storage, update metadata
+  - `GET /api/lessons/[id]/pdf/diagnostics` - Diagnostic endpoint for debugging PDF issues
+- **PDF error handling**: Generate endpoint returns detailed diagnostics on failure including PDF service URL, response status, HTML vs JSON detection, and extracted error messages
 
 ### Environment Variables Required
 - `NEXT_PUBLIC_SUPABASE_URL`
@@ -252,6 +258,11 @@ Two-column layout at `src/app/(dashboard)/admin/courses/[id]/lessons/[lessonId]/
 - `src/components/check-for-underunderstanding-modal.tsx` - CFU edit modal
 - `src/lib/html-utils.ts` - HTML parsing, text finding/replacing for Find & Replace
 - `src/app/api/find-replace/route.ts` - Find & Replace API endpoints (GET search, PATCH replace)
+- `src/app/api/lessons/[id]/pdf/info/route.ts` - GET PDF metadata (exists, generated_at, file_size)
+- `src/app/api/lessons/[id]/pdf/route.ts` - GET PDF (view or download)
+- `src/app/api/lessons/[id]/pdf/generate/route.ts` - POST to generate PDF
+- `src/app/api/lessons/[id]/pdf/diagnostics/route.ts` - GET diagnostics for debugging
+- `pdf-service/` - External Puppeteer PDF generation microservice (see PDF Generation section)
 - `src/components/find-replace-panel.tsx` - Find & Replace UI panel
 - `src/app/api/lessons/[id]/pdf/info/route.ts` - GET PDF metadata (exists, generated_at, file_size)
 - `src/app/api/lessons/[id]/pdf/route.ts` - GET PDF (view or download)
