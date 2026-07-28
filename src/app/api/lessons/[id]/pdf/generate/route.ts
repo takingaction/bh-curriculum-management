@@ -81,12 +81,37 @@ export async function POST(
     if (!renderResponse.ok) {
       const errorText = await renderResponse.text();
       console.error("Render PDF service error:", errorText);
+
+      // Gather diagnostic info
+      const diagnostics: Record<string, any> = {
+        pdfServiceUrl: pdfServiceUrl,
+        pdfServiceResponded: true,
+        status: renderResponse.status,
+        statusText: renderResponse.statusText,
+        responseContentType: renderResponse.headers.get("content-type"),
+        responsePreview: errorText.substring(0, 1000),
+      };
+
+      // Determine if it's HTML (error page) vs JSON
+      const isHtml = errorText.includes("<!DOCTYPE") || errorText.includes("<html");
+      const isJson = errorText.trim().startsWith("{");
+      diagnostics.isHtmlError = isHtml;
+      diagnostics.isJsonError = isJson;
+
+      if (isHtml) {
+        // Try to extract error message from HTML
+        const titleMatch = errorText.match(/<title>(.*?)<\/title>/i);
+        const preMatch = errorText.match(/<pre>([\s\S]*?)<\/pre>/i);
+        diagnostics.htmlError = {
+          title: titleMatch ? titleMatch[1] : null,
+          message: preMatch ? preMatch[1] : null,
+        };
+      }
+
       return NextResponse.json(
         {
           error: "PDF generation failed at external service",
-          details: errorText.substring(0, 500),
-          status: renderResponse.status,
-          statusText: renderResponse.statusText,
+          diagnostics,
         },
         { status: 500 }
       );

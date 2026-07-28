@@ -108,7 +108,7 @@ export default function EditLessonPage({
     filename?: string;
   } | null>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
-  const [pdfError, setPdfError] = useState<string | null>(null);
+  const [pdfError, setPdfError] = useState<{ message: string; diagnostics?: any } | null>(null);
   const [fields, setFields] = useState<Fields>({
     lesson_number: "",
     title: "",
@@ -201,7 +201,7 @@ export default function EditLessonPage({
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || 'Failed to generate PDF');
+        throw new Error(data.error || 'Failed to generate PDF', { cause: data.diagnostics });
       }
 
       const data = await res.json();
@@ -212,7 +212,10 @@ export default function EditLessonPage({
         filename: data.filename,
       });
     } catch (err: any) {
-      setPdfError(err.message);
+      setPdfError({
+        message: err.message,
+        diagnostics: err.cause || null,
+      });
     } finally {
       setPdfLoading(false);
     }
@@ -589,7 +592,17 @@ export default function EditLessonPage({
                 )}
                 {pdfError && (
                   <div className="bg-red-50 border border-red-200 rounded-lg p-4 mt-4">
-                    <p className="text-sm text-red-600"><strong>Error:</strong> {pdfError}</p>
+                    <p className="text-sm text-red-600"><strong>Error:</strong> {pdfError.message}</p>
+                    {pdfError.diagnostics && (
+                      <details className="mt-3 text-xs">
+                        <summary className="cursor-pointer text-red-500 font-medium hover:text-red-700">
+                          Diagnostics
+                        </summary>
+                        <pre className="mt-2 p-2 bg-white border border-red-200 rounded overflow-auto max-h-64 text-left whitespace-pre-wrap">
+                          {JSON.stringify(pdfError.diagnostics, null, 2)}
+                        </pre>
+                      </details>
+                    )}
                     <button
                       onClick={() => setPdfError(null)}
                       className="mt-2 text-xs text-red-600 hover:underline"
