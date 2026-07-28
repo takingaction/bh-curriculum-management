@@ -52,7 +52,7 @@ export async function POST(
     // Fetch course data
     const { data: course, error: courseError } = await supabase
       .from("courses")
-      .select("title, discipline, grade, image_url")
+      .select("title, discipline, grade, pdf_image_url")
       .eq("id", lesson.course_id)
       .single();
 
@@ -74,7 +74,7 @@ export async function POST(
     // Debug: log what's being sent
     const payloadSize = JSON.stringify({ lesson, course }).length;
     console.log("PDF payload size:", payloadSize, "bytes");
-    console.log("Course image_url:", course?.image_url || "none");
+    console.log("Course pdf_image_url:", course?.pdf_image_url || "none");
     console.log("Lesson has images:", lesson && Object.values(lesson).some(v => typeof v === 'string' && v.includes('<img')));
 
     const renderResponse = await fetch(`${pdfServiceUrl}/lesson-pdf`, {
