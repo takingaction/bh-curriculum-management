@@ -11,7 +11,6 @@ interface CoursePdfImageUploadProps {
 export function CoursePdfImageUpload({ courseId, currentImageUrl }: CoursePdfImageUploadProps) {
   const [uploading, setUploading] = useState(false);
   const [imageUrl, setImageUrl] = useState(currentImageUrl);
-  const [urlInput, setUrlInput] = useState(currentImageUrl || "");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -22,7 +21,7 @@ export function CoursePdfImageUpload({ courseId, currentImageUrl }: CoursePdfIma
     const formData = new FormData();
     formData.append("file", file);
     formData.append("courseId", courseId);
-    formData.append("type", "pdf"); // distinguishes this upload
+    formData.append("type", "pdf");
 
     try {
       const res = await fetch("/api/upload/course-image", {
@@ -32,8 +31,6 @@ export function CoursePdfImageUpload({ courseId, currentImageUrl }: CoursePdfIma
       const data = await res.json();
       if (res.ok) {
         setImageUrl(data.imageUrl);
-        setUrlInput(data.imageUrl);
-        // Update via API
         await fetch(`/api/admin/courses/${courseId}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -50,26 +47,20 @@ export function CoursePdfImageUpload({ courseId, currentImageUrl }: CoursePdfIma
     }
   };
 
-  const handleUrlSubmit = async () => {
-    if (!urlInput.trim()) return;
-
-    setUploading(true);
+  const handleClear = async () => {
+    if (!confirm("Remove PDF image?")) return;
     try {
       const res = await fetch(`/api/admin/courses/${courseId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pdf_image_url: urlInput.trim() }),
+        body: JSON.stringify({ pdf_image_url: null }),
       });
       if (res.ok) {
-        setImageUrl(urlInput.trim());
+        setImageUrl(null);
         window.location.reload();
-      } else {
-        alert("Failed to save URL");
       }
     } catch (error) {
-      alert("Failed to save URL");
-    } finally {
-      setUploading(false);
+      alert("Failed to remove image");
     }
   };
 
@@ -79,7 +70,7 @@ export function CoursePdfImageUpload({ courseId, currentImageUrl }: CoursePdfIma
         {imageUrl ? (
           <img src={imageUrl} alt="PDF" className="w-full h-full object-cover" />
         ) : (
-          <span className="text-[#666666] text-xs text-center p-2">No PDF Image</span>
+          <span className="text-[#666666] text-xs text-center p-2">No Image</span>
         )}
       </div>
       <div>
@@ -97,25 +88,16 @@ export function CoursePdfImageUpload({ courseId, currentImageUrl }: CoursePdfIma
           disabled={uploading}
           className="border-[#e5e5e0] mb-2"
         >
-          {uploading ? "Uploading..." : "Upload PDF Image"}
+          {uploading ? "Uploading..." : imageUrl ? "Replace Image" : "Upload Image"}
         </Button>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={urlInput}
-            onChange={(e) => setUrlInput(e.target.value)}
-            placeholder="Or paste image URL"
-            className="text-xs border border-gray-300 rounded px-2 py-1 w-40"
-          />
+        {imageUrl && (
           <button
-            onClick={handleUrlSubmit}
-            disabled={uploading || !urlInput.trim()}
-            className="text-xs bg-[#0d7377] text-white px-2 py-1 rounded hover:bg-[#0a5c5f] disabled:opacity-50"
+            onClick={handleClear}
+            className="block text-xs text-red-600 hover:underline ml-1"
           >
-            Save URL
+            Remove
           </button>
-        </div>
-        <p className="text-xs text-gray-500 mt-1">Used for PDF title page</p>
+        )}
       </div>
     </div>
   );
