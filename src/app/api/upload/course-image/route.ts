@@ -39,9 +39,12 @@ export async function POST(request: Request) {
 
     const imageUrl = urlData.publicUrl;
 
+    const uploadType = formData.get("type") as string;
+    const updateField = uploadType === "pdf" ? { pdf_image_url: imageUrl } : { image_url: imageUrl };
+
     const { error: updateError } = await supabaseAdmin
       .from("courses")
-      .update({ image_url: imageUrl })
+      .update(updateField)
       .eq("id", courseId);
 
     if (updateError) {
