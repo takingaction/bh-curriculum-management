@@ -59,7 +59,7 @@ function CheckForUnderstandingNodeView({ node, getPos }: NodeViewProps) {
         className={cssClass}
         contentEditable={false}
         style={{
-          backgroundImage: backgroundImage ? `url('${backgroundImage}')` : undefined,
+          backgroundImage: backgroundImage ? `url("${backgroundImage}")` : undefined,
           backgroundSize: "100% 100%",
           backgroundPosition: "center",
           backgroundRepeat: "no-repeat",
@@ -245,7 +245,7 @@ export const CheckForUnderstanding = Node.create<CheckForUnderstandingOptions>({
         "cfuid": cfuId,
         "data-cfu-id": cfuId,
         class: cssClass,
-        style: `background-image: url('${backgroundImage}'); background-size: 100% 100%; background-position: center; background-repeat: no-repeat; padding: 3px 60px; width: ${width};`,
+        style: `background-image: url("${backgroundImage}"); background-size: 100% 100%; background-position: center; background-repeat: no-repeat; padding: 3px 60px; width: ${width};`,
       }),
       childElements,
     ];
