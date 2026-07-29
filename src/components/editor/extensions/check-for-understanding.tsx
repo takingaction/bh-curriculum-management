@@ -210,12 +210,12 @@ export const CheckForUnderstanding = Node.create<CheckForUnderstandingOptions>({
 
     const childElements: any[] = [
       "table",
-      { style: "width: 100%; border-collapse: collapse;" },
+      { style: "width: 100%; border-collapse: collapse; border: none;" },
     ];
 
     const imageCell: any[] = [
       "td",
-      { class: "cfu-image-cell", style: "width: 25%; vertical-align: middle; text-align: right; padding: 8px;" },
+      { class: "cfu-image-cell", style: "width: 25%; vertical-align: middle; text-align: right; padding: 8px; border: none;" },
     ];
     if (pngImage) {
       imageCell.push(["img", { src: pngImage, style: `max-width: ${pngWidth}%; height: auto; display: block; margin-left: auto;` }]);
@@ -223,7 +223,7 @@ export const CheckForUnderstanding = Node.create<CheckForUnderstandingOptions>({
 
     const textCell: any[] = [
       "td",
-      { class: "cfu-text-cell", style: "width: 75%; vertical-align: middle; text-align: left; padding: 8px;" },
+      { class: "cfu-text-cell", style: "width: 75%; vertical-align: middle; text-align: left; padding: 8px; border: none;" },
     ];
     if (heading) {
       textCell.push(["h4", { style: "margin: 0; font-size: 18px; font-weight: 700; color: #333;" }, heading]);
