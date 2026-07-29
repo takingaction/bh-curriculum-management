@@ -84,6 +84,50 @@ Located in `src/components/editor/extensions/`:
 - **Click rate limiting**: 1-second cooldown via lastClickRef in NodeView
 - **Delete with confirmation**: Delete button in modal footer (when editing), confirmation modal in editor
 
+#### CFU Attribute Parsing (addAttributes)
+CFU attributes are stored as HTML attributes on the div. TipTap writes lowercase attribute names:
+- `backgroundimage` - URL for background SVG image (TipTap format)
+- `pngimage` - URL for left column image
+- `cfuid` / `data-cfu-id` - unique identifier
+- `data-background-image` / `data-png-image` - alternative data attribute format
+- `heading` / `content` - text content (also read from inner h4/p tags)
+- `alignment` / `width` / `pngwidth` - positioning and sizing
+
+**parseHTML fallback chain** (e.g., for `backgroundImage`):
+1. Check `backgroundimage` attribute first (TipTap writes this)
+2. Check `data-background-image` attribute
+3. Parse from `style` attribute's `background-image: url(...)` as last resort
+
+This ensures existing CFUs in database work regardless of which format their attributes are stored in.
+
+#### CFU SQL Migrations
+- CFUs stored in 15 text fields: lesson_outline, learning_objectives, vocabulary, materials, vapa_text_block, ncas_text_block, welcome_opening, actual_class_expectations, warm_up, lesson_hook, main_activity, instrument_expectations, reflection, closing_ceremony, assessment
+- Each CFU is a div with data-check-for-understanding="true" attribute
+- **Padding updates**: Use regex to target only CFU div padding (e.g., `padding:\s*3px\s+60px`), not all padding in database
+- **Background updates**: Must use `&quot;` encoding for URL quotes in inline styles (TipTap format)
+- **Background image SVG**: Must have `preserveAspectRatio="none"` in SVG markup to stretch correctly with `background-size: 100% 100%`
+
+#### PDF CFU Styling (pdf-service/src/template.js)
+- **CFU Block**: padding: 3px 15px, margin: 8px 0 48px 0, overflow: hidden
+- **CFU font**: 10pt for both h4 title and p body (matching body font size)
+- **Background image**: Uses `preserveAspectRatio="none"` on SVG to allow stretching
+- **Wrapped CFUs** (wrap-top-left, wrap-top-right, etc.): `display: flow-root` for proper float containment
+- **Section headers** (`.section-header`): `clear: both` to prevent overlap with floated CFUs from previous section
+- **Key CSS patterns**:
+  ```css
+  .lesson-content [data-check-for-understanding="true"] {
+    padding: 3px 15px !important;
+    margin: 8px 0 48px 0 !important;
+    overflow: hidden;
+  }
+  .lesson-content [data-check-for-understanding][class*="wrap"] {
+    display: flow-root;
+  }
+  .section-header {
+    clear: both;
+  }
+  ```
+
 #### Table Extensions
 **table-with-styles.ts** - Custom table extension with:
 - `columnWidths` attribute (array of percentage strings like ["33%", "33%", "34%"])

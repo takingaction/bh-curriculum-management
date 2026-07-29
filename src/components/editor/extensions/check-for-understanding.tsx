@@ -138,50 +138,76 @@ export const CheckForUnderstanding = Node.create<CheckForUnderstandingOptions>({
     return {
       cfuId: {
         default: null,
+        parseHTML: (element) => element.getAttribute("data-cfu-id") || element.getAttribute("cfuid") || null,
+        renderHTML: (attributes) => ({ "data-cfu-id": attributes.cfuId }),
       },
       backgroundImage: {
         default: "",
+        parseHTML: (element) => {
+          const dataAttr = element.getAttribute("data-background-image");
+          if (dataAttr) return dataAttr;
+          const style = element.getAttribute("style") || "";
+          const match = style.match(/background-image:\s*url\(["']?([^"']+)["']?\)/);
+          return match ? match[1] : "";
+        },
+        renderHTML: (attributes) => ({ "data-background-image": attributes.backgroundImage }),
       },
       pngImage: {
         default: "",
+        parseHTML: (element) => {
+          const dataAttr = element.getAttribute("data-png-image");
+          if (dataAttr) return dataAttr;
+          const imgEl = element.querySelector("img");
+          return imgEl ? imgEl.src : "";
+        },
+        renderHTML: (attributes) => ({ "data-png-image": attributes.pngImage }),
       },
       heading: {
         default: "",
+        parseHTML: (element) => {
+          const h4 = element.querySelector("h4");
+          return h4 ? h4.textContent || "" : "";
+        },
+        renderHTML: () => ({}),
       },
       content: {
         default: "",
+        parseHTML: (element) => {
+          const p = element.querySelector("p");
+          return p ? p.textContent || "" : "";
+        },
+        renderHTML: () => ({}),
       },
       alignment: {
         default: "center",
+        parseHTML: (element) => element.getAttribute("data-alignment") || "center",
+        renderHTML: (attributes) => ({ "data-alignment": attributes.alignment }),
       },
       width: {
         default: "50%",
+        parseHTML: (element) => {
+          const style = element.getAttribute("style") || "";
+          const match = style.match(/width:\s*(\d+%)/);
+          return match ? match[1] : "50%";
+        },
+        renderHTML: () => ({}),
       },
       pngWidth: {
         default: 100,
+        parseHTML: (element) => {
+          const img = element.querySelector("img");
+          if (!img) return 100;
+          const style = img.getAttribute("style") || "";
+          const match = style.match(/max-width:\s*(\d+)%/);
+          return match ? parseInt(match[1]) : 100;
+        },
+        renderHTML: () => ({}),
       },
     };
   },
 
   parseHTML() {
-    return [
-      {
-        tag: "div[data-check-for-understanding]",
-        getAttrs: (dom) => {
-          const el = dom as HTMLElement;
-          return {
-            cfuId: el.getAttribute("cfuid") || el.getAttribute("data-cfu-id") || null,
-            backgroundImage: el.getAttribute("backgroundimage") || "",
-            pngImage: el.getAttribute("pngimage") || "",
-            heading: el.getAttribute("heading") || "",
-            content: el.getAttribute("content") || "",
-            alignment: el.getAttribute("alignment") || "center",
-            width: el.getAttribute("width") || "50%",
-            pngWidth: parseInt(el.getAttribute("pngwidth") || "100") || 100,
-          };
-        },
-      },
-    ];
+    return [{ tag: "div[data-check-for-understanding]" }];
   },
 
   renderHTML({ node, HTMLAttributes }) {
@@ -208,46 +234,31 @@ export const CheckForUnderstanding = Node.create<CheckForUnderstandingOptions>({
 
     const cssClass = alignmentClasses[alignment] || "cfu-center";
 
-    const childElements: any[] = [
-      "table",
-      { style: "width: 100%; border-collapse: collapse; border: none;" },
-    ];
-
-    const imageCell: any[] = [
-      "td",
-      { class: "cfu-image-cell", style: "width: 25%; vertical-align: middle; text-align: right; padding: 8px; border: none;" },
-    ];
-    if (pngImage) {
-      imageCell.push(["img", { src: pngImage, style: `max-width: ${pngWidth}%; height: auto; display: block; margin-left: auto;` }]);
-    }
-
-    const textCell: any[] = [
-      "td",
-      { class: "cfu-text-cell", style: "width: 75%; vertical-align: middle; text-align: left; padding: 8px; border: none;" },
-    ];
-    if (heading) {
-      textCell.push(["h4", { style: "margin: 0; font-size: 18px; font-weight: 700; color: #333;" }, heading]);
-    }
-    if (content) {
-      textCell.push(["p", { style: "margin: 0; color: #333;" }, content]);
-    }
-
-    childElements.push([
-      "tr",
-      imageCell,
-      textCell,
-    ]);
-
     return [
       "div",
       mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, {
         "data-check-for-understanding": "true",
-        "cfuid": cfuId,
-        "data-cfu-id": cfuId,
         class: cssClass,
-        style: `background-image: url("${backgroundImage}"); background-size: 100% 100%; background-position: center; background-repeat: no-repeat; padding: 3px 60px; width: ${width};`,
+        style: `background-image: url('${backgroundImage}'); background-size: 100% 100%; background-position: center; background-repeat: no-repeat; padding: 3px 60px; width: ${width};`,
       }),
-      childElements,
+      [
+        "table",
+        { style: "width: 100%; border-collapse: collapse; border: none;" },
+        [
+          "tr",
+          [
+            "td",
+            { class: "cfu-image-cell", style: "width: 25%; vertical-align: middle; text-align: right; padding: 8px; border: none;" },
+            pngImage ? ["img", { src: pngImage, style: `max-width: ${pngWidth}%; height: auto; display: block; margin-left: auto;` }] : [],
+          ],
+          [
+            "td",
+            { class: "cfu-text-cell", style: "width: 75%; vertical-align: middle; text-align: left; padding: 8px; border: none;" },
+            heading ? ["h4", { style: "margin: 0; font-size: 18px; font-weight: 700; color: #333;" }, heading] : [],
+            content ? ["p", { style: "margin: 0; color: #333;" }, content] : [],
+          ],
+        ],
+      ],
     ];
   },
 
