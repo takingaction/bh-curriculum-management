@@ -180,7 +180,7 @@ export const CheckForUnderstanding = Node.create<CheckForUnderstandingOptions>({
       },
       alignment: {
         default: "center",
-        parseHTML: (element) => element.getAttribute("data-alignment") || "center",
+        parseHTML: (element) => element.getAttribute("alignment") || element.getAttribute("data-alignment") || "center",
         renderHTML: (attributes) => ({ "data-alignment": attributes.alignment }),
       },
       width: {
