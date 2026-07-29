@@ -277,6 +277,10 @@
     border: none;
   }
 
+  .lesson-content [data-check-for-understanding="true"] {
+    background-size: 100% 100% !important;
+  }
+
   .lesson-content img {
     @apply max-w-full h-auto my-4;
   }
@@ -354,7 +358,7 @@
   padding: 16px;
   margin: 16px 0;
   min-height: 150px;
-  background-size: cover;
+  background-size: 100% 100%;
   background-position: center;
 }
 
