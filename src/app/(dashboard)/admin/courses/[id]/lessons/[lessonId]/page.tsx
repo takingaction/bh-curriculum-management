@@ -603,10 +603,16 @@ export default function EditLessonPage({
                 {pdfError && (
                   <div className="bg-red-50 border border-red-200 rounded-lg p-4 mt-4">
                     <p className="text-sm text-red-600"><strong>Error:</strong> {pdfError.message}</p>
+                    {pdfError.diagnostics?.actualSize && (
+                      <p className="text-sm text-red-600 mt-1">
+                        <strong>Actual Size:</strong> {(pdfError.diagnostics.actualSize / 1024 / 1024).toFixed(2)} MB
+                        ({pdfError.diagnostics.actualSize.toLocaleString()} bytes)
+                      </p>
+                    )}
                     {pdfError.diagnostics && (
                       <details className="mt-3 text-xs">
                         <summary className="cursor-pointer text-red-500 font-medium hover:text-red-700">
-                          Diagnostics
+                          Full Diagnostics
                         </summary>
                         <pre className="mt-2 p-2 bg-white border border-red-200 rounded overflow-auto max-h-64 text-left whitespace-pre-wrap">
                           {JSON.stringify(pdfError.diagnostics, null, 2)}
