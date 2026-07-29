@@ -60,10 +60,9 @@ export async function POST(
       return NextResponse.json({ error: "Course not found" }, { status: 404 });
     }
 
-    // Generate filename with timestamp to force unique file every time
-    const timestamp = Date.now();
+    // Generate filename - no timestamp, each generation replaces the previous
     const filename = formatFilename(course.grade, course.discipline, lesson.lesson_number);
-    const storagePath = `${lessonId}/${timestamp}-${filename}`;
+    const storagePath = `${lessonId}/${filename}`;
 
     // Call Render PDF service
     const pdfServiceUrl = process.env.PDF_SERVICE_URL;
