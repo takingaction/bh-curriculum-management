@@ -54,7 +54,9 @@ export async function GET(
         "Content-Disposition": download
           ? `attachment; filename="${filename}"`
           : `inline; filename="${filename}"`,
-        "Cache-Control": "private, max-age=3600",
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0",
       },
     });
 

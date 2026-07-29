@@ -137,17 +137,20 @@ export async function POST(
     // Upload to Supabase Storage
     console.log("Uploading PDF to storage:", storagePath, "Size:", fileSize);
 
-    // Delete existing file first to ensure replacement
-    await supabaseAdmin.storage
+    // Delete existing file first, then upload fresh (don't use upsert)
+    const { error: removeError } = await supabaseAdmin.storage
       .from("lesson-pdfs")
-      .remove([storagePath])
-      .catch(() => {}); // Ignore if doesn't exist
+      .remove([storagePath]);
+
+    if (removeError) {
+      console.log("Remove error (may not exist):", removeError.message);
+    }
 
     const { error: uploadError } = await supabaseAdmin.storage
       .from("lesson-pdfs")
       .upload(storagePath, pdfBuffer, {
         contentType: "application/pdf",
-        upsert: true,
+        // Don't use upsert - always upload fresh after delete
       });
 
     if (uploadError) {
