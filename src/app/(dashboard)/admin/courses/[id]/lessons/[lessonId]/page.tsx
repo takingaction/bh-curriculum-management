@@ -209,7 +209,9 @@ export default function EditLessonPage({
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || 'Failed to generate PDF', { cause: data.diagnostics });
+        throw new Error(data.error || 'Failed to generate PDF', {
+          cause: data.diagnostics || { actualSize: data.actualSize }
+        });
       }
 
       const data = await res.json();
