@@ -314,7 +314,16 @@ Two-column layout at `src/app/(dashboard)/admin/courses/[id]/lessons/[lessonId]/
 - `src/app/api/lessons/[lessonId]/pdf/diagnostics/route.ts` - GET diagnostics for debugging
 - `pdf-service/` - External Puppeteer PDF generation microservice (see PDF Generation section)
 - `src/components/find-replace-panel.tsx` - Find & Replace UI panel
-- `src/app/api/lessons/[lessonId]/pdf/info/route.ts` - GET PDF metadata (exists, generated_at, file_size)
-- `src/app/api/lessons/[lessonId]/pdf/route.ts` - GET PDF (view or download)
-- `src/app/api/lessons/[lessonId]/pdf/generate/route.ts` - POST to generate PDF
-- `pdf-service/` - External Puppeteer PDF generation microservice (see PDF Generation section)
+
+#### Public Homepage
+Landing page at `/` with the following sections:
+- `src/app/page.tsx` - Main page assembling all homepage sections
+- `src/components/home/Header.tsx` - Fixed header with logo, About Us link, Sign In button
+- `src/components/home/HeroSection.tsx` - Full-screen hero with background image and overlay
+- `src/components/home/ElementaryArtsSection.tsx` - Text left, image right, peach background
+- `src/components/home/GradeLevelSection.tsx` - Two-column layout: title/text left, grade descriptions right
+- `src/components/home/VideoSection.tsx` - Click-to-open video popup with native dialog element
+- `src/components/home/UnlockSection.tsx` - Image left, text right with pricing info
+- `src/components/home/CallToActionSection.tsx` - Contact info and Calendly CTA button
+- `src/components/home/Footer.tsx` - Copyright with dynamic year
+- `public/images/` - Local copies of homepage images (logo.png, hero-bg.jpg, kids-dancing.png, video-thumbnail.jpg, opportunities-image.png)

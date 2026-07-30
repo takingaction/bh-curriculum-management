@@ -1,0 +1,92 @@
+"use client";
+
+import { useState, useEffect, useRef } from "react";
+
+export default function VideoSection() {
+  const [isOpen, setIsOpen] = useState(false);
+  const dialogRef = useRef<HTMLDialogElement>(null);
+
+  const videoId = "YKpdxwcm3LE";
+  const thumbnailSrc = "/images/video-thumbnail.jpg";
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+
+    if (isOpen) {
+      dialog.showModal();
+    } else {
+      dialog.close();
+    }
+  }, [isOpen]);
+
+  const handleOpen = () => {
+    setIsOpen(true);
+  };
+
+  const handleClose = () => {
+    setIsOpen(false);
+  };
+
+  return (
+    <>
+      <section className="relative py-16 lg:py-24">
+        <div className="absolute inset-0 bg-black/30" />
+        <div className="absolute inset-0">
+          <img
+            src={thumbnailSrc}
+            alt="Video thumbnail background"
+            className="w-full h-full object-cover"
+          />
+        </div>
+
+        <div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-center">
+            <button
+              onClick={handleOpen}
+              className="group flex items-center justify-center w-24 h-24 rounded-full bg-white/90 hover:bg-white transition-colors shadow-lg"
+              aria-label="Play video"
+            >
+              <svg
+                className="w-10 h-10 text-[#0d7377] ml-1"
+                fill="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path d="M8 5v14l11-7z" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <dialog
+        ref={dialogRef}
+        onClick={(e) => {
+          if (e.target === dialogRef.current) handleClose();
+        }}
+        className="p-0 bg-transparent backdrop:bg-black/80 fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
+      >
+        {isOpen && (
+          <div className="relative">
+            <button
+              onClick={handleClose}
+              className="absolute -top-10 right-0 text-white hover:text-gray-300 transition-colors"
+              aria-label="Close video"
+            >
+              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            <iframe
+              src={`https://www.youtube.com/embed/${videoId}?autoplay=1`}
+              title="Performers Ready! Video"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              className="w-[80vw] max-w-4xl aspect-video"
+            />
+          </div>
+        )}
+      </dialog>
+    </>
+  );
+}
