@@ -34,6 +34,10 @@ export async function PUT(
       updateData.summary = body.summary;
     }
 
+    if (body.pdf_image_url !== undefined) {
+      updateData.pdf_image_url = body.pdf_image_url;
+    }
+
     const { data, error } = await supabase
       .from("courses")
       .update(updateData)

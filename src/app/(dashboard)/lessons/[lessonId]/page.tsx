@@ -78,6 +78,7 @@ export default function LessonContentPage({
   const [lessonAssets, setLessonAssets] = useState<any[]>([]);
   const [courseAssets, setCourseAssets] = useState<any[]>([]);
   const [activeSection, setActiveSection] = useState<string | null>(null);
+  const [pdfExists, setPdfExists] = useState(false);
 
   useEffect(() => {
     params.then(async (p) => {
@@ -121,6 +122,15 @@ export default function LessonContentPage({
         .catch((error) => {
           console.error("Failed to fetch course assets:", error);
         });
+    }
+  }, [lesson]);
+
+  useEffect(() => {
+    if (lesson?.id) {
+      fetch(`/api/lessons/${lesson.id}/pdf/info`)
+        .then(res => res.json())
+        .then(data => setPdfExists(data.exists === true))
+        .catch(() => setPdfExists(false));
     }
   }, [lesson]);
 
@@ -287,6 +297,26 @@ export default function LessonContentPage({
                 )}
               </div>
               <div className="mt-4">
+                {pdfExists && (
+                  <div className="mb-2 text-sm">
+                    <a
+                      href={`/api/lessons/${lesson.id}/pdf?download=false`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[#0d7377] hover:underline"
+                    >
+                      View PDF
+                    </a>
+                    {" | "}
+                    <a
+                      href={`/api/lessons/${lesson.id}/pdf?download=true`}
+                      download
+                      className="text-[#0d7377] hover:underline"
+                    >
+                      Download PDF
+                    </a>
+                  </div>
+                )}
                 <LessonNavigation
                   courseId={course.id}
                   currentLessonId={lesson.id}

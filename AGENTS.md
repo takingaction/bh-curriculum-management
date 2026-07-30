@@ -108,17 +108,19 @@ This ensures existing CFUs in database work regardless of which format their att
 - **Background image SVG**: Must have `preserveAspectRatio="none"` in SVG markup to stretch correctly with `background-size: 100% 100%`
 
 #### PDF CFU Styling (pdf-service/src/template.js)
-- **CFU Block**: padding: 3px 15px, margin: 8px 0 48px 0, overflow: hidden
+- **CFU Block**: padding: 3px 20px, margin: 8px 0 48px 0, overflow: hidden
 - **CFU font**: 10pt for both h4 title and p body (matching body font size)
-- **Background image**: Uses `preserveAspectRatio="none"` on SVG to allow stretching
+- **Background image**: Uses `preserveAspectRatio="none"` on SVG to allow stretching with `background-size: 100% 100%`
 - **Wrapped CFUs** (wrap-top-left, wrap-top-right, etc.): `display: flow-root` for proper float containment
 - **Section headers** (`.section-header`): `clear: both` to prevent overlap with floated CFUs from previous section
+- **CFU margins with !important**: All CFU alignment classes have `!important` to override inline styles
 - **Key CSS patterns**:
   ```css
   .lesson-content [data-check-for-understanding="true"] {
-    padding: 3px 15px !important;
+    padding: 3px 20px !important;
     margin: 8px 0 48px 0 !important;
     overflow: hidden;
+    background-size: 100% 100% !important;
   }
   .lesson-content [data-check-for-understanding][class*="wrap"] {
     display: flow-root;
@@ -126,6 +128,10 @@ This ensures existing CFUs in database work regardless of which format their att
   .section-header {
     clear: both;
   }
+  .lesson-content .cfu-wrap-top-left {
+    margin: 0 20px 16px 0 !important;
+  }
+  /* etc for all alignment classes */
   ```
 
 #### Table Extensions
@@ -239,10 +245,10 @@ Two-column layout at `src/app/(dashboard)/admin/courses/[id]/lessons/[lessonId]/
 - **Student view**: Each section renders with `id={section.key}`, so clicking section links scrolls to that section
 
 #### Page Break Images
-- `page3.png` - Full-width image at top of page 3 (before Welcome section)
-- `last-page.png` - Full-width image before Closing Ceremony section (last page before Assessment)
+- `last-page.png` - Full-width flush image before Assessment section (Assessment is the last content page)
 - Stored in `/public/images/` in Next.js repo, served at `{APP_URL}/images/`
 - CSS class `.page-break-image` with `object-fit: contain`, `break-before: page`
+- page3.png no longer used (VAPA/NCAS sections no longer have page break images)
 
 #### PDF Generation
 - **Architecture**: Dedicated Puppeteer service on Render.com, separate from Vercel (Vercel's 250MB serverless limit can't accommodate Puppeteer's ~170MB Chromium)
@@ -258,30 +264,31 @@ Two-column layout at `src/app/(dashboard)/admin/courses/[id]/lessons/[lessonId]/
   2. Learning Objectives
   3. Vocabulary
   4. Materials
-  5. Welcome and Opening Check-In
-  6. Class Expectations and Procedures
-  7. Warm Up
-  8. Lesson "Hook"
-  9. Main Activity
-  10. Instrument Expectations
-  11. VAPA Standards
-  12. NCAS Standards
+  5. VAPA Standards
+  6. NCAS Standards
+  7. Welcome and Opening Check-In
+  8. Class Expectations and Procedures
+  9. Warm Up
+  10. Lesson "Hook"
+  11. Main Activity
+  12. Instrument Expectations
   13. Reflection
   14. Closing Ceremony
   15. Assessment
 - **PDF Layout**:
-  - **Page 1 (Title Page)**: "PERFORMERS READY!" in teal (#0d7377), course name and grade centered, course hero image fills remainder of page
-  - **Page 2 (Two-Column)**: Left column = Lesson Outline; Right column = Learning Objectives, Vocabulary, Materials (stacked vertically)
-  - **Pages 3+ (Full-Width)**: All remaining sections (Welcome, Warm Up, Hook, etc.) in full-width stacked layout
-  - **Section Headers**: Coral (#e37c64) background with white uppercase text
-  - **Footer**: Left = "COURSE NAME | GRADE | LESSON X"; Right = "PAGE X OF Y"
+  - **Page 1 (Title Page)**: "PERFORMERS READY!" logo, course name and grade on coral background, hero image fills remainder. `@page :first { margin: 0; }`
+  - **Page 2 (Two-Column)**: "LESSON PLAN: CLASS N" header + `"Lesson Title"` in curly quotes. Left column = Lesson Outline (70/30 split); Right column = Learning Objectives, Vocabulary, Materials. Uses default `@page { margin: 0.5in; }`
+  - **Pages 3+ (Full-Width)**: All remaining sections in full-width stacked layout with 0.5in margins
+  - **Assessment Page (Last)**: Full bleed page (`@page assessment { margin: 0; }`) with fake 0.5in side margins via `padding: 0 0.5in` on `.assessment-section`. Contains last-page.png (flush), assessment table, logo-end.jpg (35% width centered)
+  - **Section Headers**: VAPA/NCAS = gray (#D1D3DB); All others = coral (#e37c64)
 - **PDF features**:
-  - Uses existing `courses.image_url` field for title page hero image
-  - Letter size with 0.5in margins (0.6in bottom for footer)
+  - Uses `courses.pdf_image_url` for title page hero image (separate from website `image_url`)
+  - Letter size with 0.5in margins on pages 2+
+  - Assessment page uses named `@page assessment { margin: 0; }` with fake side margins via padding
   - Sections only included if content exists (not null/empty)
   - CSS support for tables, images (alignment), lists, bold/italic
-  - CFU blocks rendered with gray background and left border
-  - Puppeteer footer template for page numbers
+  - CFU blocks: no gray background, no vertical line, alignment classes match lesson view, 20px margins with `!important` for text wrap
+  - Puppeteer footer template for page numbers (abandoned due to @sparticuz/chromium limitations)
 - **Key files in pdf-service**:
   - `src/index.js` - Express server with Puppeteer PDF generation
   - `src/template.js` - HTML template builder for lesson PDFs
