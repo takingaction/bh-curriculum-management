@@ -238,6 +238,12 @@ Two-column layout at `src/app/(dashboard)/admin/courses/[id]/lessons/[lessonId]/
 - **Visual styling**: Section links styled in teal (`#0d7377`) to distinguish from external links (red) and resource links
 - **Student view**: Each section renders with `id={section.key}`, so clicking section links scrolls to that section
 
+#### Page Break Images
+- `page3.png` - Full-width image at top of page 3 (before Welcome section)
+- `last-page.png` - Full-width image before Closing Ceremony section (last page before Assessment)
+- Stored in `/public/images/` in Next.js repo, served at `{APP_URL}/images/`
+- CSS class `.page-break-image` with `object-fit: contain`, `break-before: page`
+
 #### PDF Generation
 - **Architecture**: Dedicated Puppeteer service on Render.com, separate from Vercel (Vercel's 250MB serverless limit can't accommodate Puppeteer's ~170MB Chromium)
 - **GitHub repo**: `https://github.com/takingaction/pdf-service`
