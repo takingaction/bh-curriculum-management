@@ -23,19 +23,18 @@ export async function POST() {
       return NextResponse.json({ error: "Admin access required" }, { status: 403 });
     }
 
-    // Check if there's already a job running
-    const { data: runningJob } = await supabaseAdmin
+    // Clear any stuck/cancelled/processing jobs from previous attempts first
+    const { error: clearError } = await supabaseAdmin
       .from("batch_pdf_jobs")
-      .select("id")
-      .eq("status", "processing")
-      .single();
+      .update({ status: "cancelled", completed_at: new Date().toISOString() })
+      .in("status", ["processing", "cancelled"]);
 
-    if (runningJob) {
-      return NextResponse.json(
-        { error: "A batch is already in progress", jobId: runningJob.id },
-        { status: 409 }
-      );
+    if (clearError) {
+      console.error("Error clearing old jobs:", clearError);
     }
+
+    // Also clear old result records
+    await supabaseAdmin.from("batch_pdf_results").delete().neq("id", "00000000-0000-0000-0000-000000000000");
 
     // Get all lesson IDs
     const { data: lessons, error: lessonsError } = await supabaseAdmin

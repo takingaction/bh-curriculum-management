@@ -7,7 +7,7 @@ import { X, ExternalLink, FileText, CheckCircle2, XCircle, AlertCircle, Loader2 
 
 interface BatchJob {
   id: string;
-  status: "pending" | "processing" | "completed";
+  status: "pending" | "processing" | "completed" | "cancelled";
   total_count: number;
   processed_count: number;
   success_count: number;
@@ -205,13 +205,23 @@ export default function BatchPdfRegeneratePage() {
       }
 
       const { jobId, totalCount } = data;
+      console.log("[Batch] Job created:", jobId, "Total:", totalCount);
       processingRef.current = true;
       processingQueueRef.current = [];
 
       // Fetch all lessons
+      console.log("[Batch] Fetching lessons...");
       const lessonsRes = await fetch("/api/lessons");
+      if (!lessonsRes.ok) {
+        console.error("[Batch] Failed to fetch lessons, status:", lessonsRes.status);
+        alert("Failed to fetch lessons");
+        setLoading(false);
+        return;
+      }
       const lessonsData = await lessonsRes.json();
+      console.log("[Batch] Lessons response:", lessonsData);
       const lessonIds = (lessonsData.lessons as any[])?.map((l) => l.id as string) || [];
+      console.log("[Batch] Lesson IDs count:", lessonIds.length);
       processingQueueRef.current = [...new Set(lessonIds)] as string[]; // Deduplicate
 
       // Re-fetch job to get updated state
@@ -221,19 +231,30 @@ export default function BatchPdfRegeneratePage() {
       processingRef.current = true;
 
       // Process sequentially
-      for (const lessonId of processingQueueRef.current) {
-        if (!processingRef.current) break;
-        if (processedRef.current.has(lessonId)) continue;
+      console.log("[Batch] Starting processing loop, total:", processingQueueRef.current.length);
 
+      for (const lessonId of processingQueueRef.current) {
+        if (!processingRef.current) {
+          console.log("[Batch] Processing cancelled by user");
+          break;
+        }
+        if (processedRef.current.has(lessonId)) {
+          console.log("[Batch] Already processed:", lessonId);
+          continue;
+        }
+
+        console.log("[Batch] Processing lesson:", lessonId);
         const result = await processLesson(lessonId, jobId);
+        console.log("[Batch] Lesson result:", lessonId, result.success ? "SUCCESS" : "FAILED", result.error);
         await submitResult(jobId, lessonId, result.success, result.error);
         processedRef.current.add(lessonId);
 
         // Refresh data
         await fetchCurrentJob();
-        await fetchResults(pagination?.page || 1, statusFilter);
+        await fetchResults(paginationPageRef.current, statusFilterRef.current);
       }
 
+      console.log("[Batch] Processing complete");
       processingRef.current = false;
       await fetchCurrentJob();
       await fetchResults(1, statusFilter);
@@ -298,6 +319,23 @@ export default function BatchPdfRegeneratePage() {
             <span className="text-white/80">{job.success_count} success</span>
             <span className="text-white/80">|</span>
             <span className="text-white/80">{job.failure_count} failed</span>
+            <button
+              onClick={async () => {
+                if (confirm("Are you sure you want to cancel the batch?")) {
+                  console.log("[Cancel] Setting processingRef to false");
+                  processingRef.current = false;
+                  console.log("[Cancel] Updating local state to cancelled");
+                  setJob({ ...job, status: "cancelled" });
+                  setIsRunning(false);
+                  console.log("[Cancel] Calling cancel API");
+                  await fetch(`/api/batch/${job.id}/cancel`, { method: "POST" });
+                  console.log("[Cancel] Done");
+                }
+              }}
+              className="ml-2 px-2 py-1 border border-white/50 rounded text-white/90 hover:bg-white/20 text-xs"
+            >
+              Cancel
+            </button>
           </div>
         </div>
       )}

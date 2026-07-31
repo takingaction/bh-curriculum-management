@@ -308,28 +308,33 @@ Two-column layout at `src/app/(dashboard)/admin/courses/[id]/lessons/[lessonId]/
 Admin tool for regenerating all lesson PDFs at `/admin/pdf-regenerate`.
 
 **Database tables**:
-- `batch_pdf_jobs` - Tracks batch job status (pending/processing/completed), progress counts, created_by
+- `batch_pdf_jobs` - Tracks batch job status (pending/processing/completed/cancelled), progress counts, created_by
 - `batch_pdf_results` - Individual lesson results with status (pending/success/failed), error messages, retry_count
 
 **API endpoints**:
-- `POST /api/batch/pdf-regenerate` - Start new batch (clears old jobs, creates result records for all lessons)
+- `POST /api/batch/pdf-regenerate` - Start new batch (clears old stuck/cancelled jobs first, creates result records for all lessons)
 - `GET /api/batch/current` - Get current running job or most recent
 - `GET /api/batch/[jobId]?page=N&pageSize=20&status=success|failed` - Paginated results with course/lesson info
 - `POST /api/batch/[jobId]/results` - Submit result for a lesson (handles 1 retry on failure)
+- `POST /api/batch/[jobId]/cancel` - Cancel a running batch job
+- `POST /api/batch/clear-stuck` - Clear stuck processing jobs
 
 **Processing flow**:
 1. Admin clicks "Start New Batch" → confirmation modal → starts batch
-2. Client fetches all lesson IDs and processes sequentially (1 at a time)
-3. Each lesson: POST to `/api/lessons/[id]/pdf/generate` → retry once if failed → submit result
-4. Progress updates via polling every 2 seconds
+2. API clears any stuck/cancelled/processing jobs before starting
+3. Client fetches all lesson IDs and processes sequentially (1 at a time)
+4. Each lesson: POST to `/api/lessons/[id]/pdf/generate` → retry once if failed → submit result
+5. Progress updates via polling every 2 seconds
 
 **UI features**:
+- **Cancel button**: In notification banner while batch is running, stops processing loop and updates database
 - Progress bar + counters (success/fail/total)
 - Filter tabs (All/Success/Failed)
 - Paginated results table with Discipline, Grade, Lesson #, Title, Status
 - Row actions: [Log] [Edit Lesson] [View PDF]
 - Log modal shows full PDF diagnostics for failed lessons
 - Confirmation modal before starting batch
+- Stuck job detection with "Clear Stuck Job" button
 
 **Note**: On Render Starter plan, PDFs process sequentially (~20 sec each, ~4 hours for 720 lessons)
 
@@ -358,10 +363,12 @@ Admin tool for regenerating all lesson PDFs at `/admin/pdf-regenerate`.
 - `src/app/api/lessons/[lessonId]/pdf/route.ts` - GET PDF (view or download)
 - `src/app/api/lessons/[lessonId]/pdf/generate/route.ts` - POST to generate PDF
 - `src/app/api/lessons/[lessonId]/pdf/diagnostics/route.ts` - GET diagnostics for debugging
-- `src/app/api/batch/pdf-regenerate/route.ts` - Start batch PDF regeneration
+- `src/app/api/batch/pdf-regenerate/route.ts` - Start batch PDF regeneration (clears stuck jobs first)
 - `src/app/api/batch/current/route.ts` - Get current/last batch job status
 - `src/app/api/batch/[jobId]/route.ts` - Get paginated results for a batch job
 - `src/app/api/batch/[jobId]/results/route.ts` - Submit result for a lesson in batch
+- `src/app/api/batch/[jobId]/cancel/route.ts` - Cancel a running batch job
+- `src/app/api/batch/clear-stuck/route.ts` - Clear stuck processing jobs
 - `src/app/(dashboard)/admin/pdf-regenerate/page.tsx` - Admin batch PDF regeneration UI
 - `pdf-service/` - External Puppeteer PDF generation microservice (see PDF Generation section)
 - `src/components/find-replace-panel.tsx` - Find & Replace UI panel
