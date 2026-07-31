@@ -56,7 +56,10 @@ export async function GET(
           id,
           lesson_number,
           title,
-          course_id
+          course_id,
+          lesson_pdfs (
+            file_size
+          )
         )
       `)
       .eq("job_id", jobId)
@@ -107,6 +110,7 @@ export async function GET(
         title: r.lessons.title,
         course_id: r.lessons.course_id,
         course: r.lessons.course_id ? coursesMap[r.lessons.course_id] : null,
+        file_size: r.lessons.lesson_pdfs?.file_size || null,
       } : null,
     }));
 

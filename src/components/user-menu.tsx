@@ -38,7 +38,7 @@ export function UserMenu({ email, fullName, role, isAdmin }: UserMenuProps) {
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-48 bg-white border border-[#e5e5e0] rounded-lg shadow-lg z-50">
+        <div className="absolute right-0 mt-2 w-56 bg-white border border-[#e5e5e0] rounded-lg shadow-lg z-[60]">
           <div className="py-1">
             <Link
               href="/dashboard"
@@ -47,15 +47,6 @@ export function UserMenu({ email, fullName, role, isAdmin }: UserMenuProps) {
             >
               Dashboard
             </Link>
-            {isAdmin && (
-              <Link
-                href="/admin"
-                className="block px-4 py-2 text-sm text-[#2d2d2d] hover:bg-[#f5f5f0]"
-                onClick={() => setOpen(false)}
-              >
-                Admin Dashboard
-              </Link>
-            )}
             <Link
               href="/profile"
               className="block px-4 py-2 text-sm text-[#2d2d2d] hover:bg-[#f5f5f0]"
@@ -63,6 +54,39 @@ export function UserMenu({ email, fullName, role, isAdmin }: UserMenuProps) {
             >
               Profile
             </Link>
+            {isAdmin && (
+              <>
+                <hr className="my-1 border-[#e5e5e0]" />
+                <Link
+                  href="/admin"
+                  className="block px-4 py-2 text-sm text-[#2d2d2d] hover:bg-[#f5f5f0]"
+                  onClick={() => setOpen(false)}
+                >
+                  Admin Dashboard
+                </Link>
+                <Link
+                  href="/admin/courses"
+                  className="block px-4 py-2 text-sm text-[#2d2d2d] hover:bg-[#f5f5f0]"
+                  onClick={() => setOpen(false)}
+                >
+                  Courses
+                </Link>
+                <Link
+                  href="/admin/teachers"
+                  className="block px-4 py-2 text-sm text-[#2d2d2d] hover:bg-[#f5f5f0]"
+                  onClick={() => setOpen(false)}
+                >
+                  Teachers
+                </Link>
+                <Link
+                  href="/admin/pdf-regenerate"
+                  className="block px-4 py-2 text-sm text-[#2d2d2d] hover:bg-[#f5f5f0]"
+                  onClick={() => setOpen(false)}
+                >
+                  Batch PDF Regeneration
+                </Link>
+              </>
+            )}
             <hr className="my-1 border-[#e5e5e0]" />
             <Link
               href="/auth/signout"

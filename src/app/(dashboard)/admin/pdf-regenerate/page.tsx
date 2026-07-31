@@ -32,6 +32,7 @@ interface BatchResult {
       discipline: string;
       grade: string;
     } | null;
+    file_size: number | null;
   } | null;
 }
 
@@ -50,23 +51,22 @@ export default function BatchPdfRegeneratePage() {
   const [results, setResults] = useState<BatchResult[]>([]);
   const [pagination, setPagination] = useState<Pagination | null>(null);
   const [statusFilter, setStatusFilter] = useState<"all" | "success" | "failed">("all");
+  const [sortField, setSortField] = useState<"lesson_number" | "title" | "file_size" | null>(null);
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [confirmMode, setConfirmMode] = useState<"start" | "resume">("start");
   const [showLogModal, setShowLogModal] = useState(false);
   const [selectedError, setSelectedError] = useState<string | null>(null);
   const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
+  const [selectedErrorMessage, setSelectedErrorMessage] = useState<string | null>(null);
   const [logData, setLogData] = useState<any>(null);
   const [logLoading, setLogLoading] = useState(false);
   const processingRef = useRef(false);
   const processingQueueRef = useRef<string[]>([]);
   const processedRef = useRef<Set<string>>(new Set());
   const jobIdRef = useRef<string | null>(null);
-  const statusFilterRef = useRef(statusFilter);
   const paginationPageRef = useRef(1);
   const resumeModeRef = useRef(false);
-
-  // Keep refs in sync
-  statusFilterRef.current = statusFilter;
 
   // Fetch current job status
   const fetchCurrentJob = useCallback(async () => {
@@ -129,7 +129,11 @@ export default function BatchPdfRegeneratePage() {
 
   // Fetch results with pagination
   const fetchResults = useCallback(async (page: number = 1, filter: "all" | "success" | "failed" = "all") => {
-    if (!jobIdRef.current) return;
+    const currentJobId = jobIdRef.current;
+    if (!currentJobId) {
+      console.log("[fetchResults] No jobId, skipping");
+      return;
+    }
     try {
       const params = new URLSearchParams({
         page: page.toString(),
@@ -138,12 +142,16 @@ export default function BatchPdfRegeneratePage() {
       if (filter !== "all") {
         params.set("status", filter);
       }
-      const res = await fetch(`/api/batch/${jobIdRef.current}?${params}`);
+      console.log("[fetchResults] Fetching results for job:", currentJobId);
+      const res = await fetch(`/api/batch/${currentJobId}?${params}`);
+      if (!res.ok) {
+        throw new Error(`HTTP error: ${res.status}`);
+      }
       const data = await res.json();
       setResults(data.results || []);
       setPagination(data.pagination);
     } catch (error) {
-      console.error("Error fetching results:", error);
+      console.error("[fetchResults] Error:", error);
     }
   }, []);
 
@@ -159,7 +167,7 @@ export default function BatchPdfRegeneratePage() {
 
   // Fetch results when job changes
   useEffect(() => {
-    if (job) {
+    if (job && jobIdRef.current) {
       fetchResults(1, statusFilter);
     }
   }, [job, statusFilter, fetchResults]);
@@ -179,18 +187,6 @@ export default function BatchPdfRegeneratePage() {
       paginationPageRef.current = pagination.page;
     }
   }, [pagination]);
-
-  // Poll for updates while running (using refs to avoid dependency changes)
-  useEffect(() => {
-    if (!job || job.status !== "processing") return;
-
-    const pollInterval = setInterval(async () => {
-      await fetchCurrentJob();
-      await fetchResults(paginationPageRef.current, statusFilterRef.current);
-    }, 2000);
-
-    return () => clearInterval(pollInterval);
-  }, [job, fetchCurrentJob, fetchResults]);
 
   // Process a single lesson PDF
   const processLesson = async (lessonId: string, jobId: string): Promise<{ success: boolean; error?: string }> => {
@@ -236,31 +232,65 @@ export default function BatchPdfRegeneratePage() {
     }
   };
 
+  // Format bytes to MB
+  const formatFileSize = (bytes: number | null): string => {
+    if (bytes === null || bytes === undefined) return "-";
+    const mb = bytes / (1024 * 1024);
+    if (mb < 0.01) return "< 0.01 MB";
+    return `${mb.toFixed(2)} MB`;
+  };
+
+  // Get simple error reason from error message
+  const getSimpleErrorReason = (errorMsg: string | null): string => {
+    if (!errorMsg) return "Unknown error";
+    if (errorMsg.includes("too large") || errorMsg.includes("file size")) return "File size exceeded";
+    if (errorMsg.includes("timeout") || errorMsg.includes("timed out")) return "Generation timed out";
+    if (errorMsg.includes("Failed to fetch") || errorMsg.includes("network")) return "Network error";
+    if (errorMsg.includes("not configured")) return "Service not configured";
+    if (errorMsg.includes("Unauthorized") || errorMsg.includes("access")) return "Access denied";
+    if (errorMsg.includes("not found")) return "Resource not found";
+    return errorMsg.substring(0, 50);
+  };
+
+  // Sort results
+  const getSortedResults = () => {
+    if (!sortField) return results;
+    return [...results].sort((a, b) => {
+      let aVal: any, bVal: any;
+      if (sortField === "lesson_number") {
+        aVal = a.lesson?.lesson_number ?? 0;
+        bVal = b.lesson?.lesson_number ?? 0;
+      } else if (sortField === "title") {
+        aVal = a.lesson?.title ?? "";
+        bVal = b.lesson?.title ?? "";
+      } else if (sortField === "file_size") {
+        aVal = a.lesson?.file_size ?? 0;
+        bVal = b.lesson?.file_size ?? 0;
+      }
+      if (aVal < bVal) return sortDirection === "asc" ? -1 : 1;
+      if (aVal > bVal) return sortDirection === "asc" ? 1 : -1;
+      return 0;
+    });
+  };
+
   // Retry failed lessons (reset them to pending)
   const retryFailed = async () => {
     if (!jobIdRef.current) return;
 
+    if (!confirm("This will reset all failed lessons to pending. Continue?")) return;
+
     setLoading(true);
     try {
-      // Fetch all failed for this job
-      const params = new URLSearchParams({ pageSize: "1000", status: "failed" });
-      const res = await fetch(`/api/batch/${jobIdRef.current}?${params}`);
+      const res = await fetch(`/api/batch/${jobIdRef.current}/retry-failed`, {
+        method: "POST",
+      });
       const data = await res.json();
 
-      if (data.results && data.results.length > 0) {
-        // Reset each failed result to pending
-        for (const result of data.results) {
-          await fetch(`/api/batch/${jobIdRef.current}/results`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              lessonId: result.lesson_id,
-              status: "pending",
-              errorMessage: null,
-            }),
-          });
-        }
-        // Refresh job state
+      if (!res.ok) {
+        alert(data.error || "Failed to retry failed lessons");
+      } else {
+        console.log("[Retry] Reset", data.count, "failed lessons to pending");
+        // Refresh job state and results
         await fetchCurrentJob();
         await fetchResults(1, "all");
       }
@@ -306,7 +336,7 @@ export default function BatchPdfRegeneratePage() {
 
         // Refresh data
         await fetchCurrentJob();
-        await fetchResults(paginationPageRef.current, statusFilterRef.current);
+        await fetchResults(paginationPageRef.current, statusFilter);
       }
 
       console.log("[Resume] Processing complete");
@@ -390,7 +420,7 @@ export default function BatchPdfRegeneratePage() {
 
         // Refresh data
         await fetchCurrentJob();
-        await fetchResults(paginationPageRef.current, statusFilterRef.current);
+        await fetchResults(paginationPageRef.current, statusFilter);
       }
 
       console.log("[Batch] Processing complete");
@@ -407,8 +437,9 @@ export default function BatchPdfRegeneratePage() {
   };
 
   // View log for a failed lesson
-  const viewLog = async (lessonId: string) => {
+  const viewLog = async (lessonId: string, errorMessage: string | null = null) => {
     setSelectedLessonId(lessonId);
+    setSelectedErrorMessage(errorMessage);
     setLogLoading(true);
     setShowLogModal(true);
 
@@ -497,6 +528,19 @@ export default function BatchPdfRegeneratePage() {
               </Button>
               <Button
                 onClick={() => {
+                  if (confirm("Are you sure you want to cancel this batch?")) {
+                    fetch(`/api/batch/${job.id}/cancel`, { method: "POST" });
+                    fetchCurrentJob();
+                  }
+                }}
+                variant="outline"
+                size="sm"
+                className="border-red-500 text-red-500 hover:bg-red-50"
+              >
+                Cancel Batch
+              </Button>
+              <Button
+                onClick={() => {
                   setConfirmMode("start");
                   setShowConfirmModal(true);
                 }}
@@ -504,6 +548,26 @@ export default function BatchPdfRegeneratePage() {
                 className="border-[#0d7377] text-[#0d7377] hover:bg-[#0d7377] hover:text-white"
               >
                 Start New Batch
+              </Button>
+              <Button
+                onClick={async () => {
+                  if (!confirm("Sync counters from database? This fixes out-of-sync job counts.")) return;
+                  const res = await fetch(`/api/batch/${job.id}/sync-counters`, { method: "POST" });
+                  const data = await res.json();
+                  if (data.success) {
+                    console.log("[Sync] Counters:", data.counters);
+                    await fetchCurrentJob();
+                    await fetchResults(1, "all");
+                  } else {
+                    alert(data.error || "Failed to sync");
+                  }
+                }}
+                variant="outline"
+                size="sm"
+                className="border-orange-500 text-orange-500 hover:bg-orange-50"
+                title="Fix out-of-sync job counters"
+              >
+                Sync Counters
               </Button>
             </div>
           )}
@@ -587,6 +651,25 @@ export default function BatchPdfRegeneratePage() {
                   Retry Failed
                 </Button>
               )}
+              <Button
+                onClick={async () => {
+                  if (!confirm("Sync counters from database? This fixes out-of-sync job counts.")) return;
+                  const res = await fetch(`/api/batch/${job.id}/sync-counters`, { method: "POST" });
+                  const data = await res.json();
+                  if (data.success) {
+                    console.log("[Sync] Counters:", data.counters);
+                    await fetchCurrentJob();
+                    await fetchResults(1, "all");
+                  } else {
+                    alert(data.error || "Failed to sync");
+                  }
+                }}
+                variant="outline"
+                size="sm"
+                className="border-purple-500 text-purple-500 hover:bg-purple-50"
+              >
+                Sync Counters
+              </Button>
             </div>
 
             {/* Filter tabs */}
@@ -628,13 +711,38 @@ export default function BatchPdfRegeneratePage() {
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Discipline</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Grade</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Lesson</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Title</th>
+                  <th
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
+                    onClick={() => {
+                      if (sortField === "title") {
+                        setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+                      } else {
+                        setSortField("title");
+                        setSortDirection("asc");
+                      }
+                    }}
+                  >
+                    Title {sortField === "title" && (sortDirection === "asc" ? "↑" : "↓")}
+                  </th>
+                  <th
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
+                    onClick={() => {
+                      if (sortField === "file_size") {
+                        setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+                      } else {
+                        setSortField("file_size");
+                        setSortDirection("desc");
+                      }
+                    }}
+                  >
+                    PDF Size {sortField === "file_size" && (sortDirection === "asc" ? "↑" : "↓")}
+                  </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {results.map((result) => (
+                {getSortedResults().map((result) => (
                   <tr key={result.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 text-sm text-gray-900">
                       {result.lesson?.course?.discipline || "-"}
@@ -647,6 +755,9 @@ export default function BatchPdfRegeneratePage() {
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-900 truncate max-w-xs">
                       {result.lesson?.title || "-"}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-900">
+                      {formatFileSize(result.lesson?.file_size ?? null)}
                     </td>
                     <td className="px-4 py-3">
                       {result.status === "success" && (
@@ -661,7 +772,7 @@ export default function BatchPdfRegeneratePage() {
                       )}
                       {result.status === "pending" && (
                         <span className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 text-gray-800 rounded text-xs">
-                          <Loader2 className="w-3 h-3 animate-spin" /> Pending
+                          Pending
                         </span>
                       )}
                     </td>
@@ -669,7 +780,7 @@ export default function BatchPdfRegeneratePage() {
                       <div className="flex justify-end gap-2">
                         {result.status === "failed" && (
                           <button
-                            onClick={() => viewLog(result.lesson_id)}
+                            onClick={() => viewLog(result.lesson_id, result.error_message)}
                             className="p-1 hover:bg-gray-200 rounded text-gray-600"
                             title="View Log"
                           >
@@ -791,6 +902,14 @@ export default function BatchPdfRegeneratePage() {
                 <X className="w-5 h-5" />
               </button>
             </div>
+            {selectedErrorMessage && (
+              <div className="px-4 py-3 bg-red-50 border-b border-red-200">
+                <p className="text-sm font-medium text-red-800">
+                  Reason: {getSimpleErrorReason(selectedErrorMessage)}
+                </p>
+                <p className="text-xs text-red-600 mt-1">{selectedErrorMessage}</p>
+              </div>
+            )}
             <div className="flex-1 overflow-auto p-4">
               {logLoading ? (
                 <div className="flex items-center justify-center py-12">
