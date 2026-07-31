@@ -1,8 +1,8 @@
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { cookies } from "next/headers";
 import { UserMenu } from "@/components/user-menu";
 import Link from "next/link";
+import Footer from "@/components/home/Footer";
 
 export default async function DashboardLayout({
   children,
@@ -11,8 +11,6 @@ export default async function DashboardLayout({
 }) {
   const supabase = await createClient();
   const supabaseAdmin = await createServiceClient();
-  const cookieStore = await cookies();
-  const viewAs = cookieStore.get("view_as")?.value || "admin";
 
   const {
     data: { user },
@@ -36,7 +34,7 @@ export default async function DashboardLayout({
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-20">
             <div style={{ height: '72px', paddingTop: '6px', paddingBottom: '6px' }}>
-              <Link href={viewAs === "admin" ? "/admin" : "/teacher"} className="block h-full">
+              <Link href="/dashboard" className="block h-full">
                 <img
                   src="/images/performers-ready.png"
                   alt="Performers Ready!"
@@ -50,13 +48,13 @@ export default async function DashboardLayout({
                 fullName={profile?.full_name || null}
                 role={profile?.role || "teacher"}
                 isAdmin={isAdmin}
-                viewAs={viewAs}
               />
             </div>
           </div>
         </div>
       </header>
       <main className="py-2">{children}</main>
+      <Footer />
     </div>
   );
 }

@@ -43,18 +43,13 @@ export async function middleware(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname;
 
+  if (pathname.startsWith("/teacher")) {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
+  }
+
   if (pathname.startsWith("/login") || pathname.startsWith("/signup")) {
     if (user) {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", user.id)
-        .single();
-
-      if (profile?.role === "admin") {
-        return NextResponse.redirect(new URL("/admin", request.url));
-      }
-      return NextResponse.redirect(new URL("/teacher", request.url));
+      return NextResponse.redirect(new URL("/dashboard", request.url));
     }
     return supabaseResponse;
   }
@@ -70,11 +65,11 @@ export async function middleware(request: NextRequest) {
       .single();
 
     if (profile?.role !== "admin") {
-      return NextResponse.redirect(new URL("/teacher", request.url));
+      return NextResponse.redirect(new URL("/dashboard", request.url));
     }
   }
 
-  if (pathname.startsWith("/teacher")) {
+  if (pathname.startsWith("/dashboard")) {
     if (!user) {
       return NextResponse.redirect(new URL("/login", request.url));
     }

@@ -1,20 +1,16 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
 
 interface UserMenuProps {
   email: string;
   fullName: string | null;
   role: string;
   isAdmin: boolean;
-  viewAs: string;
 }
 
-export function UserMenu({ email, fullName, role, isAdmin, viewAs }: UserMenuProps) {
-  const router = useRouter();
+export function UserMenu({ email, fullName, role, isAdmin }: UserMenuProps) {
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -45,12 +41,21 @@ export function UserMenu({ email, fullName, role, isAdmin, viewAs }: UserMenuPro
         <div className="absolute right-0 mt-2 w-48 bg-white border border-[#e5e5e0] rounded-lg shadow-lg z-50">
           <div className="py-1">
             <Link
-              href={viewAs === "teacher" ? "/teacher" : "/admin"}
+              href="/dashboard"
               className="block px-4 py-2 text-sm text-[#2d2d2d] hover:bg-[#f5f5f0]"
               onClick={() => setOpen(false)}
             >
               Dashboard
             </Link>
+            {isAdmin && (
+              <Link
+                href="/admin"
+                className="block px-4 py-2 text-sm text-[#2d2d2d] hover:bg-[#f5f5f0]"
+                onClick={() => setOpen(false)}
+              >
+                Admin Dashboard
+              </Link>
+            )}
             <Link
               href="/profile"
               className="block px-4 py-2 text-sm text-[#2d2d2d] hover:bg-[#f5f5f0]"
@@ -58,31 +63,13 @@ export function UserMenu({ email, fullName, role, isAdmin, viewAs }: UserMenuPro
             >
               Profile
             </Link>
-            {isAdmin && viewAs === "admin" && (
-              <Link
-                href="/api/toggle-view?view=teacher"
-                className="block px-4 py-2 text-sm text-[#2d2d2d] hover:bg-[#f5f5f0]"
-                onClick={() => setOpen(false)}
-              >
-                View as Teacher
-              </Link>
-            )}
-            {isAdmin && viewAs === "teacher" && (
-              <Link
-                href="/api/toggle-view?view=admin"
-                className="block px-4 py-2 text-sm text-[#2d2d2d] hover:bg-[#f5f5f0]"
-                onClick={() => setOpen(false)}
-              >
-                View as Admin
-              </Link>
-            )}
             <hr className="my-1 border-[#e5e5e0]" />
             <Link
-                href="/auth/signout"
-                className="block px-4 py-2 text-sm text-[#e85d5d] hover:bg-[#f5f5f0]"
-              >
-                Log Out
-              </Link>
+              href="/auth/signout"
+              className="block px-4 py-2 text-sm text-[#e85d5d] hover:bg-[#f5f5f0]"
+            >
+              Log Out
+            </Link>
           </div>
         </div>
       )}
