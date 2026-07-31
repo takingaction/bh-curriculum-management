@@ -59,6 +59,12 @@ export default function BatchPdfRegeneratePage() {
   const processingRef = useRef(false);
   const processingQueueRef = useRef<string[]>([]);
   const processedRef = useRef<Set<string>>(new Set());
+  const jobIdRef = useRef<string | null>(null);
+  const statusFilterRef = useRef(statusFilter);
+  const paginationPageRef = useRef(1);
+
+  // Keep refs in sync
+  statusFilterRef.current = statusFilter;
 
   // Fetch current job status
   const fetchCurrentJob = useCallback(async () => {
@@ -68,12 +74,14 @@ export default function BatchPdfRegeneratePage() {
       if (data.job) {
         setJob(data.job);
         setIsRunning(data.isRunning);
+        jobIdRef.current = data.job.id;
         if (data.isRunning) {
           processingRef.current = true;
         }
       } else {
         setJob(null);
         setIsRunning(false);
+        jobIdRef.current = null;
       }
     } catch (error) {
       console.error("Error fetching job:", error);
@@ -82,7 +90,7 @@ export default function BatchPdfRegeneratePage() {
 
   // Fetch results with pagination
   const fetchResults = useCallback(async (page: number = 1, filter: "all" | "success" | "failed" = "all") => {
-    if (!job) return;
+    if (!jobIdRef.current) return;
     try {
       const params = new URLSearchParams({
         page: page.toString(),
@@ -91,14 +99,14 @@ export default function BatchPdfRegeneratePage() {
       if (filter !== "all") {
         params.set("status", filter);
       }
-      const res = await fetch(`/api/batch/${job.id}?${params}`);
+      const res = await fetch(`/api/batch/${jobIdRef.current}?${params}`);
       const data = await res.json();
       setResults(data.results || []);
       setPagination(data.pagination);
     } catch (error) {
       console.error("Error fetching results:", error);
     }
-  }, [job]);
+  }, []);
 
   // Initial load
   useEffect(() => {
@@ -117,17 +125,24 @@ export default function BatchPdfRegeneratePage() {
     }
   }, [job, statusFilter, fetchResults]);
 
-  // Poll for updates while running
+  // Sync pagination page ref when pagination changes
+  useEffect(() => {
+    if (pagination?.page) {
+      paginationPageRef.current = pagination.page;
+    }
+  }, [pagination]);
+
+  // Poll for updates while running (using refs to avoid dependency changes)
   useEffect(() => {
     if (!job || job.status !== "processing") return;
 
     const pollInterval = setInterval(async () => {
       await fetchCurrentJob();
-      await fetchResults(pagination?.page || 1, statusFilter);
+      await fetchResults(paginationPageRef.current, statusFilterRef.current);
     }, 2000);
 
     return () => clearInterval(pollInterval);
-  }, [job?.status, pagination?.page, statusFilter, fetchCurrentJob, fetchResults]);
+  }, [job, fetchCurrentJob, fetchResults]);
 
   // Process a single lesson PDF
   const processLesson = async (lessonId: string, jobId: string): Promise<{ success: boolean; error?: string }> => {
@@ -251,6 +266,7 @@ export default function BatchPdfRegeneratePage() {
 
   // Pagination handlers
   const goToPage = (page: number) => {
+    paginationPageRef.current = page;
     if (job) {
       fetchResults(page, statusFilter);
     }
