@@ -114,6 +114,7 @@ This ensures existing CFUs in database work regardless of which format their att
 - **Wrapped CFUs** (wrap-top-left, wrap-top-right, etc.): `display: flow-root` for proper float containment
 - **Section headers** (`.section-header`): `clear: both` to prevent overlap with floated CFUs from previous section
 - **CFU margins with !important**: All CFU alignment classes have `!important` to override inline styles
+- **Lesson Outline bullets**: Uses `margin-bottom: -5px` (negative margin) to close up vertical space between bullet items
 - **Key CSS patterns**:
   ```css
   .lesson-content [data-check-for-understanding="true"] {
@@ -132,6 +133,9 @@ This ensures existing CFUs in database work regardless of which format their att
     margin: 0 20px 16px 0 !important;
   }
   /* etc for all alignment classes */
+  .left-column .lesson-content li {
+    margin-bottom: -5px;  /* tighter bullet spacing in lesson outline */
+  }
   ```
 
 #### Table Extensions
