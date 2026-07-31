@@ -33,9 +33,6 @@ export async function POST() {
       console.error("Error clearing old jobs:", clearError);
     }
 
-    // Also clear old result records
-    await supabaseAdmin.from("batch_pdf_results").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-
     // Get all lesson IDs
     const { data: lessons, error: lessonsError } = await supabaseAdmin
       .from("lessons")
@@ -47,16 +44,6 @@ export async function POST() {
     }
 
     const lessonIds = lessons?.map(l => l.id) || [];
-
-    // Delete old jobs (keep none - we'll create fresh)
-    const { error: deleteOldError } = await supabaseAdmin
-      .from("batch_pdf_jobs")
-      .delete()
-      .neq("id", "00000000-0000-0000-0000-000000000000"); // Delete all (this is a temp solution)
-
-    if (deleteOldError) {
-      console.error("Error deleting old jobs:", deleteOldError);
-    }
 
     // Create new batch job
     const { data: job, error: jobError } = await supabaseAdmin

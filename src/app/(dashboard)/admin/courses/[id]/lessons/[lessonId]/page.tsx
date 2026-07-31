@@ -442,8 +442,7 @@ export default function EditLessonPage({
               >
                 Lesson Materials
               </button>
-              {userEmail === 'ron@myherocreative.com' && (
-                <button
+              <button
                   type="button"
                   onClick={() => setActivePanel('pdf')}
                   className={`w-full text-left px-2 py-1.5 text-xs font-medium transition-colors truncate ${
@@ -454,7 +453,6 @@ export default function EditLessonPage({
                 >
                   PDF
                 </button>
-              )}
             </div>
             <div className="w-full h-px bg-[#e5e5e0] my-2" />
             {/* Section buttons */}
@@ -547,7 +545,7 @@ export default function EditLessonPage({
             )}
 
             {/* PDF Panel */}
-            {activePanel === 'pdf' && userEmail === 'ron@myherocreative.com' && (
+            {activePanel === 'pdf' && (
               <div className="bg-white rounded-lg border border-[#e5e5e0] p-4 space-y-4">
                 <h3 className="text-lg font-semibold text-[#2d2d2d]">PDF Generation</h3>
                 {pdfLoading ? (

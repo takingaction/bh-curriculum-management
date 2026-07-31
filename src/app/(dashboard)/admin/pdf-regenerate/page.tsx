@@ -51,6 +51,7 @@ export default function BatchPdfRegeneratePage() {
   const [pagination, setPagination] = useState<Pagination | null>(null);
   const [statusFilter, setStatusFilter] = useState<"all" | "success" | "failed">("all");
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [confirmMode, setConfirmMode] = useState<"start" | "resume">("start");
   const [showLogModal, setShowLogModal] = useState(false);
   const [selectedError, setSelectedError] = useState<string | null>(null);
   const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
@@ -62,6 +63,7 @@ export default function BatchPdfRegeneratePage() {
   const jobIdRef = useRef<string | null>(null);
   const statusFilterRef = useRef(statusFilter);
   const paginationPageRef = useRef(1);
+  const resumeModeRef = useRef(false);
 
   // Keep refs in sync
   statusFilterRef.current = statusFilter;
@@ -73,18 +75,55 @@ export default function BatchPdfRegeneratePage() {
       const data = await res.json();
       if (data.job) {
         setJob(data.job);
-        setIsRunning(data.isRunning);
         jobIdRef.current = data.job.id;
-        if (data.isRunning) {
-          processingRef.current = true;
-        }
       } else {
         setJob(null);
-        setIsRunning(false);
         jobIdRef.current = null;
+        resumeModeRef.current = false;
       }
     } catch (error) {
       console.error("Error fetching job:", error);
+    }
+  }, []);
+
+  // Fetch already processed lesson IDs (for resume)
+  const fetchAlreadyProcessedIds = useCallback(async (jobId: string) => {
+    try {
+      // Fetch all success and failed results to populate processedRef
+      const params = new URLSearchParams({ pageSize: "1000", status: "success" });
+      const successRes = await fetch(`/api/batch/${jobId}?${params}`);
+      const successData = await successRes.json();
+      if (successData.results) {
+        successData.results.forEach((r: BatchResult) => {
+          processedRef.current.add(r.lesson_id);
+        });
+      }
+
+      const failedParams = new URLSearchParams({ pageSize: "1000", status: "failed" });
+      const failedRes = await fetch(`/api/batch/${jobId}?${failedParams}`);
+      const failedData = await failedRes.json();
+      if (failedData.results) {
+        failedData.results.forEach((r: BatchResult) => {
+          processedRef.current.add(r.lesson_id);
+        });
+      }
+    } catch (error) {
+      console.error("Error fetching already processed IDs:", error);
+    }
+  }, []);
+
+  // Fetch pending lessons for resume
+  const fetchPendingLessons = useCallback(async (jobId: string): Promise<string[]> => {
+    try {
+      const res = await fetch(`/api/batch/${jobId}/pending`);
+      const data = await res.json();
+      if (data.pendingLessons) {
+        return data.pendingLessons.map((p: any) => p.lesson_id);
+      }
+      return [];
+    } catch (error) {
+      console.error("Error fetching pending lessons:", error);
+      return [];
     }
   }, []);
 
@@ -124,6 +163,15 @@ export default function BatchPdfRegeneratePage() {
       fetchResults(1, statusFilter);
     }
   }, [job, statusFilter, fetchResults]);
+
+  // Detect stuck job (processing but not actively running in this session)
+  useEffect(() => {
+    if (job?.status === "processing" && !isRunning) {
+      resumeModeRef.current = true;
+      // Fetch already processed IDs for resume
+      fetchAlreadyProcessedIds(job.id);
+    }
+  }, [job, isRunning, fetchAlreadyProcessedIds]);
 
   // Sync pagination page ref when pagination changes
   useEffect(() => {
@@ -188,12 +236,104 @@ export default function BatchPdfRegeneratePage() {
     }
   };
 
-  // Start batch process
+  // Retry failed lessons (reset them to pending)
+  const retryFailed = async () => {
+    if (!jobIdRef.current) return;
+
+    setLoading(true);
+    try {
+      // Fetch all failed for this job
+      const params = new URLSearchParams({ pageSize: "1000", status: "failed" });
+      const res = await fetch(`/api/batch/${jobIdRef.current}?${params}`);
+      const data = await res.json();
+
+      if (data.results && data.results.length > 0) {
+        // Reset each failed result to pending
+        for (const result of data.results) {
+          await fetch(`/api/batch/${jobIdRef.current}/results`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              lessonId: result.lesson_id,
+              status: "pending",
+              errorMessage: null,
+            }),
+          });
+        }
+        // Refresh job state
+        await fetchCurrentJob();
+        await fetchResults(1, "all");
+      }
+    } catch (error) {
+      console.error("Error retrying failed:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Resume batch processing
+  const resumeBatch = async () => {
+    if (!job || job.status !== "processing") return;
+
+    setShowConfirmModal(false);
+    setLoading(true);
+    processingRef.current = true;
+
+    try {
+      jobIdRef.current = job.id;
+      const pendingLessonIds = await fetchPendingLessons(job.id);
+      console.log("[Resume] Pending lessons:", pendingLessonIds.length);
+      processingQueueRef.current = pendingLessonIds;
+
+      setIsRunning(true);
+
+      // Process pending lessons
+      for (const lessonId of processingQueueRef.current) {
+        if (!processingRef.current) {
+          console.log("[Resume] Processing cancelled by user");
+          break;
+        }
+        if (processedRef.current.has(lessonId)) {
+          console.log("[Resume] Already processed:", lessonId);
+          continue;
+        }
+
+        console.log("[Resume] Processing lesson:", lessonId);
+        const result = await processLesson(lessonId, job.id);
+        console.log("[Resume] Lesson result:", lessonId, result.success ? "SUCCESS" : "FAILED", result.error);
+        await submitResult(job.id, lessonId, result.success, result.error);
+        processedRef.current.add(lessonId);
+
+        // Refresh data
+        await fetchCurrentJob();
+        await fetchResults(paginationPageRef.current, statusFilterRef.current);
+      }
+
+      console.log("[Resume] Processing complete");
+      processingRef.current = false;
+      resumeModeRef.current = false;
+      await fetchCurrentJob();
+      await fetchResults(1, statusFilter);
+
+    } catch (error: any) {
+      console.error("Resume error:", error);
+      alert(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Start new batch (fresh start)
   const startBatch = async () => {
     setShowConfirmModal(false);
     setLoading(true);
 
     try {
+      // Clear processed refs for fresh start
+      processedRef.current = new Set();
+      processingQueueRef.current = [];
+      resumeModeRef.current = false;
+
       // Start the batch job
       const res = await fetch("/api/batch/pdf-regenerate", { method: "POST" });
       const data = await res.json();
@@ -207,7 +347,6 @@ export default function BatchPdfRegeneratePage() {
       const { jobId, totalCount } = data;
       console.log("[Batch] Job created:", jobId, "Total:", totalCount);
       processingRef.current = true;
-      processingQueueRef.current = [];
 
       // Fetch all lessons
       console.log("[Batch] Fetching lessons...");
@@ -344,9 +483,36 @@ export default function BatchPdfRegeneratePage() {
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold text-[#2d2d2d]">Batch PDF Regeneration</h1>
-          {!isRunning && job?.status !== "completed" && (
+          {job?.status === "processing" && !isRunning && (
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-red-600 font-medium">Stuck job detected</span>
+              <Button
+                onClick={() => {
+                  setConfirmMode("resume");
+                  setShowConfirmModal(true);
+                }}
+                className="bg-[#0d7377] hover:bg-[#0a5c5f] text-white"
+              >
+                Resume Batch
+              </Button>
+              <Button
+                onClick={() => {
+                  setConfirmMode("start");
+                  setShowConfirmModal(true);
+                }}
+                variant="outline"
+                className="border-[#0d7377] text-[#0d7377] hover:bg-[#0d7377] hover:text-white"
+              >
+                Start New Batch
+              </Button>
+            </div>
+          )}
+          {!isRunning && job?.status !== "completed" && job?.status !== "processing" && (
             <Button
-              onClick={() => setShowConfirmModal(true)}
+              onClick={() => {
+                setConfirmMode("start");
+                setShowConfirmModal(true);
+              }}
               className="bg-[#0d7377] hover:bg-[#0a5c5f] text-white"
             >
               Start New Batch
@@ -358,21 +524,16 @@ export default function BatchPdfRegeneratePage() {
               <span>Batch in Progress...</span>
             </div>
           )}
-          {job?.status === "processing" && !isRunning && (
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-red-600">Stuck job detected</span>
-              <Button
-                onClick={async () => {
-                  await fetch("/api/batch/clear-stuck", { method: "POST" });
-                  await fetchCurrentJob();
-                }}
-                variant="outline"
-                size="sm"
-                className="border-red-600 text-red-600 hover:bg-red-50"
-              >
-                Clear Stuck Job
-              </Button>
-            </div>
+          {job?.status === "completed" && (
+            <Button
+              onClick={() => {
+                setConfirmMode("start");
+                setShowConfirmModal(true);
+              }}
+              className="bg-[#0d7377] hover:bg-[#0a5c5f] text-white"
+            >
+              Start New Batch
+            </Button>
           )}
         </div>
 
@@ -406,7 +567,7 @@ export default function BatchPdfRegeneratePage() {
             </div>
 
             {/* Stats */}
-            <div className="flex gap-6">
+            <div className="flex gap-6 items-center">
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="w-5 h-5 text-green-600" />
                 <span className="text-sm text-gray-700">{job.success_count} Success</span>
@@ -415,6 +576,17 @@ export default function BatchPdfRegeneratePage() {
                 <XCircle className="w-5 h-5 text-red-600" />
                 <span className="text-sm text-gray-700">{job.failure_count} Failed</span>
               </div>
+              {job.failure_count > 0 && (
+                <Button
+                  onClick={retryFailed}
+                  variant="outline"
+                  size="sm"
+                  className="border-orange-500 text-orange-500 hover:bg-orange-50"
+                  disabled={loading}
+                >
+                  Retry Failed
+                </Button>
+              )}
             </div>
 
             {/* Filter tabs */}
@@ -582,16 +754,25 @@ export default function BatchPdfRegeneratePage() {
       {showConfirmModal && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg max-w-md w-full p-6">
-            <h2 className="text-xl font-bold text-[#2d2d2d] mb-4">Confirm Batch Regeneration</h2>
+            <h2 className="text-xl font-bold text-[#2d2d2d] mb-4">
+              {confirmMode === "resume" ? "Resume Batch" : "Start New Batch"}
+            </h2>
             <p className="text-gray-600 mb-6">
-              This will regenerate PDFs for all 720 lessons. This may take several hours. Continue?
+              {confirmMode === "resume" ? (
+                <>This will resume processing <strong>{job?.total_count && job?.processed_count ? job.total_count - job.processed_count : "the remaining"}</strong> pending lessons from where the batch stalled. Previous results are preserved.</>
+              ) : (
+                <>This will create a NEW batch job and regenerate PDFs for all lessons. The previous batch will remain in history for reference.</>
+              )}
             </p>
             <div className="flex justify-end gap-3">
               <Button variant="outline" onClick={() => setShowConfirmModal(false)}>
                 Cancel
               </Button>
-              <Button onClick={startBatch} className="bg-[#0d7377] hover:bg-[#0a5c5f] text-white">
-                Start Batch
+              <Button
+                onClick={confirmMode === "resume" ? resumeBatch : startBatch}
+                className="bg-[#0d7377] hover:bg-[#0a5c5f] text-white"
+              >
+                {confirmMode === "resume" ? "Resume" : "Start Batch"}
               </Button>
             </div>
           </div>

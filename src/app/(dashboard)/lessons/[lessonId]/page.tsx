@@ -279,21 +279,29 @@ export default function LessonContentPage({
 
               <div className="flex gap-4 mt-4">
                 <Link
-                  href={isAdmin ? `/admin/courses/${course.id}` : `/teacher/courses/${course.id}`}
+                  href={`/dashboard/courses/${course.id}`}
                   className="text-[#0d7377] hover:underline text-sm"
                 >
                   ← Back to Course
                 </Link>
-                <Link href={isAdmin ? "/admin" : "/teacher"} className="text-[#0d7377] hover:underline text-sm">
+                <Link href="/dashboard" className="text-[#0d7377] hover:underline text-sm">
                   Back to Dashboard
                 </Link>
                 {isAdmin && (
-                  <Link
-                    href={`/admin/courses/${course.id}/lessons/${lesson.id}`}
-                    className="text-[#e85d5d] hover:underline text-sm font-medium"
-                  >
-                    Edit Lesson
-                  </Link>
+                  <>
+                    <Link
+                      href={`/admin/courses/${course.id}`}
+                      className="text-[#e85d5d] hover:underline text-sm font-medium"
+                    >
+                      Edit Course
+                    </Link>
+                    <Link
+                      href={`/admin/courses/${course.id}/lessons/${lesson.id}`}
+                      className="text-[#e85d5d] hover:underline text-sm font-medium"
+                    >
+                      Edit Lesson
+                    </Link>
+                  </>
                 )}
               </div>
               <div className="mt-4">
@@ -327,7 +335,7 @@ export default function LessonContentPage({
 
             {/* Lesson Materials - 60% width */}
             <div className="flex-1 flex flex-col justify-start py-2">
-              <h3 className="text-sm font-semibold text-gray-700 mb-2">Lesson Materials</h3>
+              <h3 className="text-sm font-semibold text-gray-700 mb-2">Lesson Resources</h3>
               <CompactLessonAssets lessonId={lesson.id} maxItems={6} />
               {lesson.presentation_name && (
                 <div className="mt-2 pt-2 border-t border-gray-200">
@@ -434,21 +442,29 @@ export default function LessonContentPage({
             </div>
             <div className="mt-4 pt-4 border-t border-gray-200 space-y-1">
               <Link
-                href={isAdmin ? `/admin/courses/${course.id}` : `/teacher/courses/${course.id}`}
+                href={`/dashboard/courses/${course.id}`}
                 className="block text-xs text-[#0d7377] hover:underline"
               >
                 ← Back to Course
               </Link>
-              <Link href={isAdmin ? "/admin" : "/teacher"} className="block text-xs text-[#0d7377] hover:underline">
+              <Link href="/dashboard" className="block text-xs text-[#0d7377] hover:underline">
                 Back to Dashboard
               </Link>
               {isAdmin && (
-                <Link
-                  href={`/admin/courses/${course.id}/lessons/${lesson.id}`}
-                  className="block text-xs text-[#e85d5d] hover:underline"
-                >
-                  Edit Lesson
-                </Link>
+                <>
+                  <Link
+                    href={`/admin/courses/${course.id}`}
+                    className="block text-xs text-[#e85d5d] hover:underline"
+                  >
+                    Edit Course
+                  </Link>
+                  <Link
+                    href={`/admin/courses/${course.id}/lessons/${lesson.id}`}
+                    className="block text-xs text-[#e85d5d] hover:underline"
+                  >
+                    Edit Lesson
+                  </Link>
+                </>
               )}
             </div>
           </div>

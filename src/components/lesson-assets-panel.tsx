@@ -314,7 +314,7 @@ export function LessonAssetsPanel({ lessonId, canEdit = false }: LessonAssetsPan
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <h3 className="font-semibold text-sm text-gray-700">Lesson Materials</h3>
+        <h3 className="font-semibold text-sm text-gray-700">Lesson Resources</h3>
         {canEdit && (
           <Button size="sm" variant="outline" onClick={() => setShowLibrary(true)}>
             <PlusIcon className="w-4 h-4 mr-1" />
@@ -324,7 +324,7 @@ export function LessonAssetsPanel({ lessonId, canEdit = false }: LessonAssetsPan
       </div>
 
       {assets.length === 0 ? (
-        <p className="text-sm text-gray-500 italic">No materials attached</p>
+        <p className="text-sm text-gray-500 italic">No resources attached</p>
       ) : (
         <DndContext
           sensors={sensors}
@@ -453,7 +453,7 @@ export function CompactLessonAssets({ lessonId, maxItems = 6 }: CompactLessonAss
   }
 
   if (assets.length === 0) {
-    return <span className="text-xs text-gray-400 italic">No materials</span>;
+    return <span className="text-xs text-gray-400 italic">No resources</span>;
   }
 
   const displayAssets = assets.slice(0, maxItems);
