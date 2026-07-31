@@ -119,7 +119,7 @@ export default function BatchPdfRegeneratePage() {
 
   // Poll for updates while running
   useEffect(() => {
-    if (!isRunning || !job) return;
+    if (!job || job.status !== "processing") return;
 
     const pollInterval = setInterval(async () => {
       await fetchCurrentJob();
@@ -127,7 +127,7 @@ export default function BatchPdfRegeneratePage() {
     }, 2000);
 
     return () => clearInterval(pollInterval);
-  }, [isRunning, job, pagination?.page, statusFilter, fetchCurrentJob, fetchResults]);
+  }, [job?.status, pagination?.page, statusFilter, fetchCurrentJob, fetchResults]);
 
   // Process a single lesson PDF
   const processLesson = async (lessonId: string, jobId: string): Promise<{ success: boolean; error?: string }> => {
@@ -268,6 +268,24 @@ export default function BatchPdfRegeneratePage() {
 
   return (
     <div className="min-h-screen bg-white">
+      {/* Batch in Progress Notification Banner */}
+      {job?.status === "processing" && (
+        <div className="bg-[#0d7377] text-white px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Loader2 className="w-5 h-5 animate-spin" />
+            <span className="font-medium">Batch PDF Regeneration in Progress</span>
+            <span className="text-sm opacity-80">
+              {job.processed_count} / {job.total_count} completed ({Math.round((job.processed_count / job.total_count) * 100)}%)
+            </span>
+          </div>
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-white/80">{job.success_count} success</span>
+            <span className="text-white/80">|</span>
+            <span className="text-white/80">{job.failure_count} failed</span>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
@@ -284,6 +302,22 @@ export default function BatchPdfRegeneratePage() {
             <div className="flex items-center gap-2 text-[#0d7377]">
               <Loader2 className="w-5 h-5 animate-spin" />
               <span>Batch in Progress...</span>
+            </div>
+          )}
+          {job?.status === "processing" && !isRunning && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-red-600">Stuck job detected</span>
+              <Button
+                onClick={async () => {
+                  await fetch("/api/batch/clear-stuck", { method: "POST" });
+                  await fetchCurrentJob();
+                }}
+                variant="outline"
+                size="sm"
+                className="border-red-600 text-red-600 hover:bg-red-50"
+              >
+                Clear Stuck Job
+              </Button>
             </div>
           )}
         </div>
