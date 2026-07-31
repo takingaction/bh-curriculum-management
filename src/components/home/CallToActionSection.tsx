@@ -7,8 +7,8 @@ export default function CallToActionSection() {
         </h2>
         <p className="text-lg sm:text-xl text-[#2d2926] leading-relaxed mb-6">
           For customer support questions or general inquiries contact us at{" "}
-          <a href="mailto:info@performersready.com" className="text-[#0d7377] hover:underline">
-            info@performersready.com
+          <a href="mailto:support@betterhumanseducation.com" className="text-[#0d7377] hover:underline">
+            support@betterhumanseducation.com
           </a>{" "}
           or <a href="tel:916-212-7926" className="text-[#0d7377] hover:underline">(916) 212-7926</a>.
         </p>
