@@ -9,12 +9,15 @@ The "Status" column (Adapted/Original badges) is hidden in this view. It was com
 
 ## Actions Column
 
-The Actions column was updated to show 3 text links instead of a single "View" button:
+The Actions column was updated to show 3 styled buttons instead of text links, matching the lesson navigation buttons:
 - **View Lesson** - links to `/lessons/${lesson.id}`
 - **View PDF** - opens PDF in new tab via `/api/lessons/${lesson.id}/pdf?download=false`
 - **Download PDF** - downloads PDF via `/api/lessons/${lesson.id}/pdf?download=true`
 
-Uses teal styling (`text-[#0d7377] hover:underline`) to match the lesson view page.
+Uses shadcn `Button` component with `variant="outline"` and `size="sm"`, styled with:
+- Teal text color (`text-[#0d7377]`)
+- Light teal hover background (`hover:bg-[#d7ffef]`)
+- Icons: Eye, FileText, Download from lucide-react
 
 ## Resource Links (Sheet Music, etc.)
 

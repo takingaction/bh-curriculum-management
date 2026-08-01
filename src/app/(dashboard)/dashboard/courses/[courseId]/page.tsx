@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Eye, FileText, Download } from "lucide-react";
 
 export default async function TeacherCoursePage({
   params,
@@ -92,18 +93,27 @@ export default async function TeacherCoursePage({
                         <Badge variant="secondary">Original</Badge>
                       )}
                     </TableCell> */}
-                    <TableCell className="flex gap-2 text-sm">
-                      <Link href={`/lessons/${lesson.id}`} className="text-[#0d7377] hover:underline">
-                        View Lesson
-                      </Link>
-                      <span className="text-gray-400">|</span>
-                      <a href={`/api/lessons/${lesson.id}/pdf?download=false`} target="_blank" rel="noopener noreferrer" className="text-[#0d7377] hover:underline">
-                        View PDF
-                      </a>
-                      <span className="text-gray-400">|</span>
-                      <a href={`/api/lessons/${lesson.id}/pdf?download=true`} download className="text-[#0d7377] hover:underline">
-                        Download PDF
-                      </a>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Link href={`/lessons/${lesson.id}`}>
+                          <Button variant="outline" size="sm" className="text-xs text-[#0d7377] border-[#e5e5e0] hover:bg-[#d7ffef]">
+                            <Eye className="w-3 h-3 mr-1" />
+                            View Lesson
+                          </Button>
+                        </Link>
+                        <a href={`/api/lessons/${lesson.id}/pdf?download=false`} target="_blank" rel="noopener noreferrer">
+                          <Button variant="outline" size="sm" className="text-xs text-[#0d7377] border-[#e5e5e0] hover:bg-[#d7ffef]">
+                            <FileText className="w-3 h-3 mr-1" />
+                            View PDF
+                          </Button>
+                        </a>
+                        <a href={`/api/lessons/${lesson.id}/pdf?download=true`} download>
+                          <Button variant="outline" size="sm" className="text-xs text-[#0d7377] border-[#e5e5e0] hover:bg-[#d7ffef]">
+                            <Download className="w-3 h-3 mr-1" />
+                            Download PDF
+                          </Button>
+                        </a>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
