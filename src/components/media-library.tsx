@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -24,10 +25,11 @@ interface MediaLibraryProps {
   courseId: string;
   open: boolean;
   onClose: () => void;
-  onImageSelect?: (imageUrl: string) => void;
+  onImageSelect?: (imageUrl: string, imageId: string, isNew: boolean) => void;
   selectMode?: boolean;
   preSelectedImage?: CourseImage | null;
   onReplaceComplete?: () => void;
+  preselectedImageUrl?: string | null;
 }
 
 export function MediaLibrary({
@@ -38,6 +40,7 @@ export function MediaLibrary({
   selectMode = false,
   preSelectedImage,
   onReplaceComplete,
+  preselectedImageUrl,
 }: MediaLibraryProps) {
   const [images, setImages] = useState<CourseImage[]>([]);
   const [loading, setLoading] = useState(false);
@@ -46,6 +49,7 @@ export function MediaLibrary({
   const [replaceImage, setReplaceImage] = useState<CourseImage | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [notification, setNotification] = useState<string | null>(null);
+  const [preselectedUrl, setPreselectedUrl] = useState<string | null>(preselectedImageUrl || null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const replaceFileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -71,11 +75,16 @@ export function MediaLibrary({
     fetchImages();
   }
 
+  useEffect(() => {
+    setPreselectedUrl(preselectedImageUrl || null);
+  }, [preselectedImageUrl]);
+
   const handleUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
 
     setUploading(true);
     const uploadedUrls: string[] = [];
+    const uploadedIds: string[] = [];
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
@@ -91,6 +100,7 @@ export function MediaLibrary({
         const data = await res.json();
         if (res.ok && data.imageUrl) {
           uploadedUrls.push(data.imageUrl);
+          uploadedIds.push(data.id);
         }
       } catch (error) {
         console.error("Upload failed:", error);
@@ -99,6 +109,11 @@ export function MediaLibrary({
 
     setUploading(false);
     fetchImages();
+
+    if (selectMode && onImageSelect && uploadedUrls.length > 0) {
+      onImageSelect(uploadedUrls[0], uploadedIds[0] || '', true);
+      onClose();
+    }
   };
 
   const handleDelete = async (image: CourseImage) => {
@@ -195,7 +210,7 @@ export function MediaLibrary({
 
   const handleImageClick = (image: CourseImage) => {
     if (selectMode && onImageSelect) {
-      onImageSelect(image.public_url);
+      onImageSelect(image.public_url, image.id, false);
       onClose();
     }
   };
@@ -261,7 +276,12 @@ export function MediaLibrary({
               {images.map((image) => (
                 <div
                   key={image.id}
-                  className="relative group aspect-square bg-gray-100 rounded-lg overflow-hidden cursor-pointer"
+                  className={cn(
+                    "relative group aspect-square bg-gray-100 rounded-lg overflow-hidden cursor-pointer transition-all",
+                    preselectedUrl === image.public_url
+                      ? "ring-2 ring-[#0d7377] ring-offset-2"
+                      : ""
+                  )}
                   onClick={() => handleImageClick(image)}
                 >
                   <img

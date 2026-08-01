@@ -90,6 +90,13 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
   const [selectedImagePos, setSelectedImagePos] = useState<number | null>(null);
   const [imageAlign, setImageAlign] = useState<"left" | "center" | "right">("left");
   const [imageWidth, setImageWidth] = useState(100);
+  const [currentImageSrc, setCurrentImageSrc] = useState<string>("");
+  const [showReplaceImageModal, setShowReplaceImageModal] = useState(false);
+  const [pendingReplaceImage, setPendingReplaceImage] = useState<{
+    url: string;
+    id: string;
+    isNew: boolean;
+  } | null>(null);
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -181,11 +188,14 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
       const attrs = imageNode.attrs;
       const align = attrs.align || "left";
       const widthPercent = attrs.widthPercent || 100;
+      const src = attrs.src || "";
       setImageAlign(align);
       setImageWidth(widthPercent);
       setSelectedImagePos(imagePos);
+      setCurrentImageSrc(src);
     } else {
       setSelectedImagePos(null);
+      setCurrentImageSrc("");
     }
   };
 
@@ -1520,6 +1530,17 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
           >
             <Trash2 className="w-4 h-4" />
           </Button>
+
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowReplaceImageModal(true)}
+            className="h-7 px-2 text-xs"
+            title="Replace Image"
+          >
+            <RefreshCw className="w-4 h-4" />
+          </Button>
         </div>
       )}
       </div>
@@ -1567,6 +1588,67 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
           }}
         />
       )}
+
+      {courseId && (
+        <MediaLibrary
+          courseId={courseId}
+          open={showReplaceImageModal}
+          onClose={() => setShowReplaceImageModal(false)}
+          selectMode
+          preselectedImageUrl={currentImageSrc}
+          onImageSelect={(url, id, isNew) => {
+            setPendingReplaceImage({ url, id, isNew });
+            setShowReplaceImageModal(false);
+          }}
+        />
+      )}
+
+      <Dialog open={!!pendingReplaceImage} onOpenChange={() => setPendingReplaceImage(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Replace Image</DialogTitle>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <img
+              src={pendingReplaceImage?.url}
+              className="max-h-48 mx-auto rounded-lg border"
+              alt="Preview"
+            />
+            <div className="flex flex-col gap-2">
+              {pendingReplaceImage?.isNew && (
+                <Button
+                  onClick={async () => {
+                    if (!pendingReplaceImage) return;
+                    editor?.chain().focus().setImage({ src: pendingReplaceImage.url }).run();
+                    onChange(editor?.getHTML() || "");
+                    setPendingReplaceImage(null);
+                  }}
+                >
+                  Replace &amp; Update Library
+                </Button>
+              )}
+              <Button
+                variant={pendingReplaceImage?.isNew ? "outline" : "default"}
+                onClick={() => {
+                  if (pendingReplaceImage) {
+                    editor?.chain().focus().setImage({ src: pendingReplaceImage.url }).run();
+                    onChange(editor?.getHTML() || "");
+                    setPendingReplaceImage(null);
+                  }
+                }}
+              >
+                Replace in Lesson Only
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => setPendingReplaceImage(null)}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={addWordModalOpen} onOpenChange={setAddWordModalOpen}>
         <DialogContent showCloseButton={false}>
