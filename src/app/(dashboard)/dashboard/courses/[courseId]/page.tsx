@@ -92,10 +92,18 @@ export default async function TeacherCoursePage({
                         <Badge variant="secondary">Original</Badge>
                       )}
                     </TableCell> */}
-                    <TableCell>
-                      <Link href={`/lessons/${lesson.id}`}>
-                        <Button variant="outline" size="sm">View</Button>
+                    <TableCell className="flex gap-2 text-sm">
+                      <Link href={`/lessons/${lesson.id}`} className="text-[#0d7377] hover:underline">
+                        View Lesson
                       </Link>
+                      <span className="text-gray-400">|</span>
+                      <a href={`/api/lessons/${lesson.id}/pdf?download=false`} target="_blank" rel="noopener noreferrer" className="text-[#0d7377] hover:underline">
+                        View PDF
+                      </a>
+                      <span className="text-gray-400">|</span>
+                      <a href={`/api/lessons/${lesson.id}/pdf?download=true`} download className="text-[#0d7377] hover:underline">
+                        Download PDF
+                      </a>
                     </TableCell>
                   </TableRow>
                 ))}

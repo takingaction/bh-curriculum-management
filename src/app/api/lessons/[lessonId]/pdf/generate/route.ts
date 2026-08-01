@@ -7,6 +7,26 @@ function formatFilename(grade: string, discipline: string, lessonNumber: number)
   return `${grade}-${discipline}-L${lessonNumber}.pdf`;
 }
 
+function addTargetBlankToResourceLinks(obj: any): any {
+  if (typeof obj === 'string') {
+    return obj.replace(/<a([^>]*class="[^"]*resource-link[^"]*"[^>]*)>/gi, (match, attrs) => {
+      if (attrs.includes('target=')) return match;
+      return `<a target="_blank"${attrs}>`;
+    });
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(item => addTargetBlankToResourceLinks(item));
+  }
+  if (obj && typeof obj === 'object') {
+    const result: any = {};
+    for (const key in obj) {
+      result[key] = addTargetBlankToResourceLinks(obj[key]);
+    }
+    return result;
+  }
+  return obj;
+}
+
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ lessonId: string }> }
@@ -80,7 +100,7 @@ export async function POST(
     const renderResponse = await fetch(`${pdfServiceUrl}/lesson-pdf`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ lesson, course }),
+      body: JSON.stringify({ lesson: addTargetBlankToResourceLinks(lesson), course }),
       signal: AbortSignal.timeout(120000), // 2 minute timeout
     });
 

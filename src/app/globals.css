@@ -330,8 +330,16 @@
 }
 .ProseMirror a.resource-link,
 .lesson-content a.resource-link {
-  color: #e85d5d;
-  text-decoration: underline;
+  color: #0d7377;
+  text-decoration: none;
+  border-bottom: 1px solid #0d7377;
+}
+.ProseMirror a.resource-link::after,
+.lesson-content a.resource-link::after {
+  content: " ↗";
+  font-size: 16px;
+  color: #0d7377;
+  margin-left: 2px;
 }
 .ProseMirror a.section-link,
 .lesson-content a.section-link {
