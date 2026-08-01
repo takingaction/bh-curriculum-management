@@ -9,10 +9,15 @@ function formatFilename(grade: string, discipline: string, lessonNumber: number)
 
 function addTargetBlankToResourceLinks(obj: any): any {
   if (typeof obj === 'string') {
-    return obj.replace(/<a([^>]*class="[^"]*resource-link[^"]*"[^>]*)>/gi, (match, attrs) => {
+    let result = obj;
+    result = result.replace(/<a([^>]*class="[^"]*resource-link[^"]*"[^>]*)>/gi, (match, attrs) => {
       if (attrs.includes('target=')) return match;
       return `<a target="_blank"${attrs}>`;
     });
+    result = result.replace(/(<a[^>]*class="[^"]*resource-link[^"]*"[^>]*>)([^<]*)(<\/a>)/gi, (match, openTag, text, closeTag) => {
+      return `${openTag}${text} ↗${closeTag}`;
+    });
+    return result;
   }
   if (Array.isArray(obj)) {
     return obj.map(item => addTargetBlankToResourceLinks(item));
