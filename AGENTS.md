@@ -283,7 +283,7 @@ Two-column layout at `src/app/(dashboard)/admin/courses/[id]/lessons/[lessonId]/
   - **Page 1 (Title Page)**: "PERFORMERS READY!" logo, course name and grade on coral background, hero image fills remainder. `@page :first { margin: 0; }`
   - **Page 2 (Two-Column)**: "LESSON PLAN: CLASS N" header + `"Lesson Title"` in curly quotes. Left column = Lesson Outline (70/30 split); Right column = Learning Objectives, Vocabulary, Materials. Uses default `@page { margin: 0.5in; }`
   - **Pages 3+ (Full-Width)**: All remaining sections in full-width stacked layout with 0.5in margins
-  - **Assessment Page (Last)**: Full bleed page (`@page assessment { margin: 0; }`) with fake 0.5in side margins via `padding: 0 0.5in` on `.assessment-section`. Contains last-page.png (flush), assessment table, logo-end.jpg (35% width centered)
+  - **Assessment Page (Last)**: Full bleed page (`@page assessment { margin: 0; }`) with fake 0.5in side margins via `padding: 0 0.5in` on `.assessment-section`. Contains last-page.png (flush), assessment table, logo-end.png (35% width centered)
   - **Section Headers**: VAPA/NCAS = gray (#D1D3DB); All others = coral (#e37c64)
 - **PDF features**:
   - Uses `courses.pdf_image_url` for title page hero image (separate from website `image_url`)
