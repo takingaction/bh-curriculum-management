@@ -27,11 +27,11 @@ CSS change in `globals.css`:
 
 ## PDF Generation
 
-Added `target="_blank"` and arrow character (↗) to resource links during PDF generation so they:
-1. Open in a new tab when clicked in the PDF viewer
-2. Show the arrow character directly in the PDF (since CSS `::after` doesn't render in PDF)
+Added arrow character (↗) to resource links during PDF generation so they show the external link indicator directly in the PDF (since CSS `::after` doesn't render in PDF).
+
+Note: `target="_blank"` does not work in PDFs without significant workaround, so links will open in the same PDF tab/window.
 
 File: `src/app/api/lessons/[lessonId]/pdf/generate/route.ts`
-- Updated `addTargetBlankToResourceLinks()` function to:
-  - Add `target="_blank"` to all `<a class="resource-link">` elements
-  - Append " ↗" to the link text content for PDF rendering
+- Added `addTargetBlankToResourceLinks()` function that recursively processes the lesson object
+- Appends " ↗" to link text content for PDF rendering
+- Also adds `target="_blank"` (may not be honored by all PDF viewers)
