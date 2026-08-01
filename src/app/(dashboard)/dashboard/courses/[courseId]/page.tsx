@@ -75,7 +75,7 @@ export default async function TeacherCoursePage({
                   <TableHead>#</TableHead>
                   <TableHead>Title</TableHead>
                   <TableHead>Duration</TableHead>
-                  <TableHead>Status</TableHead>
+                  {/* <TableHead>Status</TableHead> */}
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -85,13 +85,13 @@ export default async function TeacherCoursePage({
                     <TableCell>{lesson.lesson_number}</TableCell>
                     <TableCell>{lesson.title}</TableCell>
                     <TableCell>{lesson.total_time || "-"}</TableCell>
-                    <TableCell>
+                    {/* <TableCell>
                       {adaptedMap.has(lesson.id) ? (
                         <Badge>Adapted</Badge>
                       ) : (
                         <Badge variant="secondary">Original</Badge>
                       )}
-                    </TableCell>
+                    </TableCell> */}
                     <TableCell>
                       <Link href={`/lessons/${lesson.id}`}>
                         <Button variant="outline" size="sm">View</Button>
