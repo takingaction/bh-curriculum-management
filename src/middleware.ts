@@ -1,11 +1,7 @@
-import { createServerClient } from "@supabase/ssr";
+import { createServerClient, serialize } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 export async function middleware(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({
-    request,
-  });
-
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -13,6 +9,10 @@ export async function middleware(request: NextRequest) {
     console.error("Missing Supabase environment variables");
     return NextResponse.next({ request });
   }
+
+  let supabaseResponse = NextResponse.next({
+    request,
+  });
 
   const supabase = createServerClient(
     supabaseUrl,
@@ -23,15 +23,21 @@ export async function middleware(request: NextRequest) {
           return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value)
-          );
-          supabaseResponse = NextResponse.next({
-            request,
+          cookiesToSet.forEach(({ name, value, options }) => {
+            request.cookies.set(name, value);
+            supabaseResponse = NextResponse.next({
+              request,
+            });
+            // Use serialize to properly format cookie
+            supabaseResponse.cookies.set({
+              name,
+              value,
+              ...options,
+              secure: true,
+              sameSite: "lax",
+              httpOnly: true,
+            });
           });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
-          );
         },
       },
     }
@@ -40,6 +46,8 @@ export async function middleware(request: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  console.log("Middleware:", { pathname: request.nextUrl.pathname, hasUser: !!user });
 
   const pathname = request.nextUrl.pathname;
 
