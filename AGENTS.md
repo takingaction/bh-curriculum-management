@@ -170,6 +170,20 @@ This ensures existing CFUs in database work regardless of which format their att
 - X button to close
 - Uses direct DOM manipulation during drag to prevent iframe reload
 
+#### YouTube Video Links in Lesson Content
+**youtube-dialog.tsx** - Popup dialog for YouTube videos in lesson content:
+- Auto-opens when mounted with video playing
+- Parses YouTube URLs (youtu.be, youtube.com/watch, youtube.com/embed)
+- "Watch on YouTube" link below video
+- Closes on backdrop click or X button
+
+**YouTube Link Detection:**
+- Links containing `youtube.com` or `youtu.be` are auto-detected
+- CSS shows play arrow (▶) next to YouTube links in lesson content
+- Click opens YouTubeDialog with auto-playing video
+- Works with existing YouTube links (no class required)
+- Link modal auto-adds `youtube-link` class for new YouTube URLs
+
 #### Lesson Editor Layout (Admin)
 Two-column layout at `src/app/(dashboard)/admin/courses/[id]/lessons/[lessonId]/page.tsx`:
 
@@ -360,6 +374,7 @@ Admin tool for regenerating all lesson PDFs at `/admin/pdf-regenerate`.
 - `src/components/editor/extensions/image-with-options.ts` - Custom image with align/width
 - `src/components/lesson-assets-panel.tsx` - Lesson assets management
 - `src/components/spotify-embed.tsx` - Draggable Spotify playlist modal (lesson view)
+- `src/components/youtube-dialog.tsx` - YouTube video popup modal (lesson content)
 - `src/app/(dashboard)/lessons/[lessonId]/page.tsx` - Student/teacher view with SpotifyEmbed from course
 - `src/components/check-for-underunderstanding-modal.tsx` - CFU edit modal
 - `src/lib/html-utils.ts` - HTML parsing, text finding/replacing for Find & Replace
