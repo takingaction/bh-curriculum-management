@@ -242,23 +242,18 @@ export default function SignupPage() {
                 </select>
               </div>
 
-              <div className="flex items-start gap-3 pt-2">
+              <div className="flex items-center gap-3 pt-2">
                 <input
                   id="california"
                   name="california"
                   type="checkbox"
                   checked={formData.california}
                   onChange={handleChange}
-                  className="mt-1 h-4 w-4 rounded border-gray-300 text-[#0d7377] focus:ring-[#0d7377]"
+                  className="h-4 w-4 rounded border-gray-300 text-[#0d7377] focus:ring-[#0d7377]"
                 />
-                <div className="text-sm">
-                  <Label htmlFor="california" className="font-medium cursor-pointer">
-                    I teach in California
-                  </Label>
-                  <p className="text-gray-500">
-                    If checked, teacher will see VAPA standards. If unchecked, they will see NCAS standards. However, PDF will show both for the time being.
-                  </p>
-                </div>
+                <Label htmlFor="california" className="text-sm font-medium cursor-pointer">
+                  I teach in California
+                </Label>
               </div>
 
               <div className="pt-4">
