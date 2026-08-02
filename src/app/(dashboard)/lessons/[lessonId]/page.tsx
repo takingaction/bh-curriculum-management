@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { CompactLessonAssets } from "@/components/lesson-assets-panel";
 import { PresentationLink } from "@/components/presentation-modal";
 import { SpotifyEmbed } from "@/components/spotify-embed";
-import VideoDialog from "@/components/video-dialog";
+import YouTubeDialog from "@/components/youtube-dialog";
 import { Download, X, Volume2, EyeIcon, FileTextIcon, VideoIcon, DownloadIcon } from "lucide-react";
 import { FindReplacePanel } from "@/components/find-replace-panel";
 import { LessonNavigation } from "@/components/lesson-navigation";
@@ -509,7 +509,7 @@ export default function LessonContentPage({
       />
 
       {showVideo && videoUrl && (
-        <VideoDialog videoUrl={videoUrl} />
+        <YouTubeDialog videoUrl={videoUrl} onClose={() => { setShowVideo(false); setVideoUrl(null); }} />
       )}
 
       {previewAsset && (
