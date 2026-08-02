@@ -1,130 +1,65 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import { useRouter } from "next/navigation";
 import { AssignCoursesDialog } from "@/components/assign-courses-dialog";
+import Link from "next/link";
 
 interface Teacher {
   id: string;
   email: string;
+  first_name: string | null;
+  last_name: string | null;
   full_name: string | null;
   role: string;
+  enrollment_status: string | null;
+  primary_discipline: string | null;
+  district_name: string | null;
   created_at: string;
   teacher_assignments?: { count: number }[];
 }
 
 export default function TeachersPage() {
   const router = useRouter();
-  const [loading, setLoading] = useState(false);
-
-  const handlePromote = async (teacherId: string) => {
-    if (!confirm("Promote this teacher to admin?")) return;
-
-    try {
-      const res = await fetch(`/api/admin/teachers/${teacherId}/promote`, {
-        method: "POST",
-      });
-      const data = await res.json();
-
-      if (res.ok) {
-        alert(data.message);
-        router.refresh();
-      } else {
-        alert(data.error || "Failed to promote teacher");
-      }
-    } catch (error) {
-      alert("Failed to promote teacher");
-    }
-  };
-
-  const handleInvite = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setLoading(true);
-
-    const formData = new FormData(e.currentTarget);
-    const email = formData.get("email") as string;
-
-    try {
-      const { createClient } = await import("@/lib/supabase/client");
-      const supabase = createClient();
-
-      const { error } = await supabase.auth.signInWithOtp({
-        email,
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
-          data: {
-            role: "teacher",
-          },
-        },
-      });
-
-      if (error) {
-        alert(error.message);
-      } else {
-        alert(`Sign-in link sent to ${email}`);
-        (e.target as HTMLFormElement).reset();
-        router.refresh();
-      }
-    } catch (error) {
-      alert("Failed to send invitation");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="mb-8">
-        <h2 className="text-2xl font-bold text-[#2d2d2d]">Teachers</h2>
-        <p className="text-[#666666]">Manage teacher accounts and course assignments</p>
+      <div className="mb-8 flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-[#2d2d2d]">Teachers</h2>
+          <p className="text-[#666666]">Manage teacher accounts and course assignments</p>
+        </div>
+        <div className="flex gap-2">
+          <Link href="/admin/teachers/onboard">
+            <Button className="bg-[#0d7377] hover:bg-[#0a5c5f] text-white">
+              Onboard New Teacher
+            </Button>
+          </Link>
+          <Link href="/admin/teachers/import">
+            <Button variant="outline" className="border-[#0d7377] text-[#0d7377] hover:bg-[#0d7377] hover:text-white">
+              Import from CSV
+            </Button>
+          </Link>
+        </div>
       </div>
 
-      <Card className="border-[#e5e5e0] shadow-sm mb-8">
-        <CardHeader>
-          <CardTitle className="text-[#2d2d2d]">Invite New Teacher</CardTitle>
-        </CardHeader>
-        <CardContent className="pt-6">
-          <form onSubmit={handleInvite} className="flex gap-4 items-end">
-            <div className="flex-1">
-              <label className="text-sm font-medium text-[#2d2d2d] mb-2 block">
-                Email Address
-              </label>
-              <Input
-                name="email"
-                type="email"
-                placeholder="teacher@school.edu"
-                required
-                className="border-[#e5e5e0] focus:border-[#0d7377]"
-              />
-            </div>
-            <Button
-              type="submit"
-              disabled={loading}
-              className="bg-[#0d7377] hover:bg-[#0a5c5f] text-white"
-            >
-              {loading ? "Sending..." : "Send Invitation"}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
-
-      <TeacherList onPromote={handlePromote} />
+      <TeacherList />
     </div>
   );
 }
 
-function TeacherList({ onPromote }: { onPromote: (id: string) => void }) {
+function TeacherList() {
+  const router = useRouter();
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useState(() => {
+  useEffect(() => {
     fetchTeachers();
-  });
+  }, []);
 
   async function fetchTeachers() {
     try {
@@ -138,11 +73,17 @@ function TeacherList({ onPromote }: { onPromote: (id: string) => void }) {
 
       const { data: assignments } = await supabase
         .from("teacher_assignments")
-        .select("teacher_id, count");
+        .select("teacher_id");
+
+      const assignmentsByTeacher: Record<string, number> = {};
+      (assignments || []).forEach((a) => {
+        assignmentsByTeacher[a.teacher_id] = (assignmentsByTeacher[a.teacher_id] || 0) + 1;
+      });
 
       const teachersWithCounts = (profiles || []).map((teacher) => ({
         ...teacher,
-        teacher_assignments: assignments?.filter((a) => a.teacher_id === teacher.id) || [],
+        full_name: teacher.full_name || [teacher.first_name, teacher.last_name].filter(Boolean).join(" ") || null,
+        teacher_assignments: [{ count: assignmentsByTeacher[teacher.id] || 0 }],
       }));
 
       setTeachers(teachersWithCounts);
@@ -152,6 +93,31 @@ function TeacherList({ onPromote }: { onPromote: (id: string) => void }) {
       setLoading(false);
     }
   }
+
+  const getName = (teacher: Teacher) => {
+    if (teacher.full_name) return teacher.full_name;
+    if (teacher.first_name || teacher.last_name) {
+      return [teacher.first_name, teacher.last_name].filter(Boolean).join(" ");
+    }
+    return "-";
+  };
+
+  const getStatusBadge = (status: string | null) => {
+    const variant = status === "active" ? "default" : "secondary";
+    let className = "";
+    if (status === "active") {
+      className = "bg-green-600";
+    } else if (status === "trial") {
+      className = "bg-blue-600";
+    } else if (status === "inactive") {
+      className = "bg-red-600";
+    }
+    return (
+      <Badge variant={variant} className={`${className} ${!status || status === 'inactive' ? 'text-white' : ''}`}>
+        {status || "unknown"}
+      </Badge>
+    );
+  };
 
   if (loading) {
     return <div className="text-center py-8 text-[#666666]">Loading teachers...</div>;
@@ -169,16 +135,20 @@ function TeacherList({ onPromote }: { onPromote: (id: string) => void }) {
               <TableRow>
                 <TableHead>Name</TableHead>
                 <TableHead>Email</TableHead>
+                <TableHead>Discipline</TableHead>
+                <TableHead>Status</TableHead>
                 <TableHead>Role</TableHead>
-                <TableHead>Assigned Courses</TableHead>
+                <TableHead>Courses</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {teachers.map((teacher) => (
                 <TableRow key={teacher.id}>
-                  <TableCell className="font-medium">{teacher.full_name || "-"}</TableCell>
+                  <TableCell className="font-medium">{getName(teacher)}</TableCell>
                   <TableCell className="text-[#666666]">{teacher.email}</TableCell>
+                  <TableCell className="text-[#666666]">{teacher.primary_discipline || "N/A"}</TableCell>
+                  <TableCell>{getStatusBadge(teacher.enrollment_status)}</TableCell>
                   <TableCell>
                     <Badge
                       variant={teacher.role === "admin" ? "default" : "secondary"}
@@ -189,20 +159,18 @@ function TeacherList({ onPromote }: { onPromote: (id: string) => void }) {
                   </TableCell>
                   <TableCell>{teacher.teacher_assignments?.[0]?.count || 0}</TableCell>
                   <TableCell>
-                    <div className="flex gap-2">
-                      {teacher.role === "teacher" && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => onPromote(teacher.id)}
-                          className="border-[#0d7377] text-[#0d7377] hover:bg-[#0d7377] hover:text-white"
-                        >
-                          Promote to Admin
-                        </Button>
-                      )}
+                    <div className="flex gap-2 flex-wrap">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => router.push(`/admin/teachers/${teacher.id}`)}
+                        className="border-[#0d7377] text-[#0d7377] hover:bg-[#0d7377] hover:text-white"
+                      >
+                        Edit
+                      </Button>
                       <AssignCoursesDialog
                         teacherId={teacher.id}
-                        teacherName={teacher.full_name || teacher.email}
+                        teacherName={getName(teacher)}
                       />
                     </div>
                   </TableCell>

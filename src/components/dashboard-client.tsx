@@ -21,6 +21,7 @@ interface DashboardClientProps {
   courses: Course[];
   lessonCounts: Record<string, number>;
   adaptedCount: number;
+  isInactive?: boolean;
 }
 
 export default function DashboardClient({
@@ -29,6 +30,7 @@ export default function DashboardClient({
   courses,
   lessonCounts,
   adaptedCount,
+  isInactive = false,
 }: DashboardClientProps) {
   const [activeTab, setActiveTab] = useState<string>(
     DISCIPLINE_ORDER.find((d) => courses.some((c) => c.discipline === d)) || "Music"
@@ -42,12 +44,24 @@ export default function DashboardClient({
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      {isInactive && (
+        <div className="bg-red-600 text-white px-4 py-3 mt-6 rounded-md">
+          <p className="text-sm font-medium text-center">
+            Your account is no longer active. Please contact{" "}
+            <a href="mailto:support@betterhumanseducation.com" className="underline">
+              support@betterhumanseducation.com
+            </a>{" "}
+            to activate your account.
+          </p>
+        </div>
+      )}
+
       <div className="py-6">
         <VideoDialog />
       </div>
 
       <div className="mb-8">
-        <h2 className="text-2xl font-bold text-[#2d2d2d]">Welcome, {profile?.full_name || profile?.email}</h2>
+        <h2 className="text-2xl font-bold text-[#2d2d2d]">Welcome, {profile?.first_name || profile?.full_name || profile?.email}</h2>
         <p className="text-[#666666]">Your curriculum and teaching resources</p>
       </div>
 

@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 
 export default function HeroSection() {
   return (
@@ -18,9 +19,15 @@ export default function HeroSection() {
         <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white mb-6">
           Performers Ready!
         </h1>
-        <p className="text-lg sm:text-xl lg:text-2xl text-white/90 leading-relaxed max-w-3xl mx-auto">
+        <p className="text-lg sm:text-xl lg:text-2xl text-white/90 leading-relaxed max-w-3xl mx-auto mb-8">
           A Performing Arts curricula designed for ALL elementary teachers to feel confident and successful delivering dance, music, and theatre (even if they have no prior experience teaching the arts).
         </p>
+        <Link
+          href="/signup"
+          className="inline-block px-8 py-4 bg-[#e37c64] text-white text-lg font-semibold rounded-lg hover:bg-[#c96a55] transition-colors shadow-md"
+        >
+          Start Free Trial
+        </Link>
       </div>
     </section>
   );

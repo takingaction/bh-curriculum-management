@@ -21,6 +21,12 @@ export default function CallToActionSection() {
         >
           Schedule a Call
         </a>
+        <a
+          href="/signup"
+          className="inline-block px-8 py-4 bg-[#e37c64] text-white text-lg font-semibold rounded-lg hover:bg-[#c96a55] transition-colors shadow-md ml-4"
+        >
+          Start Free Trial
+        </a>
       </div>
     </section>
   );

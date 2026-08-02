@@ -17,7 +17,7 @@ export default function Header() {
             />
           </Link>
 
-          <nav className="hidden md:flex items-center space-x-8">
+          <nav className="hidden md:flex items-center space-x-4">
             <a
               href="https://www.betterhumanseducation.com/"
               target="_blank"
@@ -31,6 +31,12 @@ export default function Header() {
               className="px-5 py-2.5 bg-[#0d7377] text-white rounded-lg font-medium hover:bg-[#0a5c5f] transition-colors"
             >
               Sign In
+            </Link>
+            <Link
+              href="/signup"
+              className="px-5 py-2.5 bg-[#e37c64] text-white rounded-lg font-medium hover:bg-[#c96a55] transition-colors"
+            >
+              Start Free Trial
             </Link>
           </nav>
 

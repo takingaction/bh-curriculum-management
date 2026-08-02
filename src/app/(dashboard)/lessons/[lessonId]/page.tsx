@@ -7,6 +7,7 @@ import { CompactLessonAssets } from "@/components/lesson-assets-panel";
 import { PresentationLink } from "@/components/presentation-modal";
 import { SpotifyEmbed } from "@/components/spotify-embed";
 import YouTubeDialog from "@/components/youtube-dialog";
+import { TrialPdfModal } from "@/components/trial-pdf-modal";
 import { Download, X, Volume2, EyeIcon, FileTextIcon, VideoIcon, DownloadIcon } from "lucide-react";
 import { FindReplacePanel } from "@/components/find-replace-panel";
 import { LessonNavigation } from "@/components/lesson-navigation";
@@ -45,6 +46,17 @@ interface Course {
   spotify_embed_code: string | null;
 }
 
+interface Profile {
+  id: string;
+  email: string;
+  first_name: string | null;
+  last_name: string | null;
+  california: boolean | null;
+  enrollment_status: string | null;
+  trial_ends_at: string | null;
+  role: string;
+}
+
 const sections = [
   { key: "lesson_outline", label: "Lesson Outline" },
   { key: "learning_objectives", label: "Learning Objectives" },
@@ -71,11 +83,13 @@ export default function LessonContentPage({
   const router = useRouter();
   const [lesson, setLesson] = useState<Lesson | null>(null);
   const [course, setCourse] = useState<Course | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [isAdmin, setIsAdmin] = useState(false);
   const [showSpotify, setShowSpotify] = useState(false);
   const [showVideo, setShowVideo] = useState(false);
+  const [showTrialPdfModal, setShowTrialPdfModal] = useState(false);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [previewAsset, setPreviewAsset] = useState<any>(null);
   const [lessonAssets, setLessonAssets] = useState<any[]>([]);
@@ -83,13 +97,18 @@ export default function LessonContentPage({
   const [activeSection, setActiveSection] = useState<string | null>(null);
   const [pdfExists, setPdfExists] = useState(false);
 
+  const isInactive = profile?.enrollment_status === "inactive" ||
+    (profile?.enrollment_status === "trial" && profile?.trial_ends_at && new Date(profile?.trial_ends_at) < new Date());
+  const showCalifornia = profile?.california !== false;
+
   useEffect(() => {
     params.then(async (p) => {
       try {
-        const [lessonRes, viewAsRes, assetsRes] = await Promise.all([
+        const [lessonRes, viewAsRes, assetsRes, profileRes] = await Promise.all([
           fetch(`/api/lessons/${p.lessonId}`),
           fetch('/api/view-as'),
           fetch(`/api/lessons/${p.lessonId}/assets`),
+          fetch('/api/profile/check-status'),
         ]);
         if (!lessonRes.ok) throw new Error("Lesson not found");
         const data = await lessonRes.json();
@@ -101,10 +120,18 @@ export default function LessonContentPage({
           assetsData = await assetsRes.json();
         }
 
+        let profileData: any = null;
+        if (profileRes.ok) {
+          profileData = await profileRes.json();
+        }
+
         setLesson(data.lesson);
         setCourse(data.course);
         setIsAdmin(isAdminView);
         setLessonAssets(assetsData.assets || []);
+        if (profileData?.profile) {
+          setProfile(profileData.profile);
+        }
       } catch (err: any) {
         setError(err.message);
       } finally {
@@ -157,7 +184,7 @@ export default function LessonContentPage({
     if (loading) return;
     const handleScroll = () => {
       const scrollPosition = window.scrollY + 200;
-      for (const section of sections) {
+      for (const section of filteredSections) {
         if (!lesson?.[section.key as keyof Lesson]) continue;
         const element = document.getElementById(section.key);
         if (element) {
@@ -171,7 +198,13 @@ export default function LessonContentPage({
     };
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
-  }, [loading, lesson]);
+  }, [loading, lesson, showCalifornia]);
+
+  const filteredSections = sections.filter(section => {
+    if (section.key === "vapa_text_block" && !showCalifornia) return false;
+    if (section.key === "ncas_text_block" && showCalifornia) return false;
+    return true;
+  });
 
   if (loading) {
     return (
@@ -244,7 +277,16 @@ export default function LessonContentPage({
     return !!(lesson as any)[key];
   };
 
-  const contentSections = sections.filter(s => hasContent(s.key));
+  const contentSections = filteredSections.filter(s => hasContent(s.key));
+
+  const handlePdfClick = (e: React.MouseEvent, download: boolean) => {
+    if (isInactive) {
+      e.preventDefault();
+      setShowTrialPdfModal(true);
+    } else if (download) {
+      // Allow download
+    }
+  };
 
   return (
     <div className="min-h-screen bg-white">
@@ -252,11 +294,21 @@ export default function LessonContentPage({
         html { scroll-behavior: smooth; }
       `}</style>
 
-      {/* Top Header */}
+      {isInactive && (
+        <div className="bg-red-600 text-white px-4 py-3 text-center">
+          <p className="text-sm font-medium">
+            Your account is no longer active. Please contact{" "}
+            <a href="mailto:support@betterhumanseducation.com" className="underline">
+              support@betterhumanseducation.com
+            </a>{" "}
+            to activate your account.
+          </p>
+        </div>
+      )}
+
       <div className="border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex gap-6">
-            {/* Image - 250px fixed */}
             <div className="w-[250px] h-[250px] bg-[#d7ffef] flex items-center justify-center rounded-none overflow-hidden flex-shrink-0">
               {course.image_url ? (
                 <img
@@ -269,7 +321,6 @@ export default function LessonContentPage({
               )}
             </div>
 
-            {/* Title Info - 40% width */}
             <div className="w-[40%] flex-shrink-0 flex flex-col justify-start py-2">
               <div>
                 <div className="text-sm text-black uppercase tracking-wide">
@@ -314,22 +365,46 @@ export default function LessonContentPage({
               <div className="mt-4">
                 {pdfExists && (
                   <div className="mb-2 text-sm">
-                    <a
-                      href={`/api/lessons/${lesson.id}/pdf?download=false`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[#0d7377] hover:underline"
-                    >
-                      View PDF
-                    </a>
-                    {" | "}
-                    <a
-                      href={`/api/lessons/${lesson.id}/pdf?download=true`}
-                      download
-                      className="text-[#0d7377] hover:underline"
-                    >
-                      Download PDF
-                    </a>
+                    {isInactive ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setShowTrialPdfModal(true)}
+                          className="text-[#0d7377] hover:underline"
+                        >
+                          View PDF
+                        </button>
+                        {" | "}
+                        <button
+                          type="button"
+                          onClick={() => setShowTrialPdfModal(true)}
+                          className="text-[#0d7377] hover:underline"
+                        >
+                          Download PDF
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <a
+                          href={`/api/lessons/${lesson.id}/pdf?download=false`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[#0d7377] hover:underline"
+                          onClick={(e) => handlePdfClick(e, false)}
+                        >
+                          View PDF
+                        </a>
+                        {" | "}
+                        <a
+                          href={`/api/lessons/${lesson.id}/pdf?download=true`}
+                          download
+                          className="text-[#0d7377] hover:underline"
+                          onClick={(e) => handlePdfClick(e, true)}
+                        >
+                          Download PDF
+                        </a>
+                      </>
+                    )}
                   </div>
                 )}
                 <LessonNavigation
@@ -340,7 +415,6 @@ export default function LessonContentPage({
               </div>
             </div>
 
-            {/* Lesson Materials - 60% width */}
             <div className="flex-1 flex flex-col justify-start py-2">
               <h3 className="text-sm font-semibold text-gray-700 mb-2">Lesson Resources</h3>
               <CompactLessonAssets lessonId={lesson.id} maxItems={6} />
@@ -364,7 +438,6 @@ export default function LessonContentPage({
                 </div>
               )}
 
-              {/* Course Materials - BELOW Lesson Materials */}
               {courseAssets.length > 0 && (
                 <div className="mt-4 pt-4 border-t border-gray-200">
                   <h3 className="text-sm font-semibold text-gray-700 mb-2">Course Materials</h3>
@@ -421,7 +494,6 @@ export default function LessonContentPage({
           />
         )}
         <div className="flex gap-6">
-          {/* Left Navigation - Sticky */}
           <div className="w-[250px] flex-shrink-0 sticky top-0 self-start">
             <div className="space-y-1">
               {contentSections.map((section) => (
@@ -476,7 +548,6 @@ export default function LessonContentPage({
             </div>
           </div>
 
-          {/* Right Content - All sections stacked */}
           <div className="flex-1">
             {contentSections.map((section) => (
               <div key={section.key} id={section.key} className="mb-6">
@@ -511,6 +582,11 @@ export default function LessonContentPage({
       {showVideo && videoUrl && (
         <YouTubeDialog videoUrl={videoUrl} onClose={() => { setShowVideo(false); setVideoUrl(null); }} />
       )}
+
+      <TrialPdfModal
+        open={showTrialPdfModal}
+        onClose={() => setShowTrialPdfModal(false)}
+      />
 
       {previewAsset && (
         <div className="fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-8">

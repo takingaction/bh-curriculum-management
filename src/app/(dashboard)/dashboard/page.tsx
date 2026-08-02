@@ -9,13 +9,25 @@ export default async function DashboardPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { data: profile } = await supabase
+  let { data: profile } = await supabase
     .from("profiles")
     .select("*")
     .eq("id", user?.id)
     .single();
 
+  const isInactive = profile?.enrollment_status === "inactive" ||
+    (profile?.enrollment_status === "trial" && profile?.trial_ends_at && new Date(profile.trial_ends_at) < new Date());
+
+  if (isInactive && profile?.enrollment_status === "trial") {
+    await supabaseAdmin
+      .from("profiles")
+      .update({ enrollment_status: "inactive" })
+      .eq("id", user?.id);
+    profile = { ...profile, enrollment_status: "inactive" };
+  }
+
   const isAdmin = profile?.role === "admin";
+  const enrollments = profile?.enrollments || ["ALL"];
 
   let courses: any[] = [];
   let lessonCounts: Record<string, number> = {};
@@ -39,7 +51,18 @@ export default async function DashboardPage() {
       .from("teacher_assignments")
       .select("*, courses(*)")
       .eq("teacher_id", user?.id);
-    courses = assignments?.map((a: any) => a.courses).filter(Boolean) || [];
+    
+    let assignedCourses = assignments?.map((a: any) => a.courses).filter(Boolean) || [];
+
+    if (!enrollments.includes("ALL")) {
+      assignedCourses = assignedCourses.filter((course: any) => {
+        const disciplineGrade = `${course.discipline.toUpperCase()}_GRADE_${course.grade.toUpperCase()}`;
+        const disciplineOnly = course.discipline.toUpperCase();
+        return enrollments.includes(disciplineGrade) || enrollments.includes(disciplineOnly);
+      });
+    }
+
+    courses = assignedCourses;
 
     const courseIds = courses.map((c: any) => c.id);
     if (courseIds.length > 0) {
@@ -65,6 +88,7 @@ export default async function DashboardPage() {
       courses={courses}
       lessonCounts={lessonCounts}
       adaptedCount={adaptedLessons?.length || 0}
+      isInactive={isInactive}
     />
   );
 }
