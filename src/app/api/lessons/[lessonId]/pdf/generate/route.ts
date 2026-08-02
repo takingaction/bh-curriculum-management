@@ -11,31 +11,22 @@ function addTargetBlankAndArrowsToLinks(obj: any): any {
   if (typeof obj === 'string') {
     let result = obj;
 
-    // Resource links - add target="_blank" and ↗
+    // Resource links - add target="_blank"
     result = result.replace(/<a(\s+[^>]*)?class\s*=\s*["'][^"']*resource-link[^"']*["'](\s+[^>]*)?>/gi, (match) => {
       if (match.includes('target=')) return match;
       return match.replace(/^<a/, '<a target="_blank"');
     });
-    result = result.replace(/(<a[^>]*class\s*=\s*["'][^"']*resource-link[^"']*["'][^>]*>)([^<]*)(<\/a>)/gi, (match, openTag, text, closeTag) => {
-      return `${openTag}${text} ↗${closeTag}`;
-    });
 
-    // YouTube links (with class) - add target="_blank" and ▶
+    // YouTube links (with class) - add target="_blank"
     result = result.replace(/<a(\s+[^>]*)?class\s*=\s*["'][^"']*youtube-link[^"']*["'](\s+[^>]*)?>/gi, (match) => {
       if (match.includes('target=')) return match;
       return match.replace(/^<a/, '<a target="_blank"');
     });
-    result = result.replace(/(<a[^>]*class\s*=\s*["'][^"']*youtube-link[^"']*["'][^>]*>)([^<]*)(<\/a>)/gi, (match, openTag, text, closeTag) => {
-      return `${openTag}${text} ▶${closeTag}`;
-    });
 
-    // YouTube links (auto-detected by URL) - add target="_blank" and ▶
+    // YouTube links (auto-detected by URL) - add target="_blank"
     result = result.replace(/<a(\s+[^>]*)?href\s*=\s*["'][^"']*(youtube\.com|youtu\.be)[^"']*["'](\s+[^>]*)?>/gi, (match) => {
       if (match.includes('target=')) return match;
       return match.replace(/^<a/, '<a target="_blank"');
-    });
-    result = result.replace(/(<a[^>]*href\s*=\s*["'][^"']*(youtube\.com|youtu\.be)[^"']*["'][^>]*>)([^<]*)(<\/a>)/gi, (match, openTag, text, closeTag) => {
-      return `${openTag}${text} ▶${closeTag}`;
     });
 
     return result;
