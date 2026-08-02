@@ -313,6 +313,7 @@ Two-column layout at `src/app/(dashboard)/admin/courses/[id]/lessons/[lessonId]/
   - CSS support for tables, images (alignment), lists, bold/italic
   - CFU blocks: no gray background, no vertical line, alignment classes match lesson view, 20px margins with `!important` for text wrap
   - Puppeteer footer template for page numbers (abandoned due to @sparticuz/chromium limitations)
+  - Section headers: 16px margin-top ensures consistent spacing above headers when content spills to next page
 - **Key files in pdf-service**:
   - `src/index.js` - Express server with Puppeteer PDF generation
   - `src/template.js` - HTML template builder for lesson PDFs
