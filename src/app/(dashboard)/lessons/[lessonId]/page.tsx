@@ -229,7 +229,7 @@ export default function LessonContentPage({
                 element.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 window.history.pushState(null, '', href);
               }
-            } else if (anchor.classList.contains("youtube-link")) {
+            } else if (anchor.classList.contains("youtube-link") || href.includes('youtube.com') || href.includes('youtu.be')) {
               e.preventDefault();
               setVideoUrl(href);
               setShowVideo(true);
