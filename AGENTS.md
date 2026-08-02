@@ -184,6 +184,12 @@ This ensures existing CFUs in database work regardless of which format their att
 - Works with existing YouTube links (no class required)
 - Link modal auto-adds `youtube-link` class for new YouTube URLs
 
+**PDF Generation:**
+- Play icon (▶) added to YouTube links during PDF generation
+- Uses URL pattern matching (youtube.com, youtu.be) to detect links
+- Icon is embedded directly in HTML content (not CSS) for PDF compatibility
+- Both class-based and URL-based detection supported
+
 #### Lesson Editor Layout (Admin)
 Two-column layout at `src/app/(dashboard)/admin/courses/[id]/lessons/[lessonId]/page.tsx`:
 
