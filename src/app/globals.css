@@ -341,6 +341,20 @@
   color: #0d7377;
   margin-left: 2px;
 }
+/* YouTube video links */
+.ProseMirror a.youtube-link,
+.lesson-content a.youtube-link {
+  color: #0d7377;
+  text-decoration: none;
+  border-bottom: 1px solid #0d7377;
+}
+.ProseMirror a.youtube-link::after,
+.lesson-content a.youtube-link::after {
+  content: " ▶";
+  font-size: 14px;
+  color: #0d7377;
+  margin-left: 2px;
+}
 .ProseMirror a.section-link,
 .lesson-content a.section-link {
   color: #0d7377;

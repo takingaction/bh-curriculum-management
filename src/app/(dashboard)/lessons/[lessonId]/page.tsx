@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { CompactLessonAssets } from "@/components/lesson-assets-panel";
 import { PresentationLink } from "@/components/presentation-modal";
 import { SpotifyEmbed } from "@/components/spotify-embed";
+import VideoDialog from "@/components/video-dialog";
 import { Download, X, Volume2, EyeIcon, FileTextIcon, VideoIcon, DownloadIcon } from "lucide-react";
 import { FindReplacePanel } from "@/components/find-replace-panel";
 import { LessonNavigation } from "@/components/lesson-navigation";
@@ -74,6 +75,8 @@ export default function LessonContentPage({
   const [error, setError] = useState("");
   const [isAdmin, setIsAdmin] = useState(false);
   const [showSpotify, setShowSpotify] = useState(false);
+  const [showVideo, setShowVideo] = useState(false);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [previewAsset, setPreviewAsset] = useState<any>(null);
   const [lessonAssets, setLessonAssets] = useState<any[]>([]);
   const [courseAssets, setCourseAssets] = useState<any[]>([]);
@@ -226,6 +229,10 @@ export default function LessonContentPage({
                 element.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 window.history.pushState(null, '', href);
               }
+            } else if (anchor.classList.contains("youtube-link")) {
+              e.preventDefault();
+              setVideoUrl(href);
+              setShowVideo(true);
             }
           }
         }}
@@ -500,6 +507,10 @@ export default function LessonContentPage({
         onClose={() => setShowSpotify(false)}
         embedCode={course?.spotify_embed_code || ""}
       />
+
+      {showVideo && videoUrl && (
+        <VideoDialog videoUrl={videoUrl} />
+      )}
 
       {previewAsset && (
         <div className="fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-8">

@@ -2,11 +2,21 @@
 
 import { useState, useEffect, useRef } from "react";
 
-export default function VideoDialog() {
+interface VideoDialogProps {
+  videoUrl?: string;
+}
+
+export default function VideoDialog({ videoUrl }: VideoDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
   const dialogRef = useRef<HTMLDialogElement>(null);
 
-  const videoId = "YKpdxwcm3LE";
+  const getYouTubeId = (url: string): string => {
+    const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([^&?]+)/);
+    return match ? match[1] : '';
+  };
+
+  const videoId = videoUrl ? getYouTubeId(videoUrl) : "YKpdxwcm3LE";
+  const youtubeWatchUrl = `https://www.youtube.com/watch?v=${videoId}`;
   const thumbnailSrc = "/images/video-thumbnail.jpg";
 
   useEffect(() => {
@@ -75,11 +85,19 @@ export default function VideoDialog() {
             </button>
             <iframe
               src={`https://www.youtube.com/embed/${videoId}?autoplay=1`}
-              title="Performers Ready! Video"
+              title="YouTube Video"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
               className="w-[80vw] max-w-4xl aspect-video"
             />
+            <a
+              href={youtubeWatchUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block mt-2 text-white hover:text-gray-300 text-sm text-center"
+            >
+              ▶ Watch on YouTube
+            </a>
           </div>
         )}
       </dialog>

@@ -1872,11 +1872,15 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
               <Button
                 onClick={() => {
                   if (linkUrl.trim()) {
-                    const attrs: { href: string; target?: string } = {
+                    const isYouTube = linkUrl.includes('youtube.com') || linkUrl.includes('youtu.be');
+                    const attrs: { href: string; target?: string; class?: string } = {
                       href: linkUrl.trim(),
                     };
                     if (linkNewWindow) {
                       attrs.target = "_blank";
+                    }
+                    if (isYouTube) {
+                      attrs.class = "youtube-link";
                     }
                     editor?.chain().focus().extendMarkRange("link").setLink(attrs).run();
                   }
