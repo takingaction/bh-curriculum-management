@@ -23,6 +23,10 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [fullName, setFullName] = useState("");
   const [message, setMessage] = useState("");
+  const [passwordMessage, setPasswordMessage] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
 
   useEffect(() => {
     async function fetchProfile() {
@@ -66,6 +70,45 @@ export default function ProfilePage() {
       setMessage("Profile saved successfully!");
     }
     setSaving(false);
+  };
+
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordMessage("");
+
+    if (newPassword.length < 6) {
+      setPasswordMessage("Password must be at least 6 characters");
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPasswordMessage("Passwords do not match");
+      return;
+    }
+
+    setChangingPassword(true);
+
+    try {
+      const res = await fetch("/api/profile/password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ newPassword }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setPasswordMessage(data.error || "Failed to update password");
+      } else {
+        setPasswordMessage("Password updated successfully!");
+        setNewPassword("");
+        setConfirmPassword("");
+      }
+    } catch {
+      setPasswordMessage("Failed to update password");
+    }
+
+    setChangingPassword(false);
   };
 
   if (loading) {
@@ -133,6 +176,55 @@ export default function ProfilePage() {
               className="bg-[#0d7377] hover:bg-[#0a5c5f] text-white"
             >
               {saving ? "Saving..." : "Save Changes"}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle className="text-xl text-[#0d7377]">Set Password</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-gray-500 mb-4">
+            Set a password to log in without needing a magic link. You can use either password or magic link to sign in.
+          </p>
+          <form onSubmit={handlePasswordChange} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="newPassword" className="text-[#2d2d2d]">New Password</Label>
+              <Input
+                id="newPassword"
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Enter new password"
+                className="border-[#e5e5e0] focus:border-[#0d7377]"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword" className="text-[#2d2d2d]">Confirm Password</Label>
+              <Input
+                id="confirmPassword"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Confirm new password"
+                className="border-[#e5e5e0] focus:border-[#0d7377]"
+              />
+            </div>
+
+            {passwordMessage && (
+              <p className={`text-sm ${passwordMessage.includes("Error") || passwordMessage.includes("not match") || passwordMessage.includes("must be") ? "text-red-600" : "text-green-600"}`}>
+                {passwordMessage}
+              </p>
+            )}
+
+            <Button
+              type="submit"
+              disabled={changingPassword || !newPassword || !confirmPassword}
+              className="bg-[#e37c64] hover:bg-[#c96955] text-white"
+            >
+              {changingPassword ? "Updating..." : "Update Password"}
             </Button>
           </form>
         </CardContent>
