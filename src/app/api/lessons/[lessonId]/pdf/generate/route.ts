@@ -224,13 +224,43 @@ export async function POST(
       return NextResponse.json({ error: "Failed to save PDF metadata" }, { status: 500 });
     }
 
-    // Delete any failed batch_pdf_results for this lesson (manual regeneration clears failed status)
-    // This removes the entry so it no longer shows in Failed tab
-    await supabaseAdmin
+    // Find any failed batch_pdf_results for this lesson and update to success
+    const { data: failedEntries } = await supabaseAdmin
       .from("batch_pdf_results")
-      .delete()
+      .select("id, job_id")
       .eq("lesson_id", lessonId)
       .eq("status", "failed");
+
+    if (failedEntries && failedEntries.length > 0) {
+      for (const entry of failedEntries) {
+        // Update the entry to success
+        await supabaseAdmin
+          .from("batch_pdf_results")
+          .update({
+            status: "success",
+            error_message: null,
+            processed_at: new Date().toISOString(),
+          })
+          .eq("id", entry.id);
+
+        // Update the job's counters: decrement failure_count, increment success_count
+        const { data: job } = await supabaseAdmin
+          .from("batch_pdf_jobs")
+          .select("failure_count, success_count")
+          .eq("id", entry.job_id)
+          .single();
+
+        if (job) {
+          await supabaseAdmin
+            .from("batch_pdf_jobs")
+            .update({
+              failure_count: Math.max(0, job.failure_count - 1),
+              success_count: job.success_count + 1,
+            })
+            .eq("id", entry.job_id);
+        }
+      }
+    }
 
     return NextResponse.json({
       success: true,

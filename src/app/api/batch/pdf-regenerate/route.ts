@@ -33,6 +33,11 @@ export async function POST() {
       console.error("Error clearing old jobs:", clearError);
     }
 
+    // Delete old batch results from previous batches (starting fresh with new batch)
+    await supabaseAdmin
+      .from("batch_pdf_results")
+      .delete();
+
     // Get all lesson IDs
     const { data: lessons, error: lessonsError } = await supabaseAdmin
       .from("lessons")
