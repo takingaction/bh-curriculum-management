@@ -224,10 +224,11 @@ export async function POST(
       return NextResponse.json({ error: "Failed to save PDF metadata" }, { status: 500 });
     }
 
-    // Clear any failed batch_pdf_results for this lesson (manual regeneration clears failed status)
+    // Delete any failed batch_pdf_results for this lesson (manual regeneration clears failed status)
+    // This removes the entry so it no longer shows in Failed tab
     await supabaseAdmin
       .from("batch_pdf_results")
-      .update({ status: "success" })
+      .delete()
       .eq("lesson_id", lessonId)
       .eq("status", "failed");
 
