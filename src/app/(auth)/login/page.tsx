@@ -62,8 +62,8 @@ export default function LoginPage() {
     return (
       <>
         <Header />
-        <div className="min-h-screen bg-[#f5f5f0] flex items-start justify-center" style={{ paddingTop: '200px' }}>
-          <div className="w-full max-w-md p-8 bg-white rounded-xl shadow-lg mx-4">
+        <div className="min-h-screen bg-[#f5f5f0] flex items-start justify-center pt-20">
+          <div className="w-full max-w-md p-8 bg-white rounded-xl shadow-lg mx-4 mt-32">
             <div className="mb-8 text-center">
               <h1 className="text-2xl font-bold text-[#0d7377] mb-2">Performers Ready!</h1>
               <p className="text-[#666666]">Curriculum Management Platform</p>
@@ -105,8 +105,8 @@ export default function LoginPage() {
 return (
       <>
         <Header />
-        <div className="min-h-screen bg-[#f5f5f0] flex items-start justify-center" style={{ paddingTop: '200px' }}>
-          <div className="w-full max-w-md p-8 bg-white rounded-xl shadow-lg mx-4">
+        <div className="min-h-screen bg-[#f5f5f0] flex items-start justify-center pt-20">
+          <div className="w-full max-w-md p-8 bg-white rounded-xl shadow-lg mx-4 mt-32">
           <div className="mb-8 text-center">
             <h1 className="text-2xl font-bold text-[#0d7377] mb-2">Performers Ready!</h1>
             <p className="text-[#666666]">Curriculum Management Platform</p>
