@@ -22,6 +22,19 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
 
+    const checkRes = await fetch("/api/auth/check-email", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+    const checkData = await checkRes.json();
+
+    if (!checkData.exists) {
+      setError("No account found with this email. Please sign up for a free trial first.");
+      setLoading(false);
+      return;
+    }
+
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
