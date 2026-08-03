@@ -44,6 +44,7 @@ export function UserMenu({ email, fullName, role, isAdmin }: UserMenuProps) {
               href="/dashboard"
               className="block px-4 py-2 text-sm text-[#2d2d2d] hover:bg-[#f5f5f0]"
               onClick={() => setOpen(false)}
+              prefetch={false}
             >
               Dashboard
             </Link>
@@ -51,6 +52,7 @@ export function UserMenu({ email, fullName, role, isAdmin }: UserMenuProps) {
               href="/profile"
               className="block px-4 py-2 text-sm text-[#2d2d2d] hover:bg-[#f5f5f0]"
               onClick={() => setOpen(false)}
+              prefetch={false}
             >
               Profile
             </Link>
@@ -100,12 +102,14 @@ export function UserMenu({ email, fullName, role, isAdmin }: UserMenuProps) {
               </>
             )}
             <hr className="my-1 border-[#e5e5e0]" />
-            <Link
-              href="/auth/signout"
-              className="block px-4 py-2 text-sm text-[#e85d5d] hover:bg-[#f5f5f0]"
-            >
-              Log Out
-            </Link>
+            <form action="/auth/signout" method="POST">
+              <button
+                type="submit"
+                className="w-full text-left px-4 py-2 text-sm text-[#e85d5d] hover:bg-[#f5f5f0]"
+              >
+                Log Out
+              </button>
+            </form>
           </div>
         </div>
       )}

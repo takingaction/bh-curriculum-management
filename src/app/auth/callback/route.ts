@@ -22,10 +22,11 @@ export async function GET(request: Request) {
           },
           setAll(cookiesToSet) {
             try {
+              const cookieDomain = process.env.COOKIE_DOMAIN;
               cookiesToSet.forEach(({ name, value, options }) => {
                 cookieStore.set(name, value, {
                   ...options,
-                  domain: '.www.performersready.com',
+                  ...(cookieDomain && { domain: cookieDomain }),
                 });
               });
             } catch {
