@@ -414,6 +414,7 @@ Custom domain `www.performersready.com` requires explicit cookie domain for auth
 - All dropdown links have `prefetch={false}` to avoid unnecessary RSC requests
 - Issue: Next.js was prefetching `/auth/signout` on dropdown open, which has a GET handler that deleted all cookies
 - Fix: Converted to POST form, dropdown no longer clears cookies on open
+- Logout redirect uses 303 to convert POST to GET (NextResponse.redirect defaults to 307 which preserves POST method, causing 405 on /login)
 
 ### Relevant Files
 - `src/app/(dashboard)/admin/courses/[id]/page.tsx` - Course edit page with Spotify section
