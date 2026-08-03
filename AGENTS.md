@@ -429,6 +429,9 @@ Custom domain `www.performersready.com` requires explicit cookie domain for auth
 - `src/components/spotify-embed.tsx` - Draggable Spotify playlist modal (lesson view)
 - `src/components/youtube-dialog.tsx` - YouTube video popup modal (lesson content)
 - `src/app/(dashboard)/lessons/[lessonId]/page.tsx` - Student/teacher view with SpotifyEmbed from course
+  - Has floating teal "Back to Top" button at bottom right (appears after scrolling 500px)
+- `src/app/(dashboard)/dashboard/courses/[courseId]/page.tsx` - Teacher course view with lessons table
+  - Shows course image (250x250 teal box) and summary above lessons table
 - `src/components/check-for-underunderstanding-modal.tsx` - CFU edit modal
 - `src/lib/html-utils.ts` - HTML parsing, text finding/replacing for Find & Replace
 - `src/app/api/find-replace/route.ts` - Find & Replace API endpoints (GET search, PATCH replace)

@@ -58,7 +58,7 @@ export default function MigrationNotice() {
               </svg>
             </button>
             <p className="text-white text-sm sm:text-base pr-8">
-              We have just migrated to our much more robust and powerful custom platform! Your account has been migrated. Just use the{" "}
+              We have just moved to our much more robust and powerful custom platform! Your account has been migrated. Just use the{" "}
               <strong>magic link option</strong> to sign in using your email (you can add a password if you wish on your profile page once logged in).{" "}
               If you run into any issues, please email us at{" "}
               <a href="mailto:support@betterhumanseducation.com" target="_blank" rel="noopener noreferrer" className="underline hover:text-white/80">

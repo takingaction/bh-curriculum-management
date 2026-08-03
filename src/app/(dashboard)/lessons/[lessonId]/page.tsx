@@ -90,6 +90,7 @@ export default function LessonContentPage({
   const [showSpotify, setShowSpotify] = useState(false);
   const [showVideo, setShowVideo] = useState(false);
   const [showTrialPdfModal, setShowTrialPdfModal] = useState(false);
+  const [showBackToTop, setShowBackToTop] = useState(false);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [previewAsset, setPreviewAsset] = useState<any>(null);
   const [lessonAssets, setLessonAssets] = useState<any[]>([]);
@@ -207,6 +208,14 @@ export default function LessonContentPage({
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, [loading, lesson, showCalifornia]);
+
+  useEffect(() => {
+    const handleBackToTopVisibility = () => {
+      setShowBackToTop(window.scrollY > 500);
+    };
+    window.addEventListener('scroll', handleBackToTopVisibility);
+    return () => window.removeEventListener('scroll', handleBackToTopVisibility);
+  }, []);
 
   const filteredSections = sections.filter(section => {
     if (section.key === "vapa_text_block" && !showCalifornia) return false;
@@ -585,6 +594,18 @@ export default function LessonContentPage({
         open={showTrialPdfModal}
         onClose={() => setShowTrialPdfModal(false)}
       />
+
+      {showBackToTop && (
+        <button
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          className="fixed bottom-6 right-6 w-12 h-12 rounded-full bg-[#0d7377] text-white shadow-lg hover:bg-[#0a5c5f] flex items-center justify-center z-50"
+          aria-label="Back to top"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="18 15 12 9 6 15" />
+          </svg>
+        </button>
+      )}
 
       {previewAsset && (
         <div className="fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-8">

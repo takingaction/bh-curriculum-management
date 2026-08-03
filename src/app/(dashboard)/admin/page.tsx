@@ -73,24 +73,9 @@ export default async function AdminDashboard() {
             <CardDescription>Manage teacher accounts and assignments</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
-              {teachers?.slice(0, 5).map((teacher) => (
-                <div
-                  key={teacher.id}
-                  className="flex justify-between items-center p-3 bg-gray-50 rounded"
-                >
-                  <div>
-                    <p className="font-medium">{teacher.full_name || teacher.email}</p>
-                    <p className="text-sm text-gray-500">{teacher.email}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="mt-4">
-              <Link href="/admin/teachers">
-                <Button variant="outline">Manage Teachers</Button>
-              </Link>
-            </div>
+            <Link href="/admin/teachers">
+              <Button variant="outline">Manage Teachers</Button>
+            </Link>
           </CardContent>
         </Card>
       </div>
