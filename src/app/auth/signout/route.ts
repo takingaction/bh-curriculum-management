@@ -16,7 +16,7 @@ export async function POST(request: Request) {
   });
 
   const url = new URL("/login", request.url);
-  return NextResponse.redirect(url);
+  return NextResponse.redirect(url, 303);
 }
 
 export async function GET(request: Request) {
@@ -25,5 +25,5 @@ export async function GET(request: Request) {
     cookieStore.delete(cookie.name);
   });
   const url = new URL("/login", request.url);
-  return NextResponse.redirect(url);
+  return NextResponse.redirect(url, 303);
 }
