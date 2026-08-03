@@ -1,11 +1,6 @@
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { notFound, redirect } from "next/navigation";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { Eye, FileText, Download } from "lucide-react";
+import CourseClient from "./course-client";
 
 export default async function TeacherCoursePage({
   params,
@@ -30,10 +25,7 @@ export default async function TeacherCoursePage({
     .eq("id", courseId)
     .single();
 
-  console.log("DEBUG: courseId=", courseId, "course=", course, "userId=", user!.id);
-
   if (!course) {
-    console.log("DEBUG: course is null, calling notFound()");
     notFound();
     return;
   }
@@ -44,86 +36,16 @@ export default async function TeacherCoursePage({
     .eq("course_id", courseId)
     .order("lesson_number");
 
-  const { data: adaptedLessons } = await supabaseAdmin
-    .from("adapted_lessons")
-    .select("id, original_lesson_id")
-    .eq("teacher_id", user!.id)
-    .in(
-      "original_lesson_id",
-      lessons?.map((l) => l.id) || []
-    );
-
-  const adaptedMap = new Set(adaptedLessons?.map((a) => a.original_lesson_id) || []);
-
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="mb-8">
-        <h2 className="text-2xl font-bold">{course?.title}</h2>
-        <p className="text-gray-600">
-          {course?.discipline} · Grade {course?.grade}
-        </p>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Lessons ({lessons?.length || 0})</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {lessons && lessons.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>#</TableHead>
-                  <TableHead>Title</TableHead>
-                  <TableHead>Duration</TableHead>
-                  {/* <TableHead>Status</TableHead> */}
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {lessons.map((lesson) => (
-                  <TableRow key={lesson.id}>
-                    <TableCell>{lesson.lesson_number}</TableCell>
-                    <TableCell>{lesson.title}</TableCell>
-                    <TableCell>{lesson.total_time || "-"}</TableCell>
-                    {/* <TableCell>
-                      {adaptedMap.has(lesson.id) ? (
-                        <Badge>Adapted</Badge>
-                      ) : (
-                        <Badge variant="secondary">Original</Badge>
-                      )}
-                    </TableCell> */}
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Link href={`/lessons/${lesson.id}`}>
-                          <Button variant="outline" size="sm" className="text-xs text-[#0d7377] border-[#e5e5e0] hover:bg-[#d7ffef]">
-                            <Eye className="w-3 h-3 mr-1" />
-                            View Lesson
-                          </Button>
-                        </Link>
-                        <a href={`/api/lessons/${lesson.id}/pdf?download=false`} target="_blank" rel="noopener noreferrer">
-                          <Button variant="outline" size="sm" className="text-xs text-[#0d7377] border-[#e5e5e0] hover:bg-[#d7ffef]">
-                            <FileText className="w-3 h-3 mr-1" />
-                            View PDF
-                          </Button>
-                        </a>
-                        <a href={`/api/lessons/${lesson.id}/pdf?download=true`} download>
-                          <Button variant="outline" size="sm" className="text-xs text-[#0d7377] border-[#e5e5e0] hover:bg-[#d7ffef]">
-                            <Download className="w-3 h-3 mr-1" />
-                            Download PDF
-                          </Button>
-                        </a>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          ) : (
-            <p className="text-gray-500">No lessons in this course</p>
-          )}
-        </CardContent>
-      </Card>
+      <CourseClient
+        courseId={courseId}
+        courseName={course.title}
+        discipline={course.discipline}
+        grade={course.grade}
+        lessons={lessons || []}
+        userId={user.id}
+      />
     </div>
   );
 }
