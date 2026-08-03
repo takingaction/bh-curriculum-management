@@ -187,7 +187,9 @@ return (
                 {loading ? "Signing in..." : "Sign In"}
               </Button>
               <p className="text-xs text-[#666666] text-center">
-                Forgot your password? Log in with a magic link and update your password in your profile area.
+                <a href="/forgot-password" className="text-[#0d7377] hover:underline">
+                  Forgot your password?
+                </a>
               </p>
             </form>
           ) : (
