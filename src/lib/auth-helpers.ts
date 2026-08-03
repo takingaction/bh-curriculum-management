@@ -1,8 +1,9 @@
-import { createClient, getSession } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 
 export async function requireAuth() {
-  const { data: { session } } = await getSession();
+  const supabase = await createClient();
+  const { data: { session } } = await supabase.auth.getSession();
   
   if (!session) {
     redirect("/login");
@@ -12,13 +13,13 @@ export async function requireAuth() {
 }
 
 export async function requireAdmin() {
-  const { data: { session } } = await getSession();
+  const supabase = await createClient();
+  const { data: { session } } = await supabase.auth.getSession();
   
   if (!session) {
     redirect("/login");
   }
   
-  const supabase = await createClient();
   const { data: profile } = await supabase
     .from("profiles")
     .select("role")
