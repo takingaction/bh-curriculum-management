@@ -12,7 +12,7 @@ export default async function DashboardPage() {
 
   const supabase = await createClient();
 
-  const { data: profile } = await supabase
+  let { data: profile } = await supabase
     .from("profiles")
     .select("*")
     .eq("id", userId)

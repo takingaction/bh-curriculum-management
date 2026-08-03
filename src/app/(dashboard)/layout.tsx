@@ -9,8 +9,6 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const supabase = await createClient();
-
   const { data: { session } } = await getSession();
 
   if (!session) {
@@ -19,13 +17,14 @@ export default async function DashboardLayout({
 
   const user = session.user;
 
-  const { data: profile, error: profileError } = await supabase
+  const supabase = await createClient();
+
+  const { data: profile } = await supabase
     .from("profiles")
     .select("role, email, full_name")
     .eq("id", user.id)
     .single();
 
-  console.log("Layout profile query:", { profile, error: profileError?.message });
   const isAdmin = profile?.role === "admin";
 
   return (
