@@ -68,8 +68,7 @@ export async function POST(request: Request) {
 
     const { error: profileError } = await supabaseAdmin
       .from("profiles")
-      .insert({
-        id: authData.user.id,
+      .update({
         email: email.toLowerCase(),
         first_name,
         last_name,
@@ -81,7 +80,8 @@ export async function POST(request: Request) {
         enrollments: ["ALL"],
         trial_starts_at: new Date().toISOString(),
         trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
-      });
+      })
+      .eq("id", authData.user.id);
 
     if (profileError) {
       await supabaseAdmin.auth.admin.deleteUser(authData.user.id);

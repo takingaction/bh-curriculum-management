@@ -416,6 +416,12 @@ Custom domain `www.performersready.com` requires explicit cookie domain for auth
 - Fix: Converted to POST form, dropdown no longer clears cookies on open
 - Logout redirect uses 303 to convert POST to GET (NextResponse.redirect defaults to 307 which preserves POST method, causing 405 on /login)
 
+**Teacher signup duplicate key fix (RESOLVED):**
+- Database has `handle_new_user` trigger that auto-creates profile when auth user is inserted
+- `/api/teachers/signup/route.ts` was using `INSERT` for profile after creating auth user
+- This caused "duplicate key value violates unique constraint 'profiles_pkey'" error
+- Fix: Changed to `UPDATE ... .eq("id", authData.user.id)` since trigger already created the profile
+
 ### Relevant Files
 - `src/app/(dashboard)/admin/courses/[id]/page.tsx` - Course edit page with Spotify section
 - `src/components/course-spotify-section.tsx` - Course-level Spotify modal and controls (includes SpotifyEmbed preview)
