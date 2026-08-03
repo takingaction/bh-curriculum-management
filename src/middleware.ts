@@ -13,36 +13,6 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next({ request });
   }
 
-  console.log("All cookies:", request.cookies.getAll().map(c => ({ name: c.name, valueLength: c.value?.length || 0 })));
-
-  let supabaseResponse = NextResponse.next({
-    request,
-  });
-
-  const supabase = createServerClient(
-    supabaseUrl,
-    supabaseAnonKey,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            request.cookies.set(name, value);
-            supabaseResponse = NextResponse.next({ request });
-            supabaseResponse.cookies.set(name, value, options);
-          });
-        },
-      },
-    }
-  );
-
-  // Try to get user
-  const { data: { user }, error } = await supabase.auth.getUser();
-  
-  console.log("getUser result:", { hasUser: !!user, error: error?.message });
-
   const pathname = request.nextUrl.pathname;
 
   // Public paths that don't require auth
@@ -51,18 +21,56 @@ export async function middleware(request: NextRequest) {
   }
 
   if (pathname.startsWith("/login") || pathname.startsWith("/signup")) {
-    if (user) {
-      return NextResponse.redirect(new URL("/dashboard", request.url));
+    return NextResponse.next({ request });
+  }
+
+  // Get cookies directly from request
+  const cookies = request.cookies.getAll();
+  console.log("Cookies count:", cookies.length);
+  
+  // Find the auth token cookie
+  const authTokenCookie = cookies.find(c => c.name.includes('auth-token') && !c.name.includes('refresh'));
+  const refreshTokenCookie = cookies.find(c => c.name.includes('refresh-token'));
+  
+  console.log("Auth token cookie found:", !!authTokenCookie, "Name:", authTokenCookie?.name);
+  console.log("Refresh token cookie found:", !!refreshTokenCookie);
+
+  let supabaseResponse = NextResponse.next({ request });
+
+  // If no auth cookies at all, redirect to login
+  if (!authTokenCookie) {
+    console.log("No auth token cookie, redirecting to login");
+    return NextResponse.redirect(new URL("/login", request.url));
+  }
+
+  const supabase = createServerClient(
+    supabaseUrl,
+    supabaseAnonKey,
+    {
+      cookies: {
+        getAll() {
+          return cookies;
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            supabaseResponse.cookies.set(name, value, options);
+          });
+        },
+      },
     }
-    return supabaseResponse;
+  );
+
+  // Try to get user with the existing cookies
+  const { data: { user }, error } = await supabase.auth.getUser();
+  
+  console.log("getUser result:", { hasUser: !!user, error: error?.message });
+
+  if (!user) {
+    console.log("No user from getUser, redirecting to login");
+    return NextResponse.redirect(new URL("/login", request.url));
   }
 
   if (pathname.startsWith("/admin")) {
-    if (!user) {
-      console.log("No user, redirecting to login");
-      return NextResponse.redirect(new URL("/login", request.url));
-    }
-    
     // Use service client to bypass RLS for profile check
     const supabaseAdmin = await createServiceClient();
     const { data: profile, error: profileError } = await supabaseAdmin
@@ -71,7 +79,7 @@ export async function middleware(request: NextRequest) {
       .eq("id", user.id)
       .single();
 
-    console.log("Profile query result:", { profile, profileError: profileError?.message });
+    console.log("Profile query result:", { profile: profile?.role, profileError: profileError?.message });
 
     if (profileError || profile?.role !== "admin") {
       console.log("Not admin or profile error, redirecting to dashboard");
@@ -79,17 +87,8 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  if (pathname.startsWith("/dashboard")) {
-    if (!user) {
-      console.log("Dashboard access but no user, redirecting to login");
-      return NextResponse.redirect(new URL("/login", request.url));
-    }
-  }
-
-  if (pathname.startsWith("/profile")) {
-    if (!user) {
-      return NextResponse.redirect(new URL("/login", request.url));
-    }
+  if (pathname.startsWith("/dashboard") || pathname.startsWith("/profile")) {
+    // Allow access - user is authenticated
   }
 
   return supabaseResponse;
