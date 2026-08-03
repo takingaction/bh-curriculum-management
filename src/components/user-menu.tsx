@@ -61,6 +61,7 @@ export function UserMenu({ email, fullName, role, isAdmin }: UserMenuProps) {
                   href="/admin"
                   className="block px-4 py-2 text-sm text-[#2d2d2d] hover:bg-[#f5f5f0]"
                   onClick={() => setOpen(false)}
+                  prefetch={false}
                 >
                   Admin Dashboard
                 </Link>
@@ -68,6 +69,7 @@ export function UserMenu({ email, fullName, role, isAdmin }: UserMenuProps) {
                   href="/admin/courses"
                   className="block px-4 py-2 text-sm text-[#2d2d2d] hover:bg-[#f5f5f0]"
                   onClick={() => setOpen(false)}
+                  prefetch={false}
                 >
                   Courses
                 </Link>
@@ -75,6 +77,7 @@ export function UserMenu({ email, fullName, role, isAdmin }: UserMenuProps) {
                   href="/admin/teachers"
                   className="block px-4 py-2 text-sm text-[#2d2d2d] hover:bg-[#f5f5f0]"
                   onClick={() => setOpen(false)}
+                  prefetch={false}
                 >
                   Teachers
                 </Link>
@@ -82,6 +85,7 @@ export function UserMenu({ email, fullName, role, isAdmin }: UserMenuProps) {
                   href="/admin/teachers/onboard"
                   className="block px-4 py-2 text-sm text-[#2d2d2d] hover:bg-[#f5f5f0]"
                   onClick={() => setOpen(false)}
+                  prefetch={false}
                 >
                   Onboard Teachers
                 </Link>
@@ -89,6 +93,7 @@ export function UserMenu({ email, fullName, role, isAdmin }: UserMenuProps) {
                   href="/admin/pdf-regenerate"
                   className="block px-4 py-2 text-sm text-[#2d2d2d] hover:bg-[#f5f5f0]"
                   onClick={() => setOpen(false)}
+                  prefetch={false}
                 >
                   Batch PDF Regeneration
                 </Link>

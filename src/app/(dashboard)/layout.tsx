@@ -19,12 +19,13 @@ export default async function DashboardLayout({
 
   const user = session.user;
 
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select("*")
+    .select("role, email, full_name")
     .eq("id", user.id)
     .single();
 
+  console.log("Layout profile query:", { profile, error: profileError?.message });
   const isAdmin = profile?.role === "admin";
 
   return (
