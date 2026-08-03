@@ -1,4 +1,4 @@
-import { createClient, createServiceClient, getSession } from "@/lib/supabase/server";
+import { createClient, getSession } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { UserMenu } from "@/components/user-menu";
 import Link from "next/link";
@@ -10,7 +10,6 @@ export default async function DashboardLayout({
   children: React.ReactNode;
 }) {
   const supabase = await createClient();
-  const supabaseAdmin = await createServiceClient();
 
   const { data: { session } } = await getSession();
 
@@ -20,7 +19,7 @@ export default async function DashboardLayout({
 
   const user = session.user;
 
-  const { data: profile } = await supabaseAdmin
+  const { data: profile } = await supabase
     .from("profiles")
     .select("*")
     .eq("id", user.id)

@@ -1,28 +1,31 @@
-import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
+import { getSession } from "@/lib/supabase/server";
 import DashboardClient from "@/components/dashboard-client";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
-  const supabaseAdmin = await createServiceClient();
+  const { data: { session } } = await getSession();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  if (!session) {
+    return <div>Loading...</div>;
+  }
+
+  const userId = session.user.id;
 
   let { data: profile } = await supabase
     .from("profiles")
     .select("*")
-    .eq("id", user?.id)
+    .eq("id", userId)
     .single();
 
   const isInactive = profile?.enrollment_status === "inactive" ||
     (profile?.enrollment_status === "trial" && profile?.trial_ends_at && new Date(profile.trial_ends_at) < new Date());
 
   if (isInactive && profile?.enrollment_status === "trial") {
-    await supabaseAdmin
+    await supabase
       .from("profiles")
       .update({ enrollment_status: "inactive" })
-      .eq("id", user?.id);
+      .eq("id", userId);
     profile = { ...profile, enrollment_status: "inactive" };
   }
 
@@ -32,7 +35,7 @@ export default async function DashboardPage() {
   let courses: any[] = [];
   let lessonCounts: Record<string, number> = {};
 
-  const { data: allCourses } = await supabaseAdmin
+  const { data: allCourses } = await supabase
     .from("courses")
     .select("*")
     .order("discipline", { ascending: true })
@@ -50,7 +53,7 @@ export default async function DashboardPage() {
 
   const courseIds = courses.map((c: any) => c.id);
   if (courseIds.length > 0) {
-    const { data: lessons } = await supabaseAdmin
+    const { data: lessons } = await supabase
       .from("lessons")
       .select("course_id")
       .in("course_id", courseIds);
@@ -59,10 +62,10 @@ export default async function DashboardPage() {
     });
   }
 
-  const { data: adaptedLessons } = await supabaseAdmin
+  const { data: adaptedLessons } = await supabase
     .from("adapted_lessons")
     .select("id")
-    .eq("teacher_id", user?.id);
+    .eq("teacher_id", userId);
 
   return (
     <DashboardClient
