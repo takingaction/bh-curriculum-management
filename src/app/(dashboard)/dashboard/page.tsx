@@ -43,14 +43,23 @@ export default async function DashboardPage() {
     .order("discipline", { ascending: true })
     .order("grade", { ascending: true });
 
+  const gradeOrder = ["PK", "K", "1", "2", "3", "4", "5", "6"];
+  const sortedCourses = (courses: any[]) => {
+    return [...courses].sort((a, b) => {
+      const aIndex = gradeOrder.indexOf(a.grade);
+      const bIndex = gradeOrder.indexOf(b.grade);
+      return aIndex - bIndex;
+    });
+  };
+
   if (enrollments.includes("ALL")) {
-    courses = allCourses || [];
+    courses = sortedCourses(allCourses || []);
   } else {
-    courses = (allCourses || []).filter((course: any) => {
+    courses = sortedCourses((allCourses || []).filter((course: any) => {
       const courseKey = `${course.discipline.toUpperCase()}_GRADE_${course.grade.toUpperCase()}`;
       const disciplineOnly = course.discipline.toUpperCase();
       return enrollments.includes(courseKey) || enrollments.includes(disciplineOnly);
-    });
+    }));
   }
 
   const courseIds = courses.map((c: any) => c.id);
