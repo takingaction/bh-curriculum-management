@@ -1,9 +1,7 @@
-import { createClient } from "@/lib/supabase/server";
-import { getSession } from "@/lib/supabase/server";
+import { createClient, getSession } from "@/lib/supabase/server";
 import DashboardClient from "@/components/dashboard-client";
 
 export default async function DashboardPage() {
-  const supabase = await createClient();
   const { data: { session } } = await getSession();
 
   if (!session) {
@@ -12,7 +10,9 @@ export default async function DashboardPage() {
 
   const userId = session.user.id;
 
-  let { data: profile } = await supabase
+  const supabase = await createClient();
+
+  const { data: profile } = await supabase
     .from("profiles")
     .select("*")
     .eq("id", userId)
