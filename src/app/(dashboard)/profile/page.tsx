@@ -76,8 +76,8 @@ export default function ProfilePage() {
     e.preventDefault();
     setPasswordMessage("");
 
-    if (newPassword.length < 6) {
-      setPasswordMessage("Password must be at least 6 characters");
+    if (newPassword.length < 8) {
+      setPasswordMessage("Password must be at least 8 characters");
       return;
     }
 
@@ -201,7 +201,7 @@ export default function ProfilePage() {
                 className="border-[#e5e5e0] focus:border-[#0d7377]"
               />
               <p className="text-xs text-gray-500 mt-1">
-                Password must be at least 6 characters. Use 8 or more characters with lowercase, uppercase, digits, and symbols for a stronger password.
+                Password must be at least 8 characters with lowercase, uppercase, digits, and symbols.
               </p>
             </div>
             <div className="space-y-2">
