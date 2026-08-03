@@ -1,4 +1,4 @@
-import { createServiceClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
@@ -12,14 +12,15 @@ export async function POST(request: Request) {
       );
     }
 
-    const supabase = await createServiceClient();
+    const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    const { error } = await supabase.auth.admin.updateUserById(user.id, {
+    const supabaseAdmin = await createServiceClient();
+    const { error } = await supabaseAdmin.auth.admin.updateUserById(user.id, {
       password: newPassword,
     });
 
