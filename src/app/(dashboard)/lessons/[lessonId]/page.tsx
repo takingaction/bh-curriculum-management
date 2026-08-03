@@ -97,9 +97,17 @@ export default function LessonContentPage({
   const [activeSection, setActiveSection] = useState<string | null>(null);
   const [pdfExists, setPdfExists] = useState(false);
 
-  const isInactive = profile?.enrollment_status === "inactive" ||
-    profile?.enrollment_status === "trial";
+  const isBlocked = profile?.enrollment_status === "inactive" ||
+    (profile?.enrollment_status === "trial" && 
+     profile?.trial_ends_at && 
+     new Date(profile?.trial_ends_at) < new Date());
   const showCalifornia = profile?.california !== false;
+
+  useEffect(() => {
+    if (isBlocked && !loading) {
+      router.push("/dashboard");
+    }
+  }, [isBlocked, loading]);
 
   useEffect(() => {
     params.then(async (p) => {
@@ -279,8 +287,10 @@ export default function LessonContentPage({
 
   const contentSections = filteredSections.filter(s => hasContent(s.key));
 
+  const isTrial = profile?.enrollment_status === "trial";
+
   const handlePdfClick = (e: React.MouseEvent, download: boolean) => {
-    if (isInactive) {
+    if (isBlocked || isTrial) {
       e.preventDefault();
       setShowTrialPdfModal(true);
     } else if (download) {
@@ -293,18 +303,6 @@ export default function LessonContentPage({
       <style jsx global>{`
         html { scroll-behavior: smooth; }
       `}</style>
-
-      {isInactive && (
-        <div className="bg-red-600 text-white px-4 py-3 text-center">
-          <p className="text-sm font-medium">
-            Your account is no longer active. Please contact{" "}
-            <a href="mailto:support@betterhumanseducation.com" className="underline">
-              support@betterhumanseducation.com
-            </a>{" "}
-            to activate your account.
-          </p>
-        </div>
-      )}
 
       <div className="border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 py-4">
@@ -365,7 +363,7 @@ export default function LessonContentPage({
               <div className="mt-4">
                 {pdfExists && (
                   <div className="mb-2 text-sm">
-                    {isInactive ? (
+                    {(isBlocked || isTrial) ? (
                       <>
                         <button
                           type="button"

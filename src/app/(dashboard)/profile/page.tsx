@@ -144,7 +144,7 @@ export default function ProfilePage() {
         <div className="bg-[#e37c64] text-white px-4 py-3 mb-6 rounded-md">
           <p className="text-sm font-medium text-center">
             Your trial ends in {getDaysRemaining(trialEndsAt)} days.{" "}
-            <a href="mailto:support@betterhumanseducation.com" className="underline">
+            <a href="mailto:support@betterhumanseducation.com" target="_blank" rel="noopener noreferrer" className="underline">
               Contact us
             </a>{" "}
             to activate your full account.
@@ -155,7 +155,7 @@ export default function ProfilePage() {
         <div className="bg-red-600 text-white px-4 py-3 mb-6 rounded-md">
           <p className="text-sm font-medium text-center">
             Your account is no longer active. Please contact{" "}
-            <a href="mailto:support@betterhumanseducation.com" className="underline">
+            <a href="mailto:support@betterhumanseducation.com" target="_blank" rel="noopener noreferrer" className="underline">
               support@betterhumanseducation.com
             </a>{" "}
             to activate your account.
