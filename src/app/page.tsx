@@ -1,4 +1,5 @@
 import Header from "@/components/home/Header";
+import MigrationNotice from "@/components/home/MigrationNotice";
 import HeroSection from "@/components/home/HeroSection";
 import ElementaryArtsSection from "@/components/home/ElementaryArtsSection";
 import GradeLevelSection from "@/components/home/GradeLevelSection";
@@ -11,7 +12,8 @@ export default function Home() {
   return (
     <>
       <Header />
-      <main>
+      <MigrationNotice />
+      <main className="pt-[calc(var(--header-height)+var(--banner-height))]">
         <HeroSection />
         <ElementaryArtsSection />
         <GradeLevelSection />

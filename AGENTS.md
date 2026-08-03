@@ -452,7 +452,7 @@ Custom domain `www.performersready.com` requires explicit cookie domain for auth
 #### Public Homepage
 Landing page at `/` with the following sections:
 - `src/app/page.tsx` - Main page assembling all homepage sections
-- `src/components/home/Header.tsx` - Fixed header with logo, About Us link, Sign In button
+- `src/components/home/Header.tsx` - Fixed header with logo, About Us link, Sign In button (has `id="main-header"`)
 - `src/components/home/HeroSection.tsx` - Full-screen hero with background image and overlay
 - `src/components/home/ElementaryArtsSection.tsx` - Text left, image right, peach background
 - `src/components/home/GradeLevelSection.tsx` - Two-column layout: title/text left, grade descriptions right
@@ -461,3 +461,10 @@ Landing page at `/` with the following sections:
 - `src/components/home/CallToActionSection.tsx` - Contact info and Calendly CTA button
 - `src/components/home/Footer.tsx` - Copyright with dynamic year
 - `public/images/` - Local copies of homepage images (logo.png, hero-bg.jpg, kids-dancing.png, video-thumbnail.jpg, opportunities-image.png)
+
+**MigrationNotice Component** (`src/components/home/MigrationNotice.tsx`):
+- Dismissible banner above hero section notifying users of platform migration
+- Dynamically positions itself below header using header's `offsetHeight` (listens for resize)
+- X button dismisses the banner; floating info button appears to re-show it
+- Uses CSS variables `--header-height` and `--banner-height` for content spacing
+- Banner text includes magic link sign-in info and support email (opens in new tab)
