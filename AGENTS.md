@@ -433,6 +433,10 @@ Custom domain `www.performersready.com` requires explicit cookie domain for auth
 - Courses now display in proper grade order: PK, K, 1, 2, 3, 4, 5, 6
 - Applied `gradeOrder` sorting in `src/app/(dashboard)/dashboard/page.tsx`
 
+**Login page fixes:**
+- Added password reset hint below Sign In button: "Forgot your password? Log in with a magic link and update your password in your profile area."
+- Fixed login box and magic link confirmation box positioning with `pt-40` to clear fixed header
+
 ### Relevant Files
 - `src/app/(dashboard)/admin/courses/[id]/page.tsx` - Course edit page with Spotify section
 - `src/components/course-spotify-section.tsx` - Course-level Spotify modal and controls (includes SpotifyEmbed preview)
