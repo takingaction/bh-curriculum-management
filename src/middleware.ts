@@ -5,10 +5,21 @@ export async function middleware(request: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
+  console.log("Middleware running:", request.nextUrl.pathname);
+
   if (!supabaseUrl || !supabaseAnonKey) {
     console.error("Missing Supabase environment variables");
     return NextResponse.next({ request });
   }
+
+  // Get cookies manually first
+  const authCookieName = `sb-${supabaseUrl.split('://')[1]}-auth-token`;
+  const authToken = request.cookies.get(authCookieName)?.value;
+  const refreshToken = request.cookies.get(`${authCookieName}-refresh-token`)?.value;
+  
+  console.log("Auth token present:", !!authToken, "Refresh token present:", !!refreshToken);
+  console.log("Auth cookie name:", authCookieName);
+  console.log("All cookies:", request.cookies.getAll().map(c => c.name));
 
   let supabaseResponse = NextResponse.next({
     request,
@@ -20,39 +31,36 @@ export async function middleware(request: NextRequest) {
     {
       cookies: {
         getAll() {
-          const cookies = request.cookies.getAll();
-          console.log("Cookies received:", cookies.map(c => c.name));
-          return cookies;
+          return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value, options }) => {
             request.cookies.set(name, value);
-            supabaseResponse = NextResponse.next({
-              request,
-            });
+            supabaseResponse = NextResponse.next({ request });
+            // Set cookie with explicit domain for Vercel
             supabaseResponse.cookies.set({
               name,
               value,
               ...options,
+              domain: '.performersready.com',
               secure: true,
-              sameSite: "lax",
+              sameSite: 'lax',
               httpOnly: true,
             });
-            console.log("Cookie set:", name, { value: value ? "present" : "missing", options });
           });
         },
       },
     }
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  console.log("Middleware:", { pathname: request.nextUrl.pathname, hasUser: !!user });
+  // Try to get user - this will use the cookies we just passed
+  const { data: { user }, error } = await supabase.auth.getUser();
+  
+  console.log("getUser result:", { hasUser: !!user, error: error?.message });
 
   const pathname = request.nextUrl.pathname;
 
+  // Public paths that don't require auth
   if (pathname.startsWith("/teacher")) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
@@ -66,6 +74,7 @@ export async function middleware(request: NextRequest) {
 
   if (pathname.startsWith("/admin")) {
     if (!user) {
+      console.log("No user, redirecting to login");
       return NextResponse.redirect(new URL("/login", request.url));
     }
     const { data: profile } = await supabase
@@ -81,6 +90,7 @@ export async function middleware(request: NextRequest) {
 
   if (pathname.startsWith("/dashboard")) {
     if (!user) {
+      console.log("Dashboard access but no user, redirecting to login");
       return NextResponse.redirect(new URL("/login", request.url));
     }
   }
