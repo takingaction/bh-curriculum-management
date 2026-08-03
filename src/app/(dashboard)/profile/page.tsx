@@ -11,7 +11,8 @@ import { Label } from "@/components/ui/label";
 interface Profile {
   id: string;
   email: string;
-  full_name: string | null;
+  first_name: string | null;
+  last_name: string | null;
   role: string;
 }
 
@@ -21,7 +22,8 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [fullName, setFullName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [message, setMessage] = useState("");
   const [passwordMessage, setPasswordMessage] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -42,7 +44,8 @@ export default function ProfilePage() {
         console.log("Profile API response:", data);
         if (data.profile) {
           setProfile(data.profile);
-          setFullName(data.profile.full_name || "");
+          setFirstName(data.profile.first_name || "");
+          setLastName(data.profile.last_name || "");
         } else if (data.error) {
           console.error("Profile API error:", data.error);
         }
@@ -61,7 +64,7 @@ export default function ProfilePage() {
 
     const { error } = await supabase
       .from("profiles")
-      .update({ full_name: fullName })
+      .update({ first_name: firstName, last_name: lastName })
       .eq("id", profile?.id);
 
     if (error) {
@@ -142,13 +145,25 @@ export default function ProfilePage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="fullName" className="text-[#2d2d2d]">Full Name</Label>
+              <Label htmlFor="firstName" className="text-[#2d2d2d]">First Name</Label>
               <Input
-                id="fullName"
+                id="firstName"
                 type="text"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                placeholder="Enter your full name"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                placeholder="Enter your first name"
+                className="border-[#e5e5e0] focus:border-[#0d7377]"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="lastName" className="text-[#2d2d2d]">Last Name</Label>
+              <Input
+                id="lastName"
+                type="text"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                placeholder="Enter your last name"
                 className="border-[#e5e5e0] focus:border-[#0d7377]"
               />
             </div>
