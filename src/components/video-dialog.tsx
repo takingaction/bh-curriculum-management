@@ -48,7 +48,7 @@ export default function VideoDialog({ videoUrl }: VideoDialogProps) {
 
         <div className="relative z-10 py-12 px-6 text-center">
           <h3 className="text-white text-2xl font-bold mb-2">Welcome to Performers Ready!</h3>
-          <p className="text-white/80 mb-4">Watch our introduction video to get started</p>
+          <p className="text-white/80 mb-4">Watch our introduction video to get started (currently a placeholder video - real video coming shortly!)</p>
           <button
             onClick={() => setIsOpen(true)}
             className="group flex items-center justify-center w-16 h-16 mx-auto rounded-full bg-white/90 hover:bg-white transition-colors shadow-lg"
