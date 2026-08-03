@@ -5,19 +5,20 @@ export async function middleware(request: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  console.log("Middleware running:", request.nextUrl.pathname);
+  const pathname = request.nextUrl.pathname;
+  console.log("=== Middleware ===");
+  console.log("Path:", pathname);
 
   if (!supabaseUrl || !supabaseAnonKey) {
-    console.error("Missing Supabase environment variables");
+    console.error("Missing env vars");
     return NextResponse.next({ request });
   }
 
-  const pathname = request.nextUrl.pathname;
-
-  // Public paths
+  // Public paths - allow through without auth
   if (pathname.startsWith("/teacher") || pathname.startsWith("/login") || 
       pathname.startsWith("/signup") || pathname.startsWith("/auth/") ||
-      pathname.startsWith("/api/")) {
+      pathname.startsWith("/api/") || pathname.startsWith("/_next")) {
+    console.log("Public path - allowing");
     return NextResponse.next({ request });
   }
 
@@ -29,7 +30,9 @@ export async function middleware(request: NextRequest) {
     {
       cookies: {
         getAll() {
-          return request.cookies.getAll();
+          const cookies = request.cookies.getAll();
+          console.log("Cookies in getAll:", cookies.map(c => c.name));
+          return cookies;
         },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value, options }) => {
@@ -42,11 +45,12 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user }, error } = await supabase.auth.getUser();
   
-  console.log("User:", !!user);
+  console.log("getUser result:", { hasUser: !!user, error: error?.message });
 
   if (!user) {
+    console.log("No user - redirect to login");
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
@@ -58,10 +62,12 @@ export async function middleware(request: NextRequest) {
       .single();
 
     if (profile?.role !== "admin") {
+      console.log("Not admin - redirect to dashboard");
       return NextResponse.redirect(new URL("/dashboard", request.url));
     }
   }
 
+  console.log("Allow through");
   return supabaseResponse;
 }
 
