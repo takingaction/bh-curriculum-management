@@ -8,20 +8,26 @@ export async function GET(request: NextRequest) {
   const type = searchParams.get('type') as EmailOtpType | null
   const next = searchParams.get('next') ?? '/dashboard'
 
+  console.log('Auth confirm hit:', { token_hash: token_hash ? 'present' : 'missing', type, next })
+
   if (!token_hash || !type) {
+    console.log('Missing token_hash or type')
     return NextResponse.redirect(`${request.nextUrl.origin}/login?error=auth`)
   }
 
   const supabase = await createClient()
 
-  const { error } = await supabase.auth.verifyOtp({
+  const { data, error } = await supabase.auth.verifyOtp({
     type,
     token_hash,
   })
+
+  console.log('verifyOtp result:', { error, hasData: !!data })
 
   if (!error) {
     return NextResponse.redirect(`${request.nextUrl.origin}${next}`)
   }
 
+  console.log('verifyOtp error:', error)
   return NextResponse.redirect(`${request.nextUrl.origin}/login?error=auth`)
 }
