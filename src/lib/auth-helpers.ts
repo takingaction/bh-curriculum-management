@@ -8,14 +8,19 @@ export async function requireAuth() {
   
   // Get user ID from cookies manually
   const authCookies = cookieStore.getAll();
+  console.log("requireAuth cookies:", authCookies.map(c => c.name));
+  
   const authToken = authCookies.find(c => 
-    c.name.includes('auth-token') && !c.name.includes('refresh')
+    (c.name.includes('auth-token') && !c.name.includes('refresh')) ||
+    c.name === 'sb-access-token'
   );
   
   if (!authToken) {
     console.log("requireAuth: no auth token cookie");
     redirect("/login");
   }
+  
+  console.log("requireAuth: found token cookie:", authToken.name);
   
   // Decode JWT to get user ID
   try {
@@ -26,16 +31,20 @@ export async function requireAuth() {
     const payload = JSON.parse(atob(parts[1]));
     const userId = payload.sub;
     
+    console.log("requireAuth: userId from JWT:", userId);
+    
     if (!userId) {
       throw new Error('No user ID in token');
     }
     
     // Verify user exists
-    const { data: profile } = await supabase
+    const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("id")
       .eq("id", userId)
       .single();
+      
+    console.log("requireAuth: profile lookup:", { profile, error: profileError?.message });
       
     if (!profile) {
       throw new Error('User not found');
@@ -43,7 +52,7 @@ export async function requireAuth() {
     
     return { id: userId };
   } catch (err) {
-    console.log("requireAuth: JWT decode error", err);
+    console.log("requireAuth: error", err);
     redirect("/login");
   }
 }
@@ -61,8 +70,10 @@ export async function requireAdmin() {
     .eq("id", user.id)
     .single();
     
+  console.log("requireAdmin:", { profile, error: error?.message });
+    
   if (error || profile?.role !== "admin") {
-    console.log("requireAdmin: not admin", { profile, error });
+    console.log("requireAdmin: not admin");
     redirect("/dashboard");
   }
   
