@@ -23,6 +23,8 @@
 # misc
 .DS_Store
 *.pem
+import_teachers_active.csv
+test.csv
 
 # debug
 npm-debug.log*
