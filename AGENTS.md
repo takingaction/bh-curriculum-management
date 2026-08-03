@@ -387,6 +387,24 @@ Admin tool for regenerating all lesson PDFs at `/admin/pdf-regenerate`.
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `PDF_SERVICE_URL` - URL for PDF generation service (e.g., `https://pdf-service-m3mc.onrender.com`)
 
+### Cookie Domain Configuration
+Custom domain `www.performersready.com` requires explicit cookie domain for auth to work.
+
+**Files that set cookies:**
+- `src/lib/supabase/server.ts` - `createClient()` sets auth cookies
+- `src/app/auth/callback/route.ts` - OAuth/magic link callback sets session cookies
+
+**Cookie domain:** `.www.performersready.com` (leading dot covers both www and apex redirect)
+
+**Why this is needed:**
+- When app was on `.vercel.app`, cookies were scoped to that domain
+- After adding custom domain, cookies need explicit domain to work on `www.performersready.com`
+- Apex domain `performersready.com` redirects (307/308) to www, so all auth happens on www
+
+**Supabase Dashboard settings:**
+- Authentication > URL Configuration > Site URL: `https://www.performersready.com`
+- Redirect URLs must include: `https://www.performersready.com/auth/callback`
+
 ### Relevant Files
 - `src/app/(dashboard)/admin/courses/[id]/page.tsx` - Course edit page with Spotify section
 - `src/components/course-spotify-section.tsx` - Course-level Spotify modal and controls (includes SpotifyEmbed preview)
