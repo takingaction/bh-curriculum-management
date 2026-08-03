@@ -429,6 +429,10 @@ Custom domain `www.performersready.com` requires explicit cookie domain for auth
 - Course grade "PK" didn't match enrollment "TK" → TK courses invisible to users
 - Fix: Changed `GRADES` array in `enrollments-select.tsx` from `["TK", "K", ...]` to `["PK", "K", ...]`
 
+**Dashboard course card ordering:**
+- Courses now display in proper grade order: PK, K, 1, 2, 3, 4, 5, 6
+- Applied `gradeOrder` sorting in `src/app/(dashboard)/dashboard/page.tsx`
+
 ### Relevant Files
 - `src/app/(dashboard)/admin/courses/[id]/page.tsx` - Course edit page with Spotify section
 - `src/components/course-spotify-section.tsx` - Course-level Spotify modal and controls (includes SpotifyEmbed preview)
