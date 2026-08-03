@@ -409,9 +409,11 @@ Custom domain `www.performersready.com` requires explicit cookie domain for auth
 - Authentication > URL Configuration > Site URL: `https://www.performersready.com`
 - Redirect URLs must include: `https://www.performersready.com/auth/callback`
 
-**Dropdown signout fix:**
+**Dropdown signout fix (RESOLVED):**
 - Log Out uses POST form instead of GET link to prevent prefetch-triggered signout
 - All dropdown links have `prefetch={false}` to avoid unnecessary RSC requests
+- Issue: Next.js was prefetching `/auth/signout` on dropdown open, which has a GET handler that deleted all cookies
+- Fix: Converted to POST form, dropdown no longer clears cookies on open
 
 ### Relevant Files
 - `src/app/(dashboard)/admin/courses/[id]/page.tsx` - Course edit page with Spotify section
