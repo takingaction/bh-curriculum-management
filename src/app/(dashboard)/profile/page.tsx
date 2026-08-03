@@ -144,28 +144,30 @@ export default function ProfilePage() {
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="firstName" className="text-[#2d2d2d]">First Name</Label>
-              <Input
-                id="firstName"
-                type="text"
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                placeholder="Enter your first name"
-                className="border-[#e5e5e0] focus:border-[#0d7377]"
-              />
-            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="firstName" className="text-[#2d2d2d]">First Name</Label>
+                <Input
+                  id="firstName"
+                  type="text"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  placeholder="Enter your first name"
+                  className="border-[#e5e5e0] focus:border-[#0d7377]"
+                />
+              </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="lastName" className="text-[#2d2d2d]">Last Name</Label>
-              <Input
-                id="lastName"
-                type="text"
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-                placeholder="Enter your last name"
-                className="border-[#e5e5e0] focus:border-[#0d7377]"
-              />
+              <div className="space-y-2">
+                <Label htmlFor="lastName" className="text-[#2d2d2d]">Last Name</Label>
+                <Input
+                  id="lastName"
+                  type="text"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  placeholder="Enter your last name"
+                  className="border-[#e5e5e0] focus:border-[#0d7377]"
+                />
+              </div>
             </div>
 
             <div className="space-y-2">
