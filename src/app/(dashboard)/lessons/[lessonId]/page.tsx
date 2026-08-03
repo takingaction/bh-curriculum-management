@@ -127,7 +127,7 @@ export default function LessonContentPage({
 
         setLesson(data.lesson);
         setCourse(data.course);
-        setIsAdmin(isAdminView);
+        setIsAdmin(isAdminView || profileData?.profile?.role === 'admin');
         setLessonAssets(assetsData.assets || []);
         if (profileData?.profile) {
           setProfile(profileData.profile);
