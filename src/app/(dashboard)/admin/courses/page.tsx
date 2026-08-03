@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ManageImagesButton } from "@/components/manage-images-button";
+import { requireAdmin } from "@/lib/auth-helpers";
 
 const gradeOrder = ["PK", "K", "1", "2", "3", "4", "5", "6"];
 
@@ -21,6 +22,8 @@ export default async function AdminCoursesPage({
 }: {
   searchParams: Promise<{ q?: string }>;
 }) {
+  await requireAdmin();
+  
   const params = await searchParams;
   const supabase = await createServiceClient();
   const query = params.q || "";
