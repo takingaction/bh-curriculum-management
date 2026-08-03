@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 
 const DISCIPLINES = ["MUSIC", "THEATRE", "DANCE"] as const;
-const GRADES = ["TK", "K", "1", "2", "3", "4", "5", "6"] as const;
+const GRADES = ["PK", "K", "1", "2", "3", "4", "5", "6"] as const;
 
 interface EnrollmentsSelectProps {
   value: string[];
@@ -133,7 +133,7 @@ export function EnrollmentsSelect({ value, onChange }: EnrollmentsSelectProps) {
                             : "border-[#0d7377] text-[#0d7377] hover:bg-[#0d7377] hover:text-white h-7 text-xs"
                         }
                       >
-                        {grade === "TK" ? "TK" : grade === "K" ? "K" : grade}
+                        {grade === "PK" ? "PK" : grade === "K" ? "K" : grade}
                       </Button>
                     );
                   })}
