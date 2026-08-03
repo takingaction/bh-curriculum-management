@@ -422,6 +422,13 @@ Custom domain `www.performersready.com` requires explicit cookie domain for auth
 - This caused "duplicate key value violates unique constraint 'profiles_pkey'" error
 - Fix: Changed to `UPDATE ... .eq("id", authData.user.id)` since trigger already created the profile
 
+**TK/PK grade enrollment mismatch fix (RESOLVED):**
+- Enrollment system stores keys as `MUSIC_GRADE_PK`, `DANCE_GRADE_PK`, etc. (not TK)
+- `enrollments-select.tsx` was using "TK" in GRADES array, creating `MUSIC_GRADE_TK` keys
+- Dashboard filter matches `course.discipline_GRADE_course.grade` against enrollments
+- Course grade "PK" didn't match enrollment "TK" → TK courses invisible to users
+- Fix: Changed `GRADES` array in `enrollments-select.tsx` from `["TK", "K", ...]` to `["PK", "K", ...]`
+
 ### Relevant Files
 - `src/app/(dashboard)/admin/courses/[id]/page.tsx` - Course edit page with Spotify section
 - `src/components/course-spotify-section.tsx` - Course-level Spotify modal and controls (includes SpotifyEmbed preview)
