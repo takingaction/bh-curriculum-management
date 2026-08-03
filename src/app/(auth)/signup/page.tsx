@@ -106,7 +106,7 @@ export default function SignupPage() {
     return (
       <>
         <Header />
-<div className="min-h-screen bg-gray-50 flex justify-center py-12 px-4">
+        <div className="min-h-screen bg-gray-50 flex justify-center py-12 px-4" style={{ paddingTop: '120px' }}>
           <Card className="w-full max-w-lg mx-4">
             <CardHeader>
               <CardTitle className="text-2xl">Check Your Email</CardTitle>
