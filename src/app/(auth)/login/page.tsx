@@ -62,7 +62,7 @@ export default function LoginPage() {
     return (
       <>
         <Header />
-<div className="min-h-screen bg-[#f5f5f0] flex items-start justify-center pt-32">
+<div className="min-h-screen bg-[#f5f5f0] flex items-start justify-center pt-48">
           <div className="w-full max-w-md p-8 bg-white rounded-xl shadow-lg mx-4">
             <div className="mb-8 text-center">
               <h1 className="text-2xl font-bold text-[#0d7377] mb-2">Performers Ready!</h1>
