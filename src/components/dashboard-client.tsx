@@ -22,6 +22,8 @@ interface DashboardClientProps {
   lessonCounts: Record<string, number>;
   adaptedCount: number;
   isInactive?: boolean;
+  isTrial?: boolean;
+  trialEndsAt?: string | null;
 }
 
 export default function DashboardClient({
@@ -31,6 +33,8 @@ export default function DashboardClient({
   lessonCounts,
   adaptedCount,
   isInactive = false,
+  isTrial = false,
+  trialEndsAt = null,
 }: DashboardClientProps) {
   const [activeTab, setActiveTab] = useState<string>(
     DISCIPLINE_ORDER.find((d) => courses.some((c) => c.discipline === d)) || "Music"
@@ -42,9 +46,27 @@ export default function DashboardClient({
   );
   const activeCourses = courses.filter((c) => c.discipline === activeTab);
 
+  const getDaysRemaining = (endsAt: string): number => {
+    const now = new Date();
+    const ends = new Date(endsAt);
+    const diff = ends.getTime() - now.getTime();
+    return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      {isInactive && (
+      {isTrial && trialEndsAt && (
+        <div className="bg-[#e37c64] text-white px-4 py-3 mt-6 rounded-md">
+          <p className="text-sm font-medium text-center">
+            Your trial ends in {getDaysRemaining(trialEndsAt)} days.{" "}
+            <a href="mailto:support@betterhumanseducation.com" className="underline">
+              Contact us
+            </a>{" "}
+            to activate your full account.
+          </p>
+        </div>
+      )}
+      {isInactive && !isTrial && (
         <div className="bg-red-600 text-white px-4 py-3 mt-6 rounded-md">
           <p className="text-sm font-medium text-center">
             Your account is no longer active. Please contact{" "}

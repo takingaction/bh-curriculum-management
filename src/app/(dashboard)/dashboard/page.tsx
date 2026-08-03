@@ -28,6 +28,9 @@ export default async function DashboardPage() {
     profile = { ...profile, enrollment_status: "inactive" };
   }
 
+  const isTrial = profile?.enrollment_status === "trial";
+  const trialEndsAt = profile?.trial_ends_at || null;
+
   const isAdmin = profile?.role === "admin";
   const enrollments = profile?.enrollments || ["ALL"];
 
@@ -74,6 +77,8 @@ export default async function DashboardPage() {
       lessonCounts={lessonCounts}
       adaptedCount={adaptedLessons?.length || 0}
       isInactive={isInactive}
+      isTrial={isTrial}
+      trialEndsAt={trialEndsAt}
     />
   );
 }

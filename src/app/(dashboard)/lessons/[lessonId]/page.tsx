@@ -98,7 +98,7 @@ export default function LessonContentPage({
   const [pdfExists, setPdfExists] = useState(false);
 
   const isInactive = profile?.enrollment_status === "inactive" ||
-    (profile?.enrollment_status === "trial" && profile?.trial_ends_at && new Date(profile?.trial_ends_at) < new Date());
+    profile?.enrollment_status === "trial";
   const showCalifornia = profile?.california !== false;
 
   useEffect(() => {

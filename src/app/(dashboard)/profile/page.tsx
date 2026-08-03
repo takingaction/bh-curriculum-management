@@ -14,6 +14,8 @@ interface Profile {
   first_name: string | null;
   last_name: string | null;
   role: string;
+  enrollment_status?: string;
+  trial_ends_at?: string | null;
 }
 
 export default function ProfilePage() {
@@ -39,7 +41,7 @@ export default function ProfilePage() {
           return;
         }
 
-        const response = await fetch("/api/profile");
+        const response = await fetch("/api/profile/check-status");
         const data = await response.json();
         console.log("Profile API response:", data);
         if (data.profile) {
@@ -56,6 +58,17 @@ export default function ProfilePage() {
     }
     fetchProfile();
   }, []);
+
+  const getDaysRemaining = (endsAt: string): number => {
+    const now = new Date();
+    const ends = new Date(endsAt);
+    const diff = ends.getTime() - now.getTime();
+    return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+  };
+
+  const isTrial = profile?.enrollment_status === "trial";
+  const isInactive = profile?.enrollment_status === "inactive";
+  const trialEndsAt = profile?.trial_ends_at;
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -127,6 +140,28 @@ export default function ProfilePage() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">
+      {isTrial && trialEndsAt && (
+        <div className="bg-[#e37c64] text-white px-4 py-3 mb-6 rounded-md">
+          <p className="text-sm font-medium text-center">
+            Your trial ends in {getDaysRemaining(trialEndsAt)} days.{" "}
+            <a href="mailto:support@betterhumanseducation.com" className="underline">
+              Contact us
+            </a>{" "}
+            to activate your full account.
+          </p>
+        </div>
+      )}
+      {isInactive && (
+        <div className="bg-red-600 text-white px-4 py-3 mb-6 rounded-md">
+          <p className="text-sm font-medium text-center">
+            Your account is no longer active. Please contact{" "}
+            <a href="mailto:support@betterhumanseducation.com" className="underline">
+              support@betterhumanseducation.com
+            </a>{" "}
+            to activate your account.
+          </p>
+        </div>
+      )}
       <Card>
         <CardHeader>
           <CardTitle className="text-2xl text-[#0d7377]">My Profile</CardTitle>

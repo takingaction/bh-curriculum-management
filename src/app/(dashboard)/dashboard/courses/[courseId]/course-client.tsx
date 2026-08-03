@@ -42,7 +42,7 @@ export default function CourseClient({
           const profile = data.profile;
           if (profile) {
             const isInactive = profile.enrollment_status === "inactive" ||
-              (profile.enrollment_status === "trial" && profile.trial_ends_at && new Date(profile.trial_ends_at) < new Date());
+              profile.enrollment_status === "trial";
             setIsTrial(isInactive);
           }
         }
