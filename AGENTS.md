@@ -437,6 +437,9 @@ Custom domain `www.performersready.com` requires explicit cookie domain for auth
 - Added password reset hint below Sign In button: "Forgot your password? Log in with a magic link and update your password in your profile area."
 - Fixed login box and magic link confirmation box positioning with `pt-40` to clear fixed header
 
+**Signup confirmation box:**
+- Fixed signup confirmation box position with `paddingTop: '180px'` to clear fixed header
+
 ### Relevant Files
 - `src/app/(dashboard)/admin/courses/[id]/page.tsx` - Course edit page with Spotify section
 - `src/components/course-spotify-section.tsx` - Course-level Spotify modal and controls (includes SpotifyEmbed preview)
@@ -454,6 +457,8 @@ Custom domain `www.performersready.com` requires explicit cookie domain for auth
 - `src/app/(dashboard)/dashboard/courses/[courseId]/page.tsx` - Teacher course view with lessons table
   - Shows course image (250x250 teal box) and summary above lessons table
 - `src/components/check-for-underunderstanding-modal.tsx` - CFU edit modal
+- `src/app/(auth)/login/page.tsx` - Login page with password/magic link options
+- `src/app/(auth)/signup/page.tsx` - Trial signup page
 - `src/lib/html-utils.ts` - HTML parsing, text finding/replacing for Find & Replace
 - `src/app/api/find-replace/route.ts` - Find & Replace API endpoints (GET search, PATCH replace)
 - `src/app/api/lessons/[lessonId]/pdf/info/route.ts` - GET PDF metadata (exists, generated_at, file_size)
