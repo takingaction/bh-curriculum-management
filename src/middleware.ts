@@ -1,4 +1,5 @@
 import { createServerClient } from "@supabase/ssr";
+import { createServiceClient } from "@/lib/supabase/server";
 import { NextResponse, type NextRequest } from "next/server";
 
 export async function middleware(request: NextRequest) {
@@ -12,14 +13,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next({ request });
   }
 
-  // Get cookies manually first
-  const authCookieName = `sb-${supabaseUrl.split('://')[1]}-auth-token`;
-  const authToken = request.cookies.get(authCookieName)?.value;
-  const refreshToken = request.cookies.get(`${authCookieName}-refresh-token`)?.value;
-  
-  console.log("Auth token present:", !!authToken, "Refresh token present:", !!refreshToken);
-  console.log("Auth cookie name:", authCookieName);
-  console.log("All cookies:", request.cookies.getAll().map(c => c.name));
+  console.log("All cookies:", request.cookies.getAll().map(c => ({ name: c.name, valueLength: c.value?.length || 0 })));
 
   let supabaseResponse = NextResponse.next({
     request,
@@ -44,7 +38,7 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  // Try to get user - this will use the cookies we just passed
+  // Try to get user
   const { data: { user }, error } = await supabase.auth.getUser();
   
   console.log("getUser result:", { hasUser: !!user, error: error?.message });
@@ -68,13 +62,19 @@ export async function middleware(request: NextRequest) {
       console.log("No user, redirecting to login");
       return NextResponse.redirect(new URL("/login", request.url));
     }
-    const { data: profile } = await supabase
+    
+    // Use service client to bypass RLS for profile check
+    const supabaseAdmin = await createServiceClient();
+    const { data: profile, error: profileError } = await supabaseAdmin
       .from("profiles")
       .select("role")
       .eq("id", user.id)
       .single();
 
-    if (profile?.role !== "admin") {
+    console.log("Profile query result:", { profile, profileError: profileError?.message });
+
+    if (profileError || profile?.role !== "admin") {
+      console.log("Not admin or profile error, redirecting to dashboard");
       return NextResponse.redirect(new URL("/dashboard", request.url));
     }
   }
