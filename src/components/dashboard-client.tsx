@@ -65,7 +65,7 @@ export default function DashboardClient({
         <p className="text-[#666666]">Your curriculum and teaching resources</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
         <Card className="border-[#e5e5e0] shadow-sm">
           <CardHeader>
             <CardTitle className="text-4xl font-bold text-[#0d7377]">{courses.length}</CardTitle>
@@ -80,12 +80,12 @@ export default function DashboardClient({
             <CardDescription className="text-[#666666]">Total Lessons</CardDescription>
           </CardHeader>
         </Card>
-        <Card className="border-[#e5e5e0] shadow-sm">
+        {/* <Card className="border-[#e5e5e0] shadow-sm">
           <CardHeader>
             <CardTitle className="text-4xl font-bold text-[#0d7377]">{adaptedCount}</CardTitle>
             <CardDescription className="text-[#666666]">AI Adaptations</CardDescription>
           </CardHeader>
-        </Card>
+        </Card> */}
       </div>
 
       <Card className="border-[#e5e5e0] shadow-sm mb-8">
