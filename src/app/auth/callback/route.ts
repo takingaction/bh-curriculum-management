@@ -23,14 +23,7 @@ export async function GET(request: Request) {
           setAll(cookiesToSet) {
             try {
               cookiesToSet.forEach(({ name, value, options }) => {
-                // Set with explicit domain for Vercel
-                cookieStore.set(name, value, {
-                  ...options,
-                  domain: '.performersready.com',
-                  secure: true,
-                  sameSite: 'lax',
-                  httpOnly: true,
-                });
+                cookieStore.set(name, value, options);
               });
             } catch {
               // Server Component - ignore

@@ -37,16 +37,7 @@ export async function middleware(request: NextRequest) {
           cookiesToSet.forEach(({ name, value, options }) => {
             request.cookies.set(name, value);
             supabaseResponse = NextResponse.next({ request });
-            // Set cookie with explicit domain for Vercel
-            supabaseResponse.cookies.set({
-              name,
-              value,
-              ...options,
-              domain: '.performersready.com',
-              secure: true,
-              sameSite: 'lax',
-              httpOnly: true,
-            });
+            supabaseResponse.cookies.set(name, value, options);
           });
         },
       },
