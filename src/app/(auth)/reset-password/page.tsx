@@ -37,8 +37,8 @@ export default function ResetPasswordPage() {
     e.preventDefault();
     setError("");
 
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters");
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters");
       return;
     }
 
@@ -141,12 +141,16 @@ export default function ResetPasswordPage() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="At least 6 characters"
+                placeholder="At least 8 characters"
                 required
-                minLength={6}
+                minLength={8}
                 className="border-[#e5e5e0] focus:border-[#0d7377] focus:ring-[#0d7377]"
               />
             </div>
+
+            <p className="text-xs text-gray-500 -mt-2">
+              Password must be at least 8 characters with lowercase, uppercase, digits, and symbols.
+            </p>
 
             <div className="space-y-2">
               <Label htmlFor="confirmPassword" className="text-[#2d2d2d] font-medium">Confirm Password</Label>
@@ -157,7 +161,7 @@ export default function ResetPasswordPage() {
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="Confirm your password"
                 required
-                minLength={6}
+                minLength={8}
                 className="border-[#e5e5e0] focus:border-[#0d7377] focus:ring-[#0d7377]"
               />
             </div>
