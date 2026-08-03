@@ -200,6 +200,9 @@ export default function ProfilePage() {
                 placeholder="Enter new password"
                 className="border-[#e5e5e0] focus:border-[#0d7377]"
               />
+              <p className="text-xs text-gray-500 mt-1">
+                Password must be at least 6 characters. Use 8 or more characters with lowercase, uppercase, digits, and symbols for a stronger password.
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="confirmPassword" className="text-[#2d2d2d]">Confirm Password</Label>
