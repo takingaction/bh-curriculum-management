@@ -216,17 +216,34 @@ Two-column layout at `src/app/(dashboard)/admin/courses/[id]/lessons/[lessonId]/
 - All toolbars in single sticky container
 
 ### Database Schema
-- `profiles` - User profiles with role (admin/teacher)
+- `profiles` - User profiles with role (admin/teacher), enrollment_status, enrollments array
 - `courses` - Course information with discipline, grade, and spotify_embed_code
 - `lessons` - Individual lessons with content, timing, presentation, etc. (Spotify is now on courses table)
-- `teacher_assignments` - Links teachers to courses
 - `lesson_assets` - Links assets to lessons with sort_order
 - `cfu_assets` - Check for Understanding assets (admin only)
 
+### Enrollment System
+Single source of truth: `profile.enrollments` array controls course access for all users (including admins).
+
+**Enrollment values:**
+- `"ALL"` - Access to all courses
+- `"MUSIC"` - All music discipline courses
+- `"DANCE"` - All dance discipline courses
+- `"THEATRE"` - All theatre discipline courses
+- `"MUSIC_GRADE_3"` - A specific single course (discipline + grade)
+
+**Examples:**
+- `["ALL"]` → everything
+- `["MUSIC"]` → all music courses
+- `["MUSIC", "DANCE"]` → all music + all dance
+- `["MUSIC", "DANCE_GRADE_K"]` → all music + one specific dance course
+- `["MUSIC_GRADE_3", "MUSIC_GRADE_4"]` → only Music grades 3 and 4
+
+**Dashboard filtering:** All users (admin and teacher) are filtered by their `profile.enrollments`.
+
 ### RLS Policies
-- Profiles: Users can read all, update only own profile
-- Courses/Lessons: Admin full access, teachers can read assigned courses
-- Teacher assignments tracked via `teacher_assignments` table
+- Profiles: Users can read all, update only own profile (admin can update all)
+- Courses/Lessons: All users filtered by `profile.enrollments` at application level
 
 ### Common Tasks
 

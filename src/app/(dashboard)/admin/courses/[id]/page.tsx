@@ -1,4 +1,5 @@
 import { createServiceClient } from "@/lib/supabase/server";
+import { requireAdmin } from "@/lib/auth-helpers";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,8 @@ export default async function CourseDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await requireAdmin();
+  
   const { id } = await params;
   const supabase = await createServiceClient();
 

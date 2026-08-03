@@ -96,10 +96,10 @@ export async function POST(request: Request) {
     const trialStartsAt = enrollment_status === 'trial' ? new Date().toISOString() : null;
     const trialEndsAt = enrollment_status === 'trial' ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString() : null;
 
+    // Profile already exists due to handle_new_user trigger, so UPDATE instead of INSERT
     const { data: profile, error: profileError } = await supabaseAdmin
       .from("profiles")
-      .insert({
-        id: authData.user.id,
+      .update({
         email: email.toLowerCase(),
         first_name,
         last_name,
@@ -112,6 +112,7 @@ export async function POST(request: Request) {
         trial_starts_at: trialStartsAt,
         trial_ends_at: trialEndsAt,
       })
+      .eq("id", authData.user.id)
       .select()
       .single();
 

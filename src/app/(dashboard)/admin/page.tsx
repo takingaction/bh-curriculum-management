@@ -1,10 +1,13 @@
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { requireAdmin } from "@/lib/auth-helpers";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default async function AdminDashboard() {
-  const supabase = await createClient();
+  await requireAdmin();
+  
+  const supabase = await createServiceClient();
 
   const { data: courses } = await supabase
     .from("courses")

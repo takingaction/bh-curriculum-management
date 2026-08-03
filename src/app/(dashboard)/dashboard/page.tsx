@@ -32,48 +32,31 @@ export default async function DashboardPage() {
   let courses: any[] = [];
   let lessonCounts: Record<string, number> = {};
 
-  if (isAdmin) {
-    const { data: allCourses } = await supabaseAdmin
-      .from("courses")
-      .select("*")
-      .order("discipline", { ascending: true })
-      .order("grade", { ascending: true });
-    courses = allCourses || [];
+  const { data: allCourses } = await supabaseAdmin
+    .from("courses")
+    .select("*")
+    .order("discipline", { ascending: true })
+    .order("grade", { ascending: true });
 
-    const { data: allLessons } = await supabaseAdmin
+  if (enrollments.includes("ALL")) {
+    courses = allCourses || [];
+  } else {
+    courses = (allCourses || []).filter((course: any) => {
+      const courseKey = `${course.discipline.toUpperCase()}_GRADE_${course.grade.toUpperCase()}`;
+      const disciplineOnly = course.discipline.toUpperCase();
+      return enrollments.includes(courseKey) || enrollments.includes(disciplineOnly);
+    });
+  }
+
+  const courseIds = courses.map((c: any) => c.id);
+  if (courseIds.length > 0) {
+    const { data: lessons } = await supabaseAdmin
       .from("lessons")
-      .select("course_id");
-    allLessons?.forEach((lesson) => {
+      .select("course_id")
+      .in("course_id", courseIds);
+    lessons?.forEach((lesson) => {
       lessonCounts[lesson.course_id] = (lessonCounts[lesson.course_id] || 0) + 1;
     });
-  } else {
-    const { data: assignments } = await supabaseAdmin
-      .from("teacher_assignments")
-      .select("*, courses(*)")
-      .eq("teacher_id", user?.id);
-    
-    let assignedCourses = assignments?.map((a: any) => a.courses).filter(Boolean) || [];
-
-    if (!enrollments.includes("ALL")) {
-      assignedCourses = assignedCourses.filter((course: any) => {
-        const disciplineGrade = `${course.discipline.toUpperCase()}_GRADE_${course.grade.toUpperCase()}`;
-        const disciplineOnly = course.discipline.toUpperCase();
-        return enrollments.includes(disciplineGrade) || enrollments.includes(disciplineOnly);
-      });
-    }
-
-    courses = assignedCourses;
-
-    const courseIds = courses.map((c: any) => c.id);
-    if (courseIds.length > 0) {
-      const { data: lessons } = await supabaseAdmin
-        .from("lessons")
-        .select("course_id")
-        .in("course_id", courseIds);
-      lessons?.forEach((lesson) => {
-        lessonCounts[lesson.course_id] = (lessonCounts[lesson.course_id] || 0) + 1;
-      });
-    }
   }
 
   const { data: adaptedLessons } = await supabaseAdmin

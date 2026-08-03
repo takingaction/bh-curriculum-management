@@ -1,4 +1,4 @@
-import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient, getSession } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { UserMenu } from "@/components/user-menu";
 import Link from "next/link";
@@ -12,13 +12,13 @@ export default async function DashboardLayout({
   const supabase = await createClient();
   const supabaseAdmin = await createServiceClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { data: { session } } = await getSession();
 
-  if (!user) {
+  if (!session) {
     redirect("/login");
   }
+
+  const user = session.user;
 
   const { data: profile } = await supabaseAdmin
     .from("profiles")

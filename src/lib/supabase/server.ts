@@ -33,6 +33,12 @@ export async function createClient() {
   );
 }
 
+export async function getSession() {
+  const supabase = await createClient();
+  const { data: { session } } = await supabase.auth.getSession();
+  return { data: { session } };
+}
+
 export async function createServiceClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
