@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,7 +22,6 @@ interface BypassCode {
 }
 
 export default function UserAccessPage() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -89,8 +87,16 @@ export default function UserAccessPage() {
 
       setSuccess(`Code generated: ${data.code}. Share this with the user at /bypass`);
       setEmail("");
-      router.refresh();
-      fetchCodes();
+      setCodes(prev => [{
+        id: data.code,
+        code: data.code,
+        email: data.email,
+        created_at: data.createdAt,
+        expires_at: data.expiresAt,
+        used_at: null,
+        creator: null,
+      }, ...prev]);
+      setTodayCount(prev => prev + 1);
     } catch {
       setError("An unexpected error occurred");
     } finally {
