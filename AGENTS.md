@@ -480,6 +480,67 @@ Custom domain `www.performersready.com` requires explicit cookie domain for auth
 **Signup confirmation box:**
 - Fixed signup confirmation box position with `paddingTop: '180px'` to clear fixed header
 
+#### Bypass Code System (Password Reset for Users Who Can't Receive Emails)
+Admin tool for users who cannot receive magic link or password reset emails.
+
+**Database tables:**
+- `bypass_codes` - Individual bypass codes tied to specific emails
+- `universal_tokens` - Single universal token that works with any valid email
+
+**Bypass codes:**
+- Code format: `PR-YYYY-XXXX` (4 random chars after year)
+- Tied to specific email address
+- 48 hour expiration
+- Single use (marked as used after password reset)
+- 100 codes per admin per day limit
+
+**Universal token:**
+- Same format as bypass codes (indistinguishable)
+- Works with ANY valid email in the system
+- Unlimited uses
+- Stored separately in `universal_tokens` table
+- Admin can regenerate (invalidates old) or delete
+
+**API endpoints:**
+- `GET /api/admin/bypass-codes` - List all codes and universal token
+- `POST /api/admin/bypass-codes` - Generate code (body: `{email}`) or universal token (body: `{universal: true}`)
+- `DELETE /api/admin/bypass-codes` - Delete universal token
+- `POST /api/bypass/reset` - Reset password with code (validates universal or regular code)
+
+**Key files:**
+- `src/lib/bypass-utils.ts` - Code generation and validation helpers
+- `src/app/api/admin/bypass-codes/route.ts` - Admin endpoints
+- `src/app/api/bypass/reset/route.ts` - Public reset endpoint
+- `src/app/(dashboard)/admin/user-access/page.tsx` - Admin UI
+- `src/app/bypass/page.tsx` - Public password reset page
+
+**SQL migration:**
+```sql
+CREATE TABLE IF NOT EXISTS public.bypass_codes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  code TEXT UNIQUE NOT NULL,
+  email TEXT NOT NULL,
+  created_by UUID REFERENCES auth.users(id) NOT NULL,
+  used_at TIMESTAMPTZ,
+  expires_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.universal_tokens (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  token TEXT UNIQUE NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  created_by UUID REFERENCES auth.users(id)
+);
+```
+
+**Workflow:**
+1. Admin goes to `/admin/user-access`
+2. For universal: Click "Generate Universal Token" → copy and share with all users
+3. For specific user: Enter email → click "Generate Code" → share with that user
+4. Users go to `/bypass`, enter email + code + new password
+5. Universal token: Any email with account works; Regular code: Email must match
+
 ### Relevant Files
 - `src/app/(dashboard)/admin/courses/[id]/page.tsx` - Course edit page with Spotify section
 - `src/components/course-spotify-section.tsx` - Course-level Spotify modal and controls (includes SpotifyEmbed preview)
