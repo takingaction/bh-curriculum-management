@@ -133,12 +133,12 @@ export default function BypassPage() {
                 type="password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="Minimum 6 characters"
+                placeholder="Minimum 8 characters"
                 required
-                minLength={6}
+                minLength={8}
                 className="border-[#e5e5e0] focus:border-[#0d7377] focus:ring-[#0d7377]"
               />
-              <p className="text-xs text-gray-400">Must be at least 6 characters</p>
+              <p className="text-xs text-gray-400">Password must be at least 8 characters with lowercase, uppercase, digits, and symbols.</p>
             </div>
 
             <Button
