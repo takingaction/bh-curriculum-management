@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
-import { validateBypassCode } from "@/lib/bypass-utils";
+import { validateBypassCode, validateUniversalToken } from "@/lib/bypass-utils";
 
 export async function POST(request: Request) {
   try {
@@ -23,10 +23,38 @@ export async function POST(request: Request) {
       );
     }
 
-    const validation = await validateBypassCode(supabaseAdmin, code, email);
+    const universalValidation = await validateUniversalToken(supabaseAdmin, code, email);
 
-    if (!validation.valid) {
-      return NextResponse.json({ error: validation.error }, { status: 400 });
+    if (universalValidation.valid) {
+      const { data: profile } = await supabaseAdmin
+        .from("profiles")
+        .select("id")
+        .eq("email", email.toLowerCase())
+        .single();
+
+      if (!profile) {
+        return NextResponse.json({ error: "User not found" }, { status: 404 });
+      }
+
+      const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
+        profile.id,
+        { password: newPassword }
+      );
+
+      if (updateError) {
+        return NextResponse.json({ error: updateError.message }, { status: 500 });
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: "Password has been reset successfully. You can now sign in with your new password."
+      });
+    }
+
+    const codeValidation = await validateBypassCode(supabaseAdmin, code, email);
+
+    if (!codeValidation.valid) {
+      return NextResponse.json({ error: codeValidation.error }, { status: 400 });
     }
 
     const { data: profile } = await supabaseAdmin
