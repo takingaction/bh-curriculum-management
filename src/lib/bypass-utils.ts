@@ -32,8 +32,10 @@ export interface BypassCodeValidation {
   codeRecord?: BypassCodeRecord;
 }
 
+ 
 export async function validateBypassCode(
-  supabase: SupabaseClient,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
   code: string,
   email: string
 ): Promise<BypassCodeValidation> {
@@ -61,11 +63,3 @@ export async function validateBypassCode(
 
   return { valid: true, codeRecord };
 }
-
-type SupabaseClient = {
-  from: (table: string) => {
-    select: (columns: string) => {
-      eq: (column: string, value: string) => Promise<{ data: BypassCodeRecord | null; error: unknown }>;
-    };
-  };
-};
