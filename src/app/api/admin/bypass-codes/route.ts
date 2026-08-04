@@ -24,10 +24,7 @@ export async function GET() {
 
     const { data: codes, error } = await supabaseAdmin
       .from("bypass_codes")
-      .select(`
-        *,
-        creator:profiles!created_by(email, full_name)
-      `)
+      .select("*")
       .order("created_at", { ascending: false });
 
     if (error) {

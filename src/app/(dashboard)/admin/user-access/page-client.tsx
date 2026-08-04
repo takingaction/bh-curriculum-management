@@ -15,10 +15,6 @@ interface BypassCode {
   created_at: string;
   expires_at: string;
   used_at: string | null;
-  creator: {
-    email: string;
-    full_name: string | null;
-  } | null;
 }
 
 export default function UserAccessPage() {
@@ -94,7 +90,6 @@ export default function UserAccessPage() {
         created_at: data.createdAt,
         expires_at: data.expiresAt,
         used_at: null,
-        creator: null,
       }, ...prev]);
       setTodayCount(prev => prev + 1);
     } catch {
@@ -116,12 +111,6 @@ export default function UserAccessPage() {
 
   function formatDate(dateString: string) {
     return new Date(dateString).toLocaleString();
-  }
-
-  function getCreatorName(code: BypassCode) {
-    if (!code.creator) return "Unknown";
-    if (code.creator.full_name) return code.creator.full_name;
-    return code.creator.email;
   }
 
   return (
@@ -222,7 +211,6 @@ export default function UserAccessPage() {
                       <TableRow>
                         <TableHead>Email</TableHead>
                         <TableHead>Code</TableHead>
-                        <TableHead>Created By</TableHead>
                         <TableHead>Created</TableHead>
                         <TableHead>Expires</TableHead>
                         <TableHead>Status</TableHead>
@@ -236,9 +224,6 @@ export default function UserAccessPage() {
                             <code className="bg-gray-100 px-2 py-0.5 rounded text-sm font-mono">
                               {code.code}
                             </code>
-                          </TableCell>
-                          <TableCell className="text-[#666666]">
-                            {getCreatorName(code)}
                           </TableCell>
                           <TableCell className="text-[#666666] text-sm">
                             {formatDate(code.created_at)}
