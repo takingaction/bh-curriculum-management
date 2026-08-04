@@ -33,6 +33,36 @@ Vercel deployment with Supabase for admin/teacher workflow. Manages music educat
 - Content is sanitized on save, so no XSS risk
 - Empty `<p>` tags need CSS fix to render properly: `.lesson-content p:empty { min-height: 0.5rem; display: block; }`
 
+#### Resource Link Arrows (CSS ::after)
+Links to materials (resource-links) and YouTube links have arrows appended via CSS `::after` pseudo-elements:
+- **Resource links** (`.resource-link`): `content: " ↗";` - upward-right arrow
+- **YouTube links** (`.youtube-link` or URL contains youtube.com/youtu.be): `content: " ▶";` - play icon
+
+These apply to both `.ProseMirror` (editor) and `.lesson-content` (student view) via `globals.css`:
+```css
+.lesson-content a.resource-link::after {
+  content: " ↗";
+  font-size: 16px;
+  color: #0d7377;
+  margin-left: 2px;
+}
+.lesson-content a.youtube-link::after,
+.lesson-content a[href*="youtube.com"]::after,
+.lesson-content a[href*="youtu.be"]::after {
+  content: " ▶";
+  font-size: 14px;
+  color: #0d7377;
+  margin-left: 2px;
+}
+```
+
+#### Pipe Separator Fix (Resource Links)
+**Problem:** When multiple resource links were added side-by-side (e.g., `Sheet Music | Piano Track`), the pipe separator was incorrectly placed inside the anchor tag: `<a>Sheet Music | </a><a>Piano Track</a>`
+
+**SQL Migration to fix:** Replace `<a([^>]*)>([^<]*)\s+\|\s*</a>` with `<a\1>\2</a> | ` across all 15 content fields.
+
+**Note:** This pattern occurred when teachers used the link modal to add multiple links, inadvertently including the pipe separator inside the anchor text.
+
 #### TipTap Editor Extensions
 Located in `src/components/editor/extensions/`:
 
