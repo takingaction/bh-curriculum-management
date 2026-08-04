@@ -100,6 +100,16 @@ CFU attributes are stored as HTML attributes on the div. TipTap writes lowercase
 
 This ensures existing CFUs in database work regardless of which format their attributes are stored in.
 
+#### CFU renderHTML Fix (TipTap "Invalid array passed to renderSpec")
+**Problem:** TipTap would crash with "Invalid array passed to renderSpec" when loading certain lessons with CFU blocks.
+**Root cause:** The `renderHTML` method in `check-for-understanding.tsx` was using empty arrays `[]` for optional elements, which ProseMirror treats as invalid. TipTap expects `null` instead of `[]` for optional elements in the spec array.
+**Fix:** Changed `renderHTML` to use `null` instead of `[]` for optional elements, and used proper array spreading with an `innerContent` array to build the table cells correctly.
+**Key changes:**
+- `pngImage ? ["img", ...] : []` → `pngImage ? ["img", ...] : null` with imageSpec variable
+- `heading ? ["h4", ...] : []` → `heading ? ["h4", ...] : null` with headingSpec variable
+- `content ? ["p", ...] : []` → `content ? ["p", ...] : null` with contentSpec variable
+- Used `innerContent` array with spread operator to properly handle optional cell content
+
 #### CFU SQL Migrations
 - CFUs stored in 15 text fields: lesson_outline, learning_objectives, vocabulary, materials, vapa_text_block, ncas_text_block, welcome_opening, actual_class_expectations, warm_up, lesson_hook, main_activity, instrument_expectations, reflection, closing_ceremony, assessment
 - Each CFU is a div with data-check-for-understanding="true" attribute
