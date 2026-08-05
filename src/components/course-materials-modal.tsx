@@ -28,6 +28,9 @@ export function CourseMaterialsModal({
             <FileText className="w-4 h-4" />
             Course Materials
           </DialogTitle>
+          <p className="text-sm text-gray-500">
+            Digital resources including handouts, sheet music, downloads, song playlists, and presentation slides can be found in the Lesson Resource section included with each lesson.
+          </p>
         </DialogHeader>
 
         <div className="py-4">
