@@ -480,6 +480,36 @@ Custom domain `www.performersready.com` requires explicit cookie domain for auth
 **Signup confirmation box:**
 - Fixed signup confirmation box position with `paddingTop: '180px'` to clear fixed header
 
+#### Mobile Responsive Layout
+All pages now have mobile-responsive layouts using Tailwind's `md:` breakpoint (768px).
+
+**Mobile section picker (bottom sheet):**
+- Student lesson view (`/lessons/[id]`) and admin lesson editor now hide the sidebar on mobile
+- Floating teal button at bottom-center opens a bottom sheet with section navigation
+- Uses shadcn/ui `Sheet` component with `side="bottom"`
+- `SheetTrigger` styles applied directly (not via `asChild` to avoid nested button issues)
+
+**Student lesson view (`src/app/(dashboard)/lessons/[lessonId]/page.tsx`):**
+- Header: Image 30% width with square proportions on mobile (`w-[30%] h-[30vw]`), full 250px on desktop
+- Columns stack vertically on mobile, horizontal on desktop (`flex-col md:flex-row`)
+- Sidebar hidden on mobile (`hidden md:block`)
+
+**Teacher course view (`src/app/(dashboard)/dashboard/courses/[courseId]/course-client.tsx`):**
+- Same header stacking as lesson view
+- Image: `w-[30%] h-[30vw]` mobile, `w-[250px] h-[250px]` desktop
+
+**Admin lesson editor (`src/app/(dashboard)/admin/courses/[id]/lessons/[lessonId]/page-client.tsx`):**
+- Sticky header stacks vertically on mobile
+- Left links (Back to Course | View Lesson) stack vertically
+- Right buttons wrap and Delete button hidden on mobile (`hidden md:inline-flex`)
+- Sidebar hidden on mobile (`hidden md:block`)
+
+**Admin course edit (`src/app/(dashboard)/admin/courses/[id]/page.tsx`):**
+- Image, title, and action buttons all stack vertically on mobile
+- Image: `w-[30%] aspect-square` on mobile, `sm:w-20 sm:h-20` on desktop
+- Uses `InlineDeleteButton` client component for mobile (inline confirm dialog)
+- Edit form fields stack and wrap on mobile
+
 #### Bypass Code System (Password Reset for Users Who Can't Receive Emails)
 Admin tool for users who cannot receive magic link or password reset emails.
 
@@ -544,6 +574,7 @@ CREATE TABLE IF NOT EXISTS public.universal_tokens (
 ### Relevant Files
 - `src/app/(dashboard)/admin/courses/[id]/page.tsx` - Course edit page with Spotify section
 - `src/components/course-spotify-section.tsx` - Course-level Spotify modal and controls (includes SpotifyEmbed preview)
+- `src/components/inline-delete-button.tsx` - Inline delete button for mobile (Client Component)
 - `src/app/(dashboard)/admin/courses/[id]/lessons/[lessonId]/page.tsx` - Main lesson edit page with two-column layout and PDF tab
 - `src/components/editor/lesson-editor.tsx` - TipTap editor with sticky toolbar
 - `src/components/editor/extensions/spell-check.ts` - Spellcheck extension
