@@ -71,8 +71,8 @@ export default function CourseClient({
   return (
     <>
       <div className="mb-8">
-        <div className="flex gap-6">
-          <div className="w-[250px] h-[250px] bg-[#d7ffef] flex items-center justify-center rounded-none overflow-hidden flex-shrink-0">
+        <div className="flex flex-col md:flex-row md:gap-6 gap-4">
+          <div className="w-[30%] h-[30vw] md:w-[250px] md:h-[250px] bg-[#d7ffef] flex items-center justify-center rounded-none overflow-hidden flex-shrink-0">
             {imageUrl ? (
               <img
                 src={imageUrl}

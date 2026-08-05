@@ -12,6 +12,7 @@ import { ManageImagesButton } from "@/components/manage-images-button";
 import { DeleteCourseButton } from "@/components/delete-course-button";
 import { CourseSpotifySection } from "@/components/course-spotify-section";
 import { CourseAssetsPanel } from "@/components/course-assets-panel";
+import { InlineDeleteButton } from "@/components/inline-delete-button";
 
 export default async function CourseDetailPage({
   params,
@@ -41,20 +42,27 @@ export default async function CourseDetailPage({
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="flex justify-between items-start mb-8">
-        <div className="flex gap-6">
+      <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4 mb-8">
+        <div className="flex flex-col sm:flex-row gap-4">
           <CourseImageUpload courseId={course.id} currentImageUrl={course.image_url} />
-          <div>
+          <div className="flex flex-col gap-1">
             <h2 className="text-2xl font-bold">{course.title}</h2>
             <p className="text-gray-600">
               {course.discipline} · Grade {course.grade}
             </p>
           </div>
         </div>
-        <div className="flex gap-2">
-          <ManageImagesButton courseId={course.id} />
+        <div className="flex flex-col gap-2">
+          <div className="flex gap-2">
+            <ManageImagesButton courseId={course.id} />
+            <span className="hidden md:inline">
+              <DeleteCourseButton courseId={course.id} courseTitle={course.title} />
+            </span>
+            <span className="md:hidden">
+              <InlineDeleteButton courseId={course.id} courseTitle={course.title} />
+            </span>
+          </div>
           <CourseEditForm course={course} />
-          <DeleteCourseButton courseId={course.id} courseTitle={course.title} />
         </div>
       </div>
 
@@ -126,63 +134,59 @@ export default async function CourseDetailPage({
 
 function CourseEditForm({ course }: { course: { id: string; title: string; discipline: string; grade: string; summary?: string; materials?: string } }) {
   return (
-    <Card>
-      <CardContent className="pt-6">
-        <form
-          action={async (formData) => {
-            "use server";
-            const supabase = await createServiceClient();
-            await supabase
-              .from("courses")
-              .update({
-                title: formData.get("title"),
-                discipline: formData.get("discipline"),
-                grade: formData.get("grade"),
-                summary: formData.get("summary") || null,
-                materials: formData.get("materials") || null,
-                updated_at: new Date().toISOString(),
-              })
-              .eq("id", course.id);
-            redirect(`/admin/courses/${course.id}`);
-          }}
-          className="flex flex-col gap-2"
-        >
-          <input type="hidden" name="id" value={course.id} />
-          <div className="flex gap-2">
-            <input
-              name="title"
-              defaultValue={course.title}
-              className="border rounded px-2 py-1"
-              required
-            />
-            <input
-              name="discipline"
-              defaultValue={course.discipline}
-              className="border rounded px-2 py-1"
-              required
-            />
-            <input
-              name="grade"
-              defaultValue={course.grade}
-              className="border rounded px-2 py-1 w-20"
-              required
-            />
-          </div>
-          <textarea
-            name="summary"
-            defaultValue={course.summary || ""}
-            placeholder="Course summary..."
-            className="border rounded px-2 py-1 min-h-[60px]"
-          />
-          <textarea
-            name="materials"
-            defaultValue={course.materials || ""}
-            placeholder="Materials (one per line)..."
-            className="border rounded px-2 py-1 min-h-[80px]"
-          />
-          <Button type="submit" size="sm">Save</Button>
-        </form>
-      </CardContent>
-    </Card>
+    <form
+      action={async (formData) => {
+        "use server";
+        const supabase = await createServiceClient();
+        await supabase
+          .from("courses")
+          .update({
+            title: formData.get("title"),
+            discipline: formData.get("discipline"),
+            grade: formData.get("grade"),
+            summary: formData.get("summary") || null,
+            materials: formData.get("materials") || null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", course.id);
+        redirect(`/admin/courses/${course.id}`);
+      }}
+      className="flex flex-col gap-2"
+    >
+      <input type="hidden" name="id" value={course.id} />
+      <div className="flex flex-col sm:flex-row gap-2">
+        <input
+          name="title"
+          defaultValue={course.title}
+          className="border rounded px-2 py-1 flex-1"
+          required
+        />
+        <input
+          name="discipline"
+          defaultValue={course.discipline}
+          className="border rounded px-2 py-1 w-full sm:w-32"
+          required
+        />
+        <input
+          name="grade"
+          defaultValue={course.grade}
+          className="border rounded px-2 py-1 w-full sm:w-20"
+          required
+        />
+      </div>
+      <textarea
+        name="summary"
+        defaultValue={course.summary || ""}
+        placeholder="Course summary..."
+        className="border rounded px-2 py-1 min-h-[60px] w-full"
+      />
+      <textarea
+        name="materials"
+        defaultValue={course.materials || ""}
+        placeholder="Materials (one per line)..."
+        className="border rounded px-2 py-1 min-h-[80px] w-full"
+      />
+      <Button type="submit" size="sm" className="self-start">Save</Button>
+    </form>
   );
 }

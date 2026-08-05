@@ -8,7 +8,8 @@ import { PresentationLink } from "@/components/presentation-modal";
 import { SpotifyEmbed } from "@/components/spotify-embed";
 import YouTubeDialog from "@/components/youtube-dialog";
 import { TrialPdfModal } from "@/components/trial-pdf-modal";
-import { Download, X, Volume2, EyeIcon, FileTextIcon, VideoIcon, DownloadIcon } from "lucide-react";
+import { Download, X, Volume2, EyeIcon, FileTextIcon, VideoIcon, DownloadIcon, List } from "lucide-react";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { FindReplacePanel } from "@/components/find-replace-panel";
 import { LessonNavigation } from "@/components/lesson-navigation";
 
@@ -97,6 +98,7 @@ export default function LessonContentPage({
   const [courseAssets, setCourseAssets] = useState<any[]>([]);
   const [activeSection, setActiveSection] = useState<string | null>(null);
   const [pdfExists, setPdfExists] = useState(false);
+  const [sectionPickerOpen, setSectionPickerOpen] = useState(false);
 
   const isBlocked = profile?.enrollment_status === "inactive" ||
     (profile?.enrollment_status === "trial" && 
@@ -315,8 +317,8 @@ export default function LessonContentPage({
 
       <div className="border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex gap-6">
-            <div className="w-[250px] h-[250px] bg-[#d7ffef] flex items-center justify-center rounded-none overflow-hidden flex-shrink-0">
+          <div className="flex flex-col md:flex-row md:gap-6 gap-4">
+            <div className="w-[30%] h-[30vw] md:w-[250px] md:h-[250px] bg-[#d7ffef] flex items-center justify-center rounded-none overflow-hidden flex-shrink-0">
               {course.image_url ? (
                 <img
                   src={course.image_url}
@@ -328,7 +330,7 @@ export default function LessonContentPage({
               )}
             </div>
 
-            <div className="w-[40%] flex-shrink-0 flex flex-col justify-start py-2">
+            <div className="w-full md:w-[40%] md:flex-shrink-0 flex flex-col justify-start py-2">
               <div>
                 <div className="text-sm text-black uppercase tracking-wide">
                   {course.title} | Grade {course.grade}
@@ -422,7 +424,7 @@ export default function LessonContentPage({
               </div>
             </div>
 
-            <div className="flex-1 flex flex-col justify-start py-2">
+            <div className="w-full flex-1 flex flex-col justify-start py-2">
               <h3 className="text-sm font-semibold text-gray-700 mb-2">Lesson Resources</h3>
               <CompactLessonAssets lessonId={lesson.id} maxItems={6} />
               {lesson.presentation_name && (
@@ -501,7 +503,7 @@ export default function LessonContentPage({
           />
         )}
         <div className="flex gap-6">
-          <div className="w-[250px] flex-shrink-0 sticky top-0 self-start">
+          <div className="hidden md:block w-[250px] flex-shrink-0 sticky top-0 self-start">
             <div className="space-y-1">
               {contentSections.map((section) => (
                 <a
@@ -606,6 +608,41 @@ export default function LessonContentPage({
           </svg>
         </button>
       )}
+
+      <Sheet open={sectionPickerOpen} onOpenChange={setSectionPickerOpen}>
+        <SheetTrigger className="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-14 h-14 rounded-full bg-[#0d7377] text-white shadow-lg hover:bg-[#0a5c5f] flex items-center justify-center">
+          <List className="w-6 h-6" />
+        </SheetTrigger>
+        <SheetContent side="bottom" className="max-h-[70vh] overflow-y-auto rounded-t-2xl">
+          <SheetHeader>
+            <SheetTitle className="text-left">Go to Section</SheetTitle>
+          </SheetHeader>
+          <div className="mt-4 space-y-1">
+            {contentSections.map((section) => (
+              <button
+                key={section.key}
+                type="button"
+                onClick={() => {
+                  setActiveSection(section.key);
+                  setSectionPickerOpen(false);
+                  const element = document.getElementById(section.key);
+                  if (element) {
+                    element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    window.history.pushState(null, '', `#${section.key}`);
+                  }
+                }}
+                className={`w-full text-left px-3 py-2.5 text-sm font-medium transition-colors rounded-lg ${
+                  activeSection === section.key
+                    ? 'bg-[#0d7377] text-white'
+                    : 'bg-[#d7ffef] text-black hover:bg-[#c7efe0]'
+                }`}
+              >
+                {section.label}
+              </button>
+            ))}
+          </div>
+        </SheetContent>
+      </Sheet>
 
       {previewAsset && (
         <div className="fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-8">

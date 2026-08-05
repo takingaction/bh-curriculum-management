@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { List } from "lucide-react";
 import { LessonEditor } from "@/components/editor/lesson-editor";
 import { LessonAssetsPanel } from "@/components/lesson-assets-panel";
 import { FindReplacePanel } from "@/components/find-replace-panel";
@@ -99,6 +101,7 @@ export default function EditLessonPage({
   const [presentationName, setPresentationName] = useState("");
   const [presentationUrl, setPresentationUrl] = useState("");
   const [selectedSection, setSelectedSection] = useState(textFields[0].name);
+  const [sectionPickerOpen, setSectionPickerOpen] = useState(false);
   const editorSectionRef = useRef<HTMLDivElement>(null);
   const [activePanel, setActivePanel] = useState<'general' | 'materials' | 'section' | 'pdf'>('general');
   const [pdfInfo, setPdfInfo] = useState<{
@@ -357,15 +360,15 @@ export default function EditLessonPage({
     <div className="min-h-screen bg-white">
       <div className="sticky top-0 z-50 bg-white border-b border-[#e5e5e0] shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-14">
-            <div className="flex items-center gap-4">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 md:gap-4 py-2 md:py-0">
+            <div className="flex items-center gap-2 md:gap-4">
               <Link
                 href={`/admin/courses/${lesson?.course_id}`}
                 className="text-sm text-[#0d7377] hover:underline"
               >
                 ← Back to Course
               </Link>
-              <span className="text-gray-300">|</span>
+              <span className="text-gray-300 hidden md:inline">|</span>
               <Link
                 href={`/lessons/${lesson?.id}`}
                 target="_blank"
@@ -374,7 +377,7 @@ export default function EditLessonPage({
                 View Lesson ↗
               </Link>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-2 md:gap-3">
               <LessonNavigation
                 courseId={lesson?.course_id}
                 currentLessonId={lesson?.id}
@@ -405,7 +408,7 @@ export default function EditLessonPage({
                     router.push(`/admin/courses/${lesson.course_id}`);
                   }
                 }}
-                className="bg-red-600 hover:bg-red-700 text-white"
+                className="hidden md:inline-flex bg-red-600 hover:bg-red-700 text-white"
               >
                 Delete
               </Button>
@@ -417,7 +420,7 @@ export default function EditLessonPage({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
         <div className="flex gap-6">
           {/* Left Navigation - Sticky */}
-          <div className="w-[280px] flex-shrink-0 sticky top-14 self-start">
+          <div className="hidden md:block w-[280px] flex-shrink-0 sticky top-14 self-start">
             {/* Teal header buttons */}
             <div className="space-y-1 mb-2">
               <button
@@ -666,6 +669,67 @@ export default function EditLessonPage({
         existingUrl={presentationUrl}
         onSave={handleSavePresentation}
       />
+
+      <Sheet open={sectionPickerOpen} onOpenChange={setSectionPickerOpen}>
+        <SheetTrigger className="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-14 h-14 rounded-full bg-[#0d7377] text-white shadow-lg hover:bg-[#0a5c5f] flex items-center justify-center">
+          <List className="w-6 h-6" />
+        </SheetTrigger>
+        <SheetContent side="bottom" className="max-h-[70vh] overflow-y-auto rounded-t-2xl">
+          <SheetHeader>
+            <SheetTitle className="text-left">Go to Section</SheetTitle>
+          </SheetHeader>
+          <div className="mt-4 space-y-1">
+            <button
+              type="button"
+              onClick={() => { setActivePanel('general'); setSectionPickerOpen(false); }}
+              className={`w-full text-left px-3 py-2.5 text-sm font-medium transition-colors rounded-lg ${
+                activePanel === 'general'
+                  ? 'bg-[#0d7377] text-white'
+                  : 'bg-[#e85d5d] text-white'
+              }`}
+            >
+              General Info
+            </button>
+            <button
+              type="button"
+              onClick={() => { setActivePanel('materials'); setSectionPickerOpen(false); }}
+              className={`w-full text-left px-3 py-2.5 text-sm font-medium transition-colors rounded-lg ${
+                activePanel === 'materials'
+                  ? 'bg-[#0d7377] text-white'
+                  : 'bg-[#e85d5d] text-white'
+              }`}
+            >
+              Lesson Materials
+            </button>
+            <button
+              type="button"
+              onClick={() => { setActivePanel('pdf'); setSectionPickerOpen(false); }}
+              className={`w-full text-left px-3 py-2.5 text-sm font-medium transition-colors rounded-lg ${
+                activePanel === 'pdf'
+                  ? 'bg-[#0d7377] text-white'
+                  : 'bg-[#e85d5d] text-white'
+              }`}
+            >
+              PDF
+            </button>
+            <div className="w-full h-px bg-[#e5e5e0] my-2" />
+            {textFields.map((field) => (
+              <button
+                key={field.name}
+                type="button"
+                onClick={() => { setActivePanel('section'); setSelectedSection(field.name); setSectionPickerOpen(false); }}
+                className={`w-full text-left px-3 py-2.5 text-sm font-medium transition-colors rounded-lg ${
+                  activePanel === 'section' && selectedSection === field.name
+                    ? 'bg-[#0d7377] text-white'
+                    : 'bg-[#d7ffef] text-black hover:bg-[#c7efe0]'
+                }`}
+              >
+                {field.label}
+              </button>
+            ))}
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
