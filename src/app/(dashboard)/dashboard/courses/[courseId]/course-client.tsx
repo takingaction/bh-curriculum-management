@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Eye, FileText, Download } from "lucide-react";
 import { TrialPdfModal } from "@/components/trial-pdf-modal";
+import { CourseMaterialsModal } from "@/components/course-materials-modal";
 
 interface Lesson {
   id: string;
@@ -21,6 +22,7 @@ interface CourseClientProps {
   grade: string;
   imageUrl?: string | null;
   summary?: string | null;
+  materials?: string | null;
   lessons: Lesson[];
   userId: string;
 }
@@ -32,10 +34,12 @@ export default function CourseClient({
   grade,
   imageUrl,
   summary,
+  materials,
   lessons,
 }: CourseClientProps) {
   const [isTrial, setIsTrial] = useState(false);
   const [showTrialModal, setShowTrialModal] = useState(false);
+  const [showMaterialsModal, setShowMaterialsModal] = useState(false);
 
   useEffect(() => {
     async function checkTrial() {
@@ -86,6 +90,16 @@ export default function CourseClient({
             <h2 className="text-2xl font-bold text-black mt-2">{courseName}</h2>
             {summary && (
               <p className="text-gray-600 mt-2">{summary}</p>
+            )}
+            {materials && (
+              <button
+                type="button"
+                onClick={() => setShowMaterialsModal(true)}
+                className="flex items-center gap-1.5 text-xs text-[#0d7377] hover:underline mt-2"
+              >
+                <FileText className="w-3 h-3" />
+                View Course Materials
+              </button>
             )}
           </div>
         </div>
@@ -156,6 +170,13 @@ export default function CourseClient({
       <TrialPdfModal
         open={showTrialModal}
         onClose={() => setShowTrialModal(false)}
+      />
+
+      <CourseMaterialsModal
+        open={showMaterialsModal}
+        onClose={() => setShowMaterialsModal(false)}
+        courseName={courseName}
+        materials={materials}
       />
     </>
   );

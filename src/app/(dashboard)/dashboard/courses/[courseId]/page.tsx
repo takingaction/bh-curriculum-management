@@ -45,6 +45,7 @@ export default async function TeacherCoursePage({
         grade={course.grade}
         imageUrl={course.image_url}
         summary={course.summary}
+        materials={course.materials}
         lessons={lessons || []}
         userId={user.id}
       />

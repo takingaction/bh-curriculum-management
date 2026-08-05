@@ -14,6 +14,8 @@ export interface Course {
   discipline: string;
   grade: string;
   total_lessons: number;
+  summary?: string | null;
+  materials?: string | null;
   created_at: string;
   updated_at: string;
 }

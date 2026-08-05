@@ -34,6 +34,10 @@ export async function PUT(
       updateData.summary = body.summary;
     }
 
+    if (body.materials !== undefined) {
+      updateData.materials = body.materials;
+    }
+
     if (body.pdf_image_url !== undefined) {
       updateData.pdf_image_url = body.pdf_image_url;
     }

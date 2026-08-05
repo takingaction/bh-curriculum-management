@@ -124,7 +124,7 @@ export default async function CourseDetailPage({
   );
 }
 
-function CourseEditForm({ course }: { course: { id: string; title: string; discipline: string; grade: string; summary?: string } }) {
+function CourseEditForm({ course }: { course: { id: string; title: string; discipline: string; grade: string; summary?: string; materials?: string } }) {
   return (
     <Card>
       <CardContent className="pt-6">
@@ -139,6 +139,7 @@ function CourseEditForm({ course }: { course: { id: string; title: string; disci
                 discipline: formData.get("discipline"),
                 grade: formData.get("grade"),
                 summary: formData.get("summary") || null,
+                materials: formData.get("materials") || null,
                 updated_at: new Date().toISOString(),
               })
               .eq("id", course.id);
@@ -172,6 +173,12 @@ function CourseEditForm({ course }: { course: { id: string; title: string; disci
             defaultValue={course.summary || ""}
             placeholder="Course summary..."
             className="border rounded px-2 py-1 min-h-[60px]"
+          />
+          <textarea
+            name="materials"
+            defaultValue={course.materials || ""}
+            placeholder="Materials (one per line)..."
+            className="border rounded px-2 py-1 min-h-[80px]"
           />
           <Button type="submit" size="sm">Save</Button>
         </form>
