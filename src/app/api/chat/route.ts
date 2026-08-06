@@ -49,7 +49,7 @@ interface LessonBasic {
     id: string;
     title: string;
     grade: string;
-  } | null;
+  } | null | unknown;
 }
 
 function filterCoursesByEnrollment(courses: Course[], enrollments: string[]): Course[] {
@@ -481,7 +481,8 @@ export async function POST(request: Request) {
 
       if (fullLesson) {
         const lessonWithCourse = fullLesson as unknown as LessonBasic;
-        const course = lessonWithCourse.courses?.[0];
+        const courseData = lessonWithCourse.courses as { id?: string; title?: string; grade?: string } | null;
+        const course = Array.isArray(courseData) ? courseData[0] : courseData;
         currentLessonInfo = `Current lesson context: "${fullLesson.title}" (Course: ${course?.title || "Unknown"}, Grade: ${course?.grade || "Unknown"}, Lesson #: ${fullLesson.lesson_number})`;
         fullLessonContent = `FULL CONTENT OF THIS LESSON:
 
