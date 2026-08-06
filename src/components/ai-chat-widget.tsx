@@ -33,7 +33,19 @@ interface Course {
 }
 
 const CHAT_STORAGE_KEY = 'aiChatHistory';
+const SEARCH_STORAGE_KEY = 'aiSearchState';
 const MAX_STORED_MESSAGES = 50;
+
+interface SearchState {
+  results: SearchResult[];
+  totalResults: number;
+  hasMore: boolean;
+  page: number;
+  query: string;
+  scope: "lesson" | "course" | "global";
+  lessonId: string | null;
+  courseId: string | null;
+}
 
 export default function AIChatWidget() {
   const { lessonId, courseId } = useChatContext();
@@ -52,7 +64,6 @@ export default function AIChatWidget() {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [links, setLinks] = useState<Link[]>([]);
-  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [directResults, setDirectResults] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"results" | "links">("results");
   const [resultsMinimized, setResultsMinimized] = useState(false);
@@ -68,6 +79,20 @@ export default function AIChatWidget() {
   const [searchPage, setSearchPage] = useState(0);
   const [searchTotalResults, setSearchTotalResults] = useState(0);
   const [searchHasMore, setSearchHasMore] = useState(false);
+  const [searchResults, setSearchResults] = useState<SearchResult[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem(SEARCH_STORAGE_KEY);
+        if (saved) {
+          const state: SearchState = JSON.parse(saved);
+          if (state.results && state.results.length > 0) {
+            return state.results;
+          }
+        }
+      } catch { }
+    }
+    return [];
+  });
 
   useEffect(() => {
     if (courseId) {
@@ -95,6 +120,44 @@ export default function AIChatWidget() {
       }
     }
   }, [messages]);
+
+  useEffect(() => {
+    if (searchResults.length > 0 || searchTotalResults > 0) {
+      try {
+        const state: SearchState = {
+          results: searchResults,
+          totalResults: searchTotalResults,
+          hasMore: searchHasMore,
+          page: searchPage,
+          query: searchQuery,
+          scope: searchScope,
+          lessonId,
+          courseId,
+        };
+        localStorage.setItem(SEARCH_STORAGE_KEY, JSON.stringify(state));
+      } catch { }
+    }
+  }, [searchResults, searchTotalResults, searchHasMore, searchPage, searchQuery, searchScope]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem(SEARCH_STORAGE_KEY);
+        if (saved) {
+          const state: SearchState = JSON.parse(saved);
+          if (state.results && state.results.length > 0) {
+            setSearchResults(state.results);
+            setSearchTotalResults(state.totalResults);
+            setSearchHasMore(state.hasMore);
+            setSearchPage(state.page);
+            setSearchQuery(state.query || "");
+            if (state.scope) setSearchScope(state.scope);
+            setResultsMinimized(false);
+          }
+        }
+      } catch { }
+    }
+  }, []);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -168,7 +231,12 @@ export default function AIChatWidget() {
     setLinks([]);
     setSearchResults([]);
     setDirectResults(null);
+    setSearchPage(0);
+    setSearchTotalResults(0);
+    setSearchHasMore(false);
+    setSearchQuery("");
     localStorage.removeItem(CHAT_STORAGE_KEY);
+    localStorage.removeItem(SEARCH_STORAGE_KEY);
   };
 
   const handleSearch = async () => {
@@ -249,8 +317,11 @@ export default function AIChatWidget() {
         body: JSON.stringify({
           message: searchQuery,
           searchQuery: searchQuery,
+          scope: searchScope,
           page: nextPage,
           pageSize: 10,
+          lessonId: lessonId,
+          courseId: courseId,
         }),
       });
 
@@ -266,6 +337,8 @@ export default function AIChatWidget() {
         setSearchResults(prev => [...prev, ...data.results]);
         setSearchPage(nextPage);
         setSearchHasMore(data.hasMore || false);
+      } else {
+        setSearchHasMore(false);
       }
     } catch (error) {
       console.error("Load more error:", error);
