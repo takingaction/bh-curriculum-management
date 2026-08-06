@@ -258,7 +258,9 @@ export default function AIChatWidget() {
       });
 
       if (!response.ok) {
-        throw new Error("Failed to load more");
+        const errorText = await response.text();
+        console.error("Load more failed:", response.status, errorText);
+        throw new Error(`Failed to load more: ${response.status}`);
       }
 
       const data = await response.json();
@@ -546,7 +548,7 @@ export default function AIChatWidget() {
                     : "text-gray-500 hover:text-gray-700"
                 }`}
               >
-                Results {searchResults.length > 0 && `(${searchResults.length})`}
+                Results {searchTotalResults > 0 && `(${searchTotalResults})`}
               </button>
               <button
                 type="button"
