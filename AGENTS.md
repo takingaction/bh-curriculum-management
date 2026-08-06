@@ -171,6 +171,81 @@ This ensures existing CFUs in database work regardless of which format their att
 - **Background updates**: Must use `&quot;` encoding for URL quotes in inline styles (TipTap format)
 - **Background image SVG**: Must have `preserveAspectRatio="none"` in SVG markup to stretch correctly with `background-size: 100% 100%`
 
+#### CFU Broken HTML Structure Fix (August 2026)
+**Problem:** Commit `5533b05` introduced a bug in `renderHTML` that caused `img`, `h4`, and `p` elements to be siblings of `<table>` instead of nested inside the `<td>` cells. This made CFU images render at full size instead of constrained to cell width.
+
+**Broken pattern:**
+```html
+<td class="cfu-image-cell"></td>
+<img src="...">                          <!-- OUTSIDE td -->
+<td class="cfu-text-cell"></td>
+<h4>...</h4>                             <!-- OUTSIDE td -->
+<p>...</p>                               <!-- OUTSIDE td -->
+```
+
+**SQL Migration to fix:**
+```sql
+BEGIN;
+CREATE OR REPLACE FUNCTION fix_cfu_html(html TEXT)
+RETURNS TEXT AS $$
+BEGIN
+  html := regexp_replace(html,
+    E'<td class="cfu-image-cell"([^>]*)></td>(<img[^>]+>)',
+    E'<td class="cfu-image-cell"\\1>\\2</td>',
+    'g');
+  html := regexp_replace(html,
+    E'<td class="cfu-text-cell"([^>]*)></td>(<h4[^>]*>[^<]*</h4>)<p([^>]*)>([^<]*)</p>',
+    E'<td class="cfu-text-cell"\\1>\\2<p\\3>\\4</p></td>',
+    'g');
+  RETURN html;
+END;
+$$ LANGUAGE plpgsql;
+
+UPDATE lessons SET
+  lesson_outline = fix_cfu_html(lesson_outline),
+  learning_objectives = fix_cfu_html(learning_objectives),
+  vocabulary = fix_cfu_html(vocabulary),
+  materials = fix_cfu_html(materials),
+  vapa_text_block = fix_cfu_html(vapa_text_block),
+  ncas_text_block = fix_cfu_html(ncas_text_block),
+  welcome_opening = fix_cfu_html(welcome_opening),
+  actual_class_expectations = fix_cfu_html(actual_class_expectations),
+  warm_up = fix_cfu_html(warm_up),
+  lesson_hook = fix_cfu_html(lesson_hook),
+  main_activity = fix_cfu_html(main_activity),
+  instrument_expectations = fix_cfu_html(instrument_expectations),
+  reflection = fix_cfu_html(reflection),
+  closing_ceremony = fix_cfu_html(closing_ceremony),
+  assessment = fix_cfu_html(assessment)
+WHERE id IN ('<lesson_ids>');
+COMMIT;
+```
+
+**Affected courses/lessons fixed (27 total):**
+- Music and Movement (2 lessons)
+- The Blues (2 lessons)
+- Squares (2 lessons)
+- Programmatic Music (2 lessons)
+- Opera and Musical Theatre (2 lessons)
+- Triangles (2 lessons)
+- Music Moods (2 lessons)
+- Count on Me (2 lessons)
+- Chants and Cheers (2 lessons)
+- The Conductor (2 lessons)
+- Circles (2 lessons)
+- Take Me Out to the Ball Game (2 lessons)
+- Dynamic Symbols (1 lesson)
+- Rehearsal: Part 1 (1 lesson)
+- Music Makes Me... (1 lesson)
+
+**Detection query:**
+```sql
+SELECT id, title FROM lessons WHERE
+  lesson_outline ~ '<td class="cfu-image-cell"[^>]*></td>\\s*<img'
+  OR learning_objectives ~ '<td class="cfu-image-cell"[^>]*></td>\\s*<img'
+  -- (same pattern for all 15 fields)
+```
+
 #### PDF CFU Styling (pdf-service/src/template.js)
 - **CFU Block**: padding: 3px 20px, margin: 8px 0 48px 0, overflow: hidden
 - **CFU font**: 10pt for both h4 title and p body (matching body font size)
