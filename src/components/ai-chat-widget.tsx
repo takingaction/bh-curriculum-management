@@ -320,8 +320,8 @@ export default function AIChatWidget() {
           scope: searchScope,
           page: nextPage,
           pageSize: 10,
-          lessonId: lessonId,
-          courseId: courseId,
+          lessonId: lessonId || undefined,
+          courseId: courseId || undefined,
         }),
       });
 
