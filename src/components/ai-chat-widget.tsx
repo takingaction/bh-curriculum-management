@@ -305,19 +305,21 @@ export default function AIChatWidget() {
   };
 
   const loadMoreResults = async () => {
-    if (isSearching || !searchHasMore) return;
+    if (isSearching || !searchHasMore || !searchQuery) return;
 
     setIsSearching(true);
     const nextPage = searchPage + 1;
+    const currentSearchQuery = searchQuery;
+    const currentScope = searchScope;
 
     try {
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          message: searchQuery,
-          searchQuery: searchQuery,
-          scope: searchScope,
+          message: currentSearchQuery,
+          searchQuery: currentSearchQuery,
+          scope: currentScope,
           page: nextPage,
           pageSize: 10,
           lessonId: lessonId || undefined,
