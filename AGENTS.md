@@ -723,76 +723,59 @@ Admin tool for tracking teacher engagement and site usage at `/admin/analytics`.
 - `src/components/user-menu.tsx` - Analytics link in admin dropdown
 
 #### AI Chat Assistant
-Feature for exploring lesson content using Claude AI via Anthropic API with vector embeddings for semantic search.
+Feature for exploring lesson content and answering questions about music/dance/theatre education.
+
+**Widget Access**: Restricted to specific users only:
+- `ron@myherocreative.com`
+- `emili@betterhumanseducation.com`
 
 **API Route**: `POST /api/chat`
-- Accepts: `{ message, scope: 'lesson'|'course'|'global', lessonId?, courseId?, conversationHistory? }`
-- Returns: `{ response: string, links: { label: string, url: string }[], results: SearchResult[] }`
+- Accepts: `{ message, scope?, lessonId?, courseId?, conversationHistory?, searchQuery?, page?, pageSize? }`
+- Returns: `{ response: string, links: [], results: SearchResult[], totalResults?, hasMore? }`
 
-**Key features**:
-- Multi-turn conversation support via conversationHistory
-- Scope selector: Current Lesson | Current Course | All My Content
-- Clickable links in AI responses navigate directly to lessons
-- Chat widget appears in bottom-right corner on all dashboard pages
-- Visible to all authenticated users (teachers and admins)
-- **Enrollment filtering**: Users only see courses/lessons they have access to based on their `profile.enrollments`
-- **Hybrid mode**: Claude answers general questions from training knowledge UNLESS user types "IMC" (In My Content)
+**Widget UI** (`src/components/ai-chat-widget.tsx`):
+- **Two modes**: "Ask" (chat with AI) and "Search Content" (explicit keyword search)
+- **Search Content tab** has scope selector: Lesson, Course, Global
+- **Course dropdown** shows when scope is "Course" (defaults to current course)
+- **Results panel**: Shows paginated results with "Load More" button
+- **Results styling**: Match Find & Replace - Lesson # - Course - Grade - Section with highlighted snippet
+- **Result links**: Point to teacher lesson view (`/lessons/{id}`) NOT admin
+- **Chat history**: Persists in localStorage (max 50 messages), cleared on "Clear chat"
+- **Back to Top button**: Moved to bottom-left on lesson pages to avoid overlap with widget
 
-**How it works**:
+**Keyword Search** (via Search Content tab):
+- Uses `findMatchesInContent()` from `html-utils.ts` (same as Find & Replace)
+- Searches all 15 lesson content fields
+- Case-insensitive substring matching across HTML content
+- Results capped at 10 per page with pagination
 
-1. **General question** (no "IMC"): Claude answers directly from its training knowledge about music education, VAPA standards, NCAS standards, pedagogy, etc.
+**Smart Query Detection**:
+1. **Course list queries** (`isCourseListQuery`): "list my courses", "show courses", etc.
+   - Queries courses table directly, filtered by user enrollments
+   - Returns formatted list grouped by discipline/grade
 
-2. **Curriculum search** (with "IMC"): Example: `IMC find lessons with Anchor Standard 7`
-   - Generates vector embedding for the query (using local `@xenova/transformers` with `all-MiniLM-L6-v2`)
-   - Searches Supabase pg_vector for semantically similar lesson content
-   - Shows direct search results immediately (free)
-   - Then sends results to Claude for natural language summary (~$0.03)
-   - Both search results and AI summary are displayed
+2. **Standard queries** (`isStandardQuery`): "Anchor Standard X", "VAPA standard", "NCAS standard"
+   - Auto-searches VAPA and NCAS text blocks specifically
+   - Extracts "Anchor Standard N" as exact phrase (not generic "Standard N")
+   - Returns results with "Found X references across Y lessons" message
 
-**Vector Embeddings Setup**:
-
-1. **Enable pg_vector extension** in Supabase dashboard (if not already enabled)
-
-2. **Run migration**: `supabase/migrations/023_lesson_embeddings.sql`
-   - Creates `lesson_embeddings` table with 384-dimension vectors
-   - Creates `search_lesson_embeddings` function for similarity search
-
-3. **Install dependencies** (for embedding generation and search):
-   ```bash
-   npm install @xenova/transformers
-   ```
-
-4. **Generate embeddings** (one-time, free using local model):
-   ```bash
-   # Set in .env.local:
-   USE_LOCAL_EMBEDDINGS=true
-
-   # Run the script:
-   npx tsx scripts/generate-embeddings.ts
-   ```
+3. **General AI questions**: Falls through to Anthropic Claude for music/dance/theatre education questions
 
 **Response formatting**:
-- Search results show: Course name, Grade, Lesson #, Section, Relevance %, Snippet
-- AI responses include markdown links: `[Course Name - Lesson # | Section Name](URL)`
-- Quick links section at bottom of chat for easy navigation
-- Disclosure notice: "AI-generated responses may contain inaccuracies"
-
-**Cost**:
-- **General questions**: ~$0.03 per message (Haiku)
-- **Embedding generation**: Free (local model)
-- **Per-search**: Free (local model)
-- **Embedding storage**: Free (included in Supabase Pro)
+- Search results show: Course, Grade, Lesson #, Section label, snippet with `<mark>` highlighting
+- Uses `dangerouslySetInnerHTML` for snippet rendering
+- CSS for `<mark>`: yellow background (#fef08a)
 
 **Files**:
-- `src/app/api/chat/route.ts` - API endpoint with vector search and enrollment filtering
-- `src/components/ai-chat-widget.tsx` - Chat widget UI component
-- `src/app/(dashboard)/layout.tsx` - Dashboard layout with AIChatWidget
-- `scripts/generate-embeddings.ts` - Script to generate embeddings for all lessons
-- `supabase/migrations/023_lesson_embeddings.sql` - Database migration
+- `src/app/api/chat/route.ts` - API endpoint with query detection and search
+- `src/components/ai-chat-widget.tsx` - Chat widget UI with two modes
+- `src/components/chat-context.tsx` - React context for page context (lessonId/courseId)
+- `src/components/set-chat-context.tsx` - Sets context on lesson/course pages
+- `src/app/(dashboard)/layout.tsx` - Conditionally renders widget for authorized users
+- `src/app/globals.css` - Added `mark { background-color: #fef08a; }` for highlighting
 
 **Environment Variables**:
 - `ANTHROPIC_API_KEY` - Anthropic API key (required for AI responses)
-- `USE_LOCAL_EMBEDDINGS=true` - Use local model instead of OpenAI (optional, for free embeddings)
 
 ### Relevant Files
 - `src/app/(dashboard)/admin/courses/[id]/page.tsx` - Course edit page with Spotify section
@@ -836,6 +819,10 @@ Feature for exploring lesson content using Claude AI via Anthropic API with vect
 - `src/app/(dashboard)/admin/analytics/page-client.tsx` - Teacher activity analytics page (client component)
 - `src/app/api/analytics/teacher-activity/route.ts` - Teacher activity API endpoint
 - `src/app/api/activity/log/route.ts` - Activity logging endpoint
+- `src/app/api/chat/route.ts` - AI chat API endpoint with query detection and search
+- `src/components/ai-chat-widget.tsx` - Chat widget UI with Ask and Search Content modes
+- `src/components/chat-context.tsx` - React context for page context (lessonId/courseId)
+- `src/components/set-chat-context.tsx` - Sets context on lesson/course pages
 
 #### Public Homepage
 Landing page at `/` with the following sections:

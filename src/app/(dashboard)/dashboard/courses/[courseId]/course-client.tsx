@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Eye, FileText, Download } from "lucide-react";
 import { TrialPdfModal } from "@/components/trial-pdf-modal";
 import { CourseMaterialsModal } from "@/components/course-materials-modal";
+import { SetChatContext } from "@/components/set-chat-context";
 
 interface Lesson {
   id: string;
@@ -70,6 +71,7 @@ export default function CourseClient({
 
   return (
     <>
+      <SetChatContext courseId={courseId} />
       <div className="mb-8">
         <div className="flex flex-col md:flex-row md:gap-6 gap-4">
           <div className="w-[30%] h-[30vw] md:w-[250px] md:h-[250px] bg-[#d7ffef] flex items-center justify-center rounded-none overflow-hidden flex-shrink-0">
