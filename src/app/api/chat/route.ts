@@ -58,7 +58,7 @@ function filterCoursesByEnrollment(courses: Course[], enrollments: string[]): Co
   }
   return courses.filter((course: Course) => {
     const courseKey = `${course.discipline?.toUpperCase()}_GRADE_${course.grade?.toUpperCase()}`;
-    const disciplineOnly = course.discipline?.toUpperCase();
+    const disciplineOnly = course.discipline?.toUpperCase() || "";
     return enrollments.includes(courseKey) || enrollments.includes(disciplineOnly);
   });
 }

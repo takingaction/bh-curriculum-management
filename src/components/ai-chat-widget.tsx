@@ -142,6 +142,9 @@ export default function AIChatWidget() {
       setDirectResults(data.directResults || null);
       setSearchTotalResults(data.totalResults || 0);
       setSearchHasMore(data.hasMore || false);
+      if (data.results && data.results.length > 0 && userMessage) {
+        setSearchQuery(userMessage);
+      }
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Unknown error";
       setMessages((prev) => [
