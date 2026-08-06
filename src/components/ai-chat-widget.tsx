@@ -248,10 +248,7 @@ export default function AIChatWidget() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message: searchQuery,
-          scope: searchScope,
           searchQuery: searchQuery,
-          lessonId: searchScope === "lesson" ? lessonId : null,
-          courseId: searchScope === "course" ? selectedCourseId : null,
           page: nextPage,
           pageSize: 10,
         }),
