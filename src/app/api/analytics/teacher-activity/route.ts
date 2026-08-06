@@ -16,10 +16,11 @@ export async function GET(request: Request) {
     const startDate30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     const startDate = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
 
-    // Get all teachers
+    // Get all teachers (exclude admins)
     const { data: teachers, error: teachersError } = await supabaseAdmin
       .from("profiles")
       .select("id, first_name, last_name, email, role, enrollment_status, created_at")
+      .eq("role", "teacher")
       .order("last_name", { ascending: true });
 
     if (teachersError) {
