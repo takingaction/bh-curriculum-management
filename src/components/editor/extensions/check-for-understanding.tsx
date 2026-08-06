@@ -224,9 +224,9 @@ export const CheckForUnderstanding = Node.create<CheckForUnderstandingOptions>({
       "wrap-top-left": "cfu-wrap-top-left",
       "wrap-top-right": "cfu-wrap-top-right",
       "wrap-top-center": "cfu-wrap-top-center",
-      "wrap-bottom-left": "cfu-wrap-top-left",
-      "wrap-bottom-right": "cfu-wrap-top-right",
-      "wrap-bottom-center": "cfu-wrap-top-center",
+      "wrap-bottom-left": "cfu-wrap-bottom-left",
+      "wrap-bottom-right": "cfu-wrap-bottom-right",
+      "wrap-bottom-center": "cfu-wrap-bottom-center",
       "left": "cfu-left",
       "right": "cfu-right",
       "center": "cfu-center",
@@ -234,17 +234,16 @@ export const CheckForUnderstanding = Node.create<CheckForUnderstandingOptions>({
 
     const cssClass = alignmentClasses[alignment] || "cfu-center";
 
-    const imageSpec = pngImage ? ["img", { src: pngImage, style: `max-width: ${pngWidth}%; height: auto; display: block; margin-left: auto;` }] : null;
-    const headingSpec = heading ? ["h4", { style: "margin: 0; font-size: 18px; font-weight: 700; color: #333;" }, heading] : null;
-    const contentSpec = content ? ["p", { style: "margin: 0; color: #333;" }, content] : null;
+    const imageContent = pngImage ? (["img", { src: pngImage, style: `max-width: ${pngWidth}%; height: auto; display: block; margin-left: auto;` }] as const) : null;
+    const headingContent = heading ? (["h4", { style: "margin: 0; font-size: 18px; font-weight: 700; color: #333;" }, heading] as const) : null;
+    const contentContent = content ? (["p", { style: "margin: 0; color: #333;" }, content] as const) : null;
 
-    const innerContent: any[] = [
-      ["td", { class: "cfu-image-cell", style: "width: 25%; vertical-align: middle; text-align: right; padding: 8px; border: none;" }],
-    ];
-    if (imageSpec) innerContent.push(imageSpec);
-    innerContent.push(["td", { class: "cfu-text-cell", style: "width: 75%; vertical-align: middle; text-align: left; padding: 8px; border: none;" }]);
-    if (headingSpec) innerContent.push(headingSpec);
-    if (contentSpec) innerContent.push(contentSpec);
+    const imageCell: any[] = ["td", { class: "cfu-image-cell", style: "width: 25%; vertical-align: middle; text-align: right; padding: 8px; border: none;" }];
+    if (imageContent) imageCell.push(imageContent);
+
+    const textCell: any[] = ["td", { class: "cfu-text-cell", style: "width: 75%; vertical-align: middle; text-align: left; padding: 8px; border: none;" }];
+    if (headingContent) textCell.push(headingContent);
+    if (contentContent) textCell.push(contentContent);
 
     return [
       "div",
@@ -258,7 +257,8 @@ export const CheckForUnderstanding = Node.create<CheckForUnderstandingOptions>({
         { style: "width: 100%; border-collapse: collapse; border: none;" },
         [
           "tr",
-          ...innerContent,
+          imageCell,
+          textCell,
         ],
       ],
     ];

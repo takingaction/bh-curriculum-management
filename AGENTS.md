@@ -130,15 +130,39 @@ CFU attributes are stored as HTML attributes on the div. TipTap writes lowercase
 
 This ensures existing CFUs in database work regardless of which format their attributes are stored in.
 
-#### CFU renderHTML Fix (TipTap "Invalid array passed to renderSpec")
-**Problem:** TipTap would crash with "Invalid array passed to renderSpec" when loading certain lessons with CFU blocks.
-**Root cause:** The `renderHTML` method in `check-for-understanding.tsx` was using empty arrays `[]` for optional elements, which ProseMirror treats as invalid. TipTap expects `null` instead of `[]` for optional elements in the spec array.
-**Fix:** Changed `renderHTML` to use `null` instead of `[]` for optional elements, and used proper array spreading with an `innerContent` array to build the table cells correctly.
-**Key changes:**
-- `pngImage ? ["img", ...] : []` → `pngImage ? ["img", ...] : null` with imageSpec variable
-- `heading ? ["h4", ...] : []` → `heading ? ["h4", ...] : null` with headingSpec variable
-- `content ? ["p", ...] : []` → `content ? ["p", ...] : null` with contentSpec variable
-- Used `innerContent` array with spread operator to properly handle optional cell content
+#### CFU renderHTML Structure
+**Important:** The `renderHTML` method must produce properly nested HTML structure for CSS selectors to work.
+
+**Required structure:**
+```html
+<tr>
+  <td class="cfu-image-cell">  <!-- 25% width, image right-aligned -->
+    <img ...>                  <!-- nested inside td, NOT a sibling -->
+  </td>
+  <td class="cfu-text-cell">   <!-- 75% width, text left-aligned -->
+    <h4>...</h4>               <!-- nested inside td, NOT a sibling -->
+    <p>...</p>                 <!-- nested inside td, NOT a sibling -->
+  </td>
+</tr>
+```
+
+**Implementation uses `imageCell` and `textCell` arrays:**
+- `imageCell: any[] = ["td", { class: "cfu-image-cell", ... }]` - td element with img nested inside
+- `textCell: any[] = ["td", { class: "cfu-text-cell", ... }]` - td element with h4 and p nested inside
+- Content elements (`img`, `h4`, `p`) are pushed into their parent td array, not added as siblings
+
+**Alignment class mapping (critical for wrap-bottom positions):**
+```javascript
+"wrap-top-left": "cfu-wrap-top-left",
+"wrap-top-right": "cfu-wrap-top-right",
+"wrap-top-center": "cfu-wrap-top-center",
+"wrap-bottom-left": "cfu-wrap-bottom-left",    // was incorrectly mapped to cfu-wrap-top-left
+"wrap-bottom-right": "cfu-wrap-bottom-right",   // was incorrectly mapped to cfu-wrap-top-right
+"wrap-bottom-center": "cfu-wrap-bottom-center", // was incorrectly mapped to cfu-wrap-top-center
+"left": "cfu-left",
+"right": "cfu-right",
+"center": "cfu-center",
+```
 
 #### CFU SQL Migrations
 - CFUs stored in 15 text fields: lesson_outline, learning_objectives, vocabulary, materials, vapa_text_block, ncas_text_block, welcome_opening, actual_class_expectations, warm_up, lesson_hook, main_activity, instrument_expectations, reflection, closing_ceremony, assessment
@@ -622,6 +646,78 @@ Admin tool for tracking teacher engagement and site usage at `/admin/analytics`.
 - `src/app/(dashboard)/lessons/[lessonId]/page.tsx` - Lesson view tracking
 - `src/app/(dashboard)/dashboard/courses/[courseId]/page.tsx` - Course view tracking
 - `src/components/user-menu.tsx` - Analytics link in admin dropdown
+
+#### AI Chat Assistant
+Feature for exploring lesson content using Claude AI via Anthropic API with vector embeddings for semantic search.
+
+**API Route**: `POST /api/chat`
+- Accepts: `{ message, scope: 'lesson'|'course'|'global', lessonId?, courseId?, conversationHistory? }`
+- Returns: `{ response: string, links: { label: string, url: string }[], results: SearchResult[] }`
+
+**Key features**:
+- Multi-turn conversation support via conversationHistory
+- Scope selector: Current Lesson | Current Course | All My Content
+- Clickable links in AI responses navigate directly to lessons
+- Chat widget appears in bottom-right corner on all dashboard pages
+- Visible to all authenticated users (teachers and admins)
+- **Enrollment filtering**: Users only see courses/lessons they have access to based on their `profile.enrollments`
+- **Hybrid mode**: Claude answers general questions from training knowledge UNLESS user types "IMC" (In My Content)
+
+**How it works**:
+
+1. **General question** (no "IMC"): Claude answers directly from its training knowledge about music education, VAPA standards, NCAS standards, pedagogy, etc.
+
+2. **Curriculum search** (with "IMC"): Example: `IMC find lessons with Anchor Standard 7`
+   - Generates vector embedding for the query (using local `@xenova/transformers` with `all-MiniLM-L6-v2`)
+   - Searches Supabase pg_vector for semantically similar lesson content
+   - Shows direct search results immediately (free)
+   - Then sends results to Claude for natural language summary (~$0.03)
+   - Both search results and AI summary are displayed
+
+**Vector Embeddings Setup**:
+
+1. **Enable pg_vector extension** in Supabase dashboard (if not already enabled)
+
+2. **Run migration**: `supabase/migrations/023_lesson_embeddings.sql`
+   - Creates `lesson_embeddings` table with 384-dimension vectors
+   - Creates `search_lesson_embeddings` function for similarity search
+
+3. **Install dependencies** (for embedding generation and search):
+   ```bash
+   npm install @xenova/transformers
+   ```
+
+4. **Generate embeddings** (one-time, free using local model):
+   ```bash
+   # Set in .env.local:
+   USE_LOCAL_EMBEDDINGS=true
+
+   # Run the script:
+   npx tsx scripts/generate-embeddings.ts
+   ```
+
+**Response formatting**:
+- Search results show: Course name, Grade, Lesson #, Section, Relevance %, Snippet
+- AI responses include markdown links: `[Course Name - Lesson # | Section Name](URL)`
+- Quick links section at bottom of chat for easy navigation
+- Disclosure notice: "AI-generated responses may contain inaccuracies"
+
+**Cost**:
+- **General questions**: ~$0.03 per message (Haiku)
+- **Embedding generation**: Free (local model)
+- **Per-search**: Free (local model)
+- **Embedding storage**: Free (included in Supabase Pro)
+
+**Files**:
+- `src/app/api/chat/route.ts` - API endpoint with vector search and enrollment filtering
+- `src/components/ai-chat-widget.tsx` - Chat widget UI component
+- `src/app/(dashboard)/layout.tsx` - Dashboard layout with AIChatWidget
+- `scripts/generate-embeddings.ts` - Script to generate embeddings for all lessons
+- `supabase/migrations/023_lesson_embeddings.sql` - Database migration
+
+**Environment Variables**:
+- `ANTHROPIC_API_KEY` - Anthropic API key (required for AI responses)
+- `USE_LOCAL_EMBEDDINGS=true` - Use local model instead of OpenAI (optional, for free embeddings)
 
 ### Relevant Files
 - `src/app/(dashboard)/admin/courses/[id]/page.tsx` - Course edit page with Spotify section
