@@ -888,14 +888,12 @@ function formatDirectResults(results: SearchResult[]): string {
     };
   });
 
-  lessons.sort((a, b) => b.relevance - a.relevance);
-
   const lines: string[] = [];
   lines.push(`**Search Results** (${results.length} matches across ${lessons.length} lessons):\n\n`);
 
   for (const lesson of lessons.slice(0, 10)) {
     lines.push(`**${lesson.courseTitle} - Grade ${lesson.grade} | Lesson ${lesson.lessonNumber}: ${lesson.lessonTitle}**`);
-    lines.push(`Section: ${lesson.fieldLabel} | Relevance: ${lesson.relevance}%`);
+    lines.push(`Section: ${lesson.fieldLabel}`);
     lines.push(`Link: ${lesson.url}`);
     lines.push(`Snippet: "${lesson.snippet}..."\n`);
   }
