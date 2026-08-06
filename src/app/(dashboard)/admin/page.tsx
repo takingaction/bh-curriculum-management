@@ -78,6 +78,18 @@ export default async function AdminDashboard() {
             </Link>
           </CardContent>
         </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Analytics</CardTitle>
+            <CardDescription>View teacher activity and engagement</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link href="/admin/analytics">
+              <Button variant="outline">Teacher Activity</Button>
+            </Link>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

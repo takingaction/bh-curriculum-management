@@ -36,6 +36,14 @@ export default async function TeacherCoursePage({
     .eq("course_id", courseId)
     .order("lesson_number");
 
+  await supabaseAdmin
+    .from("user_activity_log")
+    .insert({
+      user_id: user.id,
+      action: "view_course",
+      resource_id: courseId,
+    });
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <CourseClient

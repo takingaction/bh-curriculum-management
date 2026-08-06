@@ -152,6 +152,20 @@ export default function LessonContentPage({
   }, []);
 
   useEffect(() => {
+    if (lesson?.id && profile?.id) {
+      fetch("/api/activity/log", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: profile.id,
+          action: "view_lesson",
+          resource_id: lesson.id,
+        }),
+      }).catch((err) => console.error("Failed to log lesson view:", err));
+    }
+  }, [lesson?.id, profile?.id]);
+
+  useEffect(() => {
     if (lesson?.course_id) {
       fetch(`/api/courses/${lesson.course_id}/assets`)
         .then((res) => res.json())

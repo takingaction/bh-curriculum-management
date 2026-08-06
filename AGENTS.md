@@ -571,6 +571,58 @@ CREATE TABLE IF NOT EXISTS public.universal_tokens (
 4. Users go to `/bypass`, enter email + code + new password
 5. Universal token: Any email with account works; Regular code: Email must match
 
+#### Teacher Activity Analytics
+Admin tool for tracking teacher engagement and site usage at `/admin/analytics`.
+
+**Database table:**
+- `user_activity_log` - Tracks user actions (login, view_lesson, view_course)
+
+**Tracked actions:**
+- `login` - Recorded in auth callback when user signs in
+- `view_lesson` - Recorded when teacher views a lesson page
+- `view_course` - Recorded when teacher views a course page
+
+**API endpoint:**
+- `GET /api/analytics/teacher-activity` - Returns aggregated activity metrics
+  - Query params: `days` (7/30/90), `sort`, `order`, `limit`, `offset`
+  - Returns: summary stats + per-teacher metrics (sortable, paginated)
+
+**Summary metrics:**
+- `totalTeachers` - Total number of teachers
+- `activeLast7Days` / `activeLast30Days` - Teachers with any activity in period
+- `avgDaysActivePerWeek` - Average unique days active (for active teachers)
+- `dailyActiveRate` - Percentage of teachers active today
+- `mostActiveDay` - Most common day of week for activity (aggregate)
+
+**Per-teacher metrics:**
+- `days_active_last_7` / `days_active_last_30` - Unique days with activity
+- `logins_7d` / `logins_30d` - Number of logins
+- `lessons_viewed_7d` / `lessons_viewed_30d` - Number of lesson pages visited
+- `courses_viewed_7d` / `courses_viewed_30d` - Number of course pages visited
+- `total_actions_7d` / `total_actions_30d` - Sum of all actions
+- `last_active` - Timestamp of most recent activity
+- `is_daily_active` - Had activity today
+- `is_weekly_active` - Active 4+ days in last 7 days
+
+**UI features:**
+- Summary cards: Total Teachers, Active (7d/30d), Avg Days/Week, Daily Active Rate, Most Active Day
+- Sortable table with columns: Name, Days Active, Logins, Lessons Viewed, Courses Viewed, Total Actions, Last Active, Status
+- Date range filter (7d/30d/90d)
+- Status badges: Daily Active (green), Weekly Active (teal), Active (gray), Inactive (light gray)
+- Pagination (25 per page)
+- Link in admin dropdown menu
+
+**Key files:**
+- `supabase/migrations/022_teacher_activity_log.sql` - Database migration
+- `src/app/api/analytics/teacher-activity/route.ts` - API endpoint
+- `src/app/(dashboard)/admin/analytics/page.tsx` - Admin page (server component)
+- `src/app/(dashboard)/admin/analytics/page-client.tsx` - Admin page (client component)
+- `src/app/api/activity/log/route.ts` - Activity logging endpoint
+- `src/app/auth/callback/route.ts` - Login tracking added here
+- `src/app/(dashboard)/lessons/[lessonId]/page.tsx` - Lesson view tracking
+- `src/app/(dashboard)/dashboard/courses/[courseId]/page.tsx` - Course view tracking
+- `src/components/user-menu.tsx` - Analytics link in admin dropdown
+
 ### Relevant Files
 - `src/app/(dashboard)/admin/courses/[id]/page.tsx` - Course edit page with Spotify section
 - `src/components/course-spotify-section.tsx` - Course-level Spotify modal and controls (includes SpotifyEmbed preview)
@@ -609,6 +661,10 @@ CREATE TABLE IF NOT EXISTS public.universal_tokens (
 - `src/app/(dashboard)/admin/pdf-regenerate/page.tsx` - Admin batch PDF regeneration UI
 - `pdf-service/` - External Puppeteer PDF generation microservice (see PDF Generation section)
 - `src/components/find-replace-panel.tsx` - Find & Replace UI panel
+- `src/app/(dashboard)/admin/analytics/page.tsx` - Teacher activity analytics page (server component)
+- `src/app/(dashboard)/admin/analytics/page-client.tsx` - Teacher activity analytics page (client component)
+- `src/app/api/analytics/teacher-activity/route.ts` - Teacher activity API endpoint
+- `src/app/api/activity/log/route.ts` - Activity logging endpoint
 
 #### Public Homepage
 Landing page at `/` with the following sections:

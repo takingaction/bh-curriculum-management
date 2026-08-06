@@ -107,6 +107,14 @@ export function UserMenu({ email, fullName, role, isAdmin }: UserMenuProps) {
                 >
                   Batch PDF Regeneration
                 </Link>
+                <Link
+                  href="/admin/analytics"
+                  className="block px-4 py-2 text-sm text-[#2d2d2d] hover:bg-[#f5f5f0]"
+                  onClick={() => setOpen(false)}
+                  prefetch={false}
+                >
+                  Teacher Analytics
+                </Link>
               </>
             )}
             <hr className="my-1 border-[#e5e5e0]" />

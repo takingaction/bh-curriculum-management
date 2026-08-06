@@ -1,6 +1,21 @@
-import { createServerClient } from "@supabase/ssr";
+import { createServerClient, createServerClient as createSupabaseServerClient } from "@supabase/ssr";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
+
+async function createServiceClient() {
+  return createSupabaseServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return [];
+        },
+        setAll() {},
+      },
+    }
+  );
+}
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
@@ -16,7 +31,7 @@ export async function GET(request: Request) {
 
   if (code) {
     const cookieStore = await cookies();
-    
+
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -43,18 +58,30 @@ export async function GET(request: Request) {
     );
 
     const { data, error } = await supabase.auth.exchangeCodeForSession(code);
-    
-    console.log("Exchange result:", { 
-      hasUser: !!data.user, 
+
+    console.log("Exchange result:", {
+      hasUser: !!data.user,
       hasError: !!error,
       errorMessage: error?.message,
       session: data.session ? "present" : "missing"
     });
-    
+
     if (!error && data.user) {
+      try {
+        const supabaseAdmin = await createServiceClient();
+        await supabaseAdmin
+          .from("user_activity_log")
+          .insert({
+            user_id: data.user.id,
+            action: "login",
+            resource_id: null,
+          });
+      } catch (logError) {
+        console.error("Failed to log login activity:", logError);
+      }
       return NextResponse.redirect(`${origin}${next}`);
     }
-    
+
     if (error) {
       console.error("Auth callback error:", error.message);
     }
