@@ -480,8 +480,8 @@ export async function POST(request: Request) {
         .single();
 
       if (fullLesson) {
-        const lessonWithCourse = fullLesson as LessonBasic;
-        const course = lessonWithCourse.courses;
+        const lessonWithCourse = fullLesson as unknown as LessonBasic;
+        const course = lessonWithCourse.courses?.[0];
         currentLessonInfo = `Current lesson context: "${fullLesson.title}" (Course: ${course?.title || "Unknown"}, Grade: ${course?.grade || "Unknown"}, Lesson #: ${fullLesson.lesson_number})`;
         fullLessonContent = `FULL CONTENT OF THIS LESSON:
 
