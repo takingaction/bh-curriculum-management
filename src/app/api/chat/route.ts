@@ -75,6 +75,16 @@ function detectSearchScope(message: string, pageLessonId: string | null, pageCou
     "does this lesson", "does this course", "in this lesson", "in this course"
   ];
 
+  const coursePatterns = [
+    "this course", "the course", "in this course", "the entire course",
+    "course-wide", "throughout the course", "across the course",
+    "entire course", "whole course", "all lessons in this course",
+    "summarize the course", "course overview", "all lessons in the course"
+  ];
+  const lessonPatterns = [
+    "this lesson", "the lesson", "in this lesson", "the entire lesson",
+    "throughout this lesson", "across this lesson"
+  ];
   const globalPatterns = [
     "all my content", "all content", "everything", "all lessons",
     "search all", "find all", "search everything", "search all my",
@@ -83,23 +93,15 @@ function detectSearchScope(message: string, pageLessonId: string | null, pageCou
     "beyond this", "the entire", "my curriculum", "entire content",
     "all courses", "every lesson", "everywhere"
   ];
-  const coursePatterns = [
-    "this course", "the course", "in this course", "the entire course",
-    "course-wide", "throughout the course", "across the course"
-  ];
-  const lessonPatterns = [
-    "this lesson", "the lesson", "in this lesson", "the entire lesson",
-    "throughout this lesson", "across this lesson"
-  ];
 
   const hasGlobal = globalPatterns.some(p => lower.includes(p));
   const hasCourse = coursePatterns.some(p => lower.includes(p));
   const hasLesson = lessonPatterns.some(p => lower.includes(p));
   const isCurriculumQuery = curriculumQueryPatterns.some(p => lower.includes(p));
 
-  if (hasGlobal) return "global";
   if (hasCourse) return "course";
   if (hasLesson) return "lesson";
+  if (hasGlobal) return "global";
 
   if (pageLessonId) return "lesson";
   if (pageCourseId) return "course";
@@ -483,6 +485,34 @@ export async function POST(request: Request) {
       if (courseData) {
         currentCourseInfo = `Current course context: "${courseData.title}" (${courseData.discipline}, Grade ${courseData.grade}). Summary: ${courseData.summary || "No summary available."}`;
         courseLessons = lessonsData || [];
+      }
+
+      const lowerMessage = message.toLowerCase();
+      const wantsCourseSummary = lowerMessage.includes("summarize") ||
+        lowerMessage.includes("overview") ||
+        lowerMessage.includes("what's covered") ||
+        lowerMessage.includes("what is covered") ||
+        lowerMessage.includes("whole course") ||
+        lowerMessage.includes("entire course") ||
+        lowerMessage.includes("all about");
+
+      if (wantsCourseSummary && courseLessons.length > 0) {
+        const { data: fullLessons } = await supabase
+          .from("lessons")
+          .select("id, lesson_number, title, lesson_outline, main_activity, learning_objectives")
+          .eq("course_id", courseId)
+          .order("lesson_number");
+
+        if (fullLessons && fullLessons.length > 0) {
+          const lessonSummaries = fullLessons.map((l: Record<string, unknown>) => {
+            const outline = (l.lesson_outline as string)?.replace(/<[^>]*>/g, '').substring(0, 200) || "(no outline)";
+            const activity = (l.main_activity as string)?.replace(/<[^>]*>/g, '').substring(0, 200) || "(no activity description)";
+            const objectives = (l.learning_objectives as string)?.replace(/<[^>]*>/g, '').substring(0, 200) || "(no objectives)";
+            return `Lesson ${l.lesson_number}: ${l.title}\n  Overview: ${outline}...\n  Activity: ${activity}...\n  Objectives: ${objectives}...`;
+          }).join("\n\n");
+
+          currentCourseInfo += `\n\nHere is content from all lessons in this course:\n\n${lessonSummaries}`;
+        }
       }
     }
 
