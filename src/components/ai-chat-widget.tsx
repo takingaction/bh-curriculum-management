@@ -76,6 +76,8 @@ export default function AIChatWidget() {
   const [courses, setCourses] = useState<Course[]>([]);
   const [selectedCourseId, setSelectedCourseId] = useState<string>("");
   const [isSearching, setIsSearching] = useState(false);
+  const [copyFeedback, setCopyFeedback] = useState<number | null>(null);
+  const [exportFeedback, setExportFeedback] = useState<number | null>(null);
 
   const searchParamsRef = useRef<{ query: string; scope: "lesson" | "course" | "global"; lessonId: string | null; courseId: string | null }>({ query: "", scope: "global", lessonId: null, courseId: null });
   const [searchPage, setSearchPage] = useState(0);
@@ -291,6 +293,45 @@ export default function AIChatWidget() {
     setSearchQuery("");
     localStorage.removeItem(CHAT_STORAGE_KEY);
     localStorage.removeItem(SEARCH_STORAGE_KEY);
+  };
+
+  const handleCopyMessage = async (content: string, index: number) => {
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopyFeedback(index);
+      setTimeout(() => setCopyFeedback(null), 2000);
+    } catch (err) {
+      console.error("Failed to copy:", err);
+    }
+  };
+
+  const handleExportMessage = async (content: string, index: number) => {
+    try {
+      const response = await fetch("/api/export", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content, format: "docx" }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Export failed");
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "ai-response.docx";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+
+      setExportFeedback(index);
+      setTimeout(() => setExportFeedback(null), 2000);
+    } catch (err) {
+      console.error("Failed to export:", err);
+    }
   };
 
   const handleSearch = async () => {
@@ -649,9 +690,48 @@ export default function AIChatWidget() {
                   : "bg-gray-100 text-gray-800"
               }`}
             >
-              <div className="text-sm whitespace-pre-wrap">
-                {message.role === "assistant" ? renderMessage(message.content) : message.content}
-              </div>
+              {message.role === "assistant" ? (
+                <div>
+                  <div className="flex justify-end gap-1 mb-1">
+                    <button
+                      onClick={() => handleCopyMessage(message.content, index)}
+                      className="p-1 hover:bg-gray-200 rounded text-gray-500 hover:text-gray-700"
+                      title="Copy to clipboard"
+                    >
+                      {copyFeedback === index ? (
+                        <span className="text-xs text-green-600">Copied!</span>
+                      ) : (
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
+                          <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
+                        </svg>
+                      )}
+                    </button>
+                    <button
+                      onClick={() => handleExportMessage(message.content, index)}
+                      className="p-1 hover:bg-gray-200 rounded text-gray-500 hover:text-gray-700"
+                      title="Export as Word document"
+                    >
+                      {exportFeedback === index ? (
+                        <span className="text-xs text-green-600">Done!</span>
+                      ) : (
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                          <polyline points="7 10 12 15 17 10"/>
+                          <line x1="12" x2="12" y1="15" y2="3"/>
+                        </svg>
+                      )}
+                    </button>
+                  </div>
+                  <div className="text-sm whitespace-pre-wrap">
+                    {renderMessage(message.content)}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-sm whitespace-pre-wrap">
+                  {message.content}
+                </div>
+              )}
             </div>
           </div>
         ))}
