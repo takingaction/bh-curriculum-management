@@ -142,17 +142,9 @@ function isStandardQuery(message: string): boolean {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    console.log("Chat API received:", { 
-      message: body.message ? body.message.substring(0, 50) : null, 
-      scope: body.scope, 
-      page: body.page, 
-      hasMessage: !!body.message,
-      bodyKeys: Object.keys(body)
-    });
     const { message, conversationHistory, lessonId, courseId, scope: explicitScope, searchQuery: explicitQuery, page = 0, pageSize = 10 } = body;
 
     if (!message) {
-      console.log("Missing message error - full body:", JSON.stringify(body).substring(0, 200));
       return NextResponse.json({ error: "Missing message" }, { status: 400 });
     }
 

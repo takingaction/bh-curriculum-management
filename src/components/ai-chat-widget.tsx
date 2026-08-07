@@ -335,7 +335,6 @@ export default function AIChatWidget() {
       lessonId: lid || undefined,
       courseId: cid || undefined,
     };
-    console.log("Load More request:", requestBody);
 
     try {
       const response = await fetch("/api/chat", {
