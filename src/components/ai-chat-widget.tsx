@@ -269,7 +269,7 @@ export default function AIChatWidget() {
         { role: "assistant", content: `Error: ${message}. Please try again.` },
       ]);
     } finally {
-      setIsLoading(false);
+      setIsSearching(false);
     }
   };
 
@@ -299,8 +299,6 @@ export default function AIChatWidget() {
     setIsSearching(true);
     setSearchResults([]);
     setDirectResults(null);
-    setActiveTab("results");
-    setResultsMinimized(false);
     setSearchPage(0);
 
     try {
