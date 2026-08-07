@@ -777,6 +777,66 @@ Feature for exploring lesson content and answering questions about music/dance/t
 **Environment Variables**:
 - `ANTHROPIC_API_KEY` - Anthropic API key (required for AI responses)
 
+#### Lesson Version Control (AI-Powered)
+Feature allowing teachers to create/modify lessons via AI chat and save versions.
+
+**Access**: Restricted to admin users only (`ron@myherocreative.com`, `emili@betterhumanseducation.com`)
+
+**Database tables**:
+- `lesson_versions` - Stores AI-modified lesson content with version metadata
+- `lesson_version_pdf_usage` - Tracks weekly PDF generation limits per user
+
+**Version data model**:
+- `id` - UUID primary key
+- `lesson_id` - References lessons table
+- `version_number` - Auto-incremented per lesson (1, 2, 3)
+- `version_name` - Optional custom name
+- `content` - JSONB with field names as keys, each containing `{ html: string, original_length: number }`
+- `modification_reason` - Free-form text (optional)
+- `created_by` - User ID who created the version
+- `pdf_storage_path` - Supabase storage path for generated PDF
+- `pdf_generated_at` - Timestamp of last PDF generation
+- `is_approved` - Boolean flag
+- `deleted_at` - Soft delete timestamp
+
+**RLS Policies**:
+- Users can CRUD their own versions only
+- Admins can view all versions (read-only)
+- Max 3 active versions per lesson (enforced by database trigger)
+
+**Version ownership**:
+- Versions are linked to the user who creates them via `created_by`
+- Teachers can only see/manage their own versions
+- Admins can view all versions but cannot edit/delete others' versions
+
+**Flow**:
+1. Teacher views lesson and opens AI Chat widget
+2. Teacher asks AI to modify content (e.g., "Make this lesson 30 minutes shorter")
+3. AI provides modification preview with `modifiedFields` array
+4. Teacher clicks "Save as Version" button
+5. SaveVersionDialog opens with name and reason fields
+6. Version is saved with modified content merged from original
+
+**Version PDF generation**:
+- `POST /api/lessons/[lessonId]/versions/[versionId]/pdf` - Generate PDF for a version
+- `GET /api/lessons/[lessonId]/versions/[versionId]/pdf` - View/download existing PDF
+- Weekly limit: 20 PDFs per user (resets Monday)
+- PDF includes original lesson title in header, version name in page 2 label
+
+**Key files**:
+- `src/lib/version-utils.ts` - Version utilities, constants, types
+- `src/components/version-tab-bar.tsx` - Version list UI in lesson sidebar
+- `src/components/version-tabs.tsx` - Version tabs for admin editor
+- `src/components/version-preview.tsx` - Version content preview dialog
+- `src/components/generate-pdf-dialog.tsx` - Version PDF generation dialog
+- `src/components/save-version-dialog.tsx` - Save version dialog with name/reason
+- `src/app/(dashboard)/lessons/[lessonId]/page.tsx` - Student lesson view with version support
+- `src/app/api/lessons/[lessonId]/versions/route.ts` - GET/POST versions
+- `src/app/api/lessons/[lessonId]/versions/[versionId]/route.ts` - GET/PATCH/DELETE single version
+- `src/app/api/lessons/[lessonId]/versions/[versionId]/pdf/route.ts` - Version PDF generation
+- `src/app/api/pdf-usage/route.ts` - Weekly PDF usage tracking
+- `supabase/migrations/024_lesson_versions.sql` - Database migration
+
 ### Relevant Files
 - `src/app/(dashboard)/admin/courses/[id]/page.tsx` - Course edit page with Spotify section
 - `src/components/course-spotify-section.tsx` - Course-level Spotify modal and controls (includes SpotifyEmbed preview)

@@ -48,7 +48,7 @@ interface SearchState {
 }
 
 export default function AIChatWidget() {
-  const { lessonId, courseId } = useChatContext();
+  const { lessonId, courseId, versionCount, onSaveVersionRequest, setClearModificationCallback } = useChatContext();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>(() => {
     if (typeof window !== 'undefined') {
@@ -97,6 +97,48 @@ export default function AIChatWidget() {
     }
     return [];
   });
+
+  const [modificationPreview, setModificationPreview] = useState<Record<string, unknown> | null>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('aiModificationPreview');
+        return saved ? JSON.parse(saved) : null;
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  });
+  const [hasModification, setHasModification] = useState(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('aiModificationPreview');
+        return !!saved;
+      } catch {
+        return false;
+      }
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    if (lessonId && modificationPreview) {
+      const previewLessonId = (modificationPreview as any).lessonId;
+      if (previewLessonId && previewLessonId !== lessonId) {
+        setModificationPreview(null);
+        setHasModification(false);
+        localStorage.removeItem('aiModificationPreview');
+      }
+    }
+  }, [lessonId, modificationPreview]);
+
+  useEffect(() => {
+    if (modificationPreview) {
+      localStorage.setItem('aiModificationPreview', JSON.stringify(modificationPreview));
+    } else {
+      localStorage.removeItem('aiModificationPreview');
+    }
+  }, [modificationPreview]);
 
   useEffect(() => {
     if (courseId) {
@@ -171,6 +213,21 @@ export default function AIChatWidget() {
   }, []);
 
   useEffect(() => {
+    const clearFn = () => {
+      setModificationPreview(null);
+      setHasModification(false);
+    };
+    if (setClearModificationCallback) {
+      setClearModificationCallback(clearFn);
+    }
+    return () => {
+      if (setClearModificationCallback) {
+        setClearModificationCallback(null);
+      }
+    };
+  }, [setClearModificationCallback]);
+
+  useEffect(() => {
     if (typeof window === 'undefined') return;
 
     const handleStorageChange = (e: StorageEvent) => {
@@ -227,6 +284,14 @@ export default function AIChatWidget() {
     if (!input.trim() || isLoading) return;
 
     const userMessage = input.trim();
+    const modPatterns = /30\s*min|45\s*min|60\s*min|shorter|longer|reduce|condense|duration|special\s*needs|adapt|accommodation|materials|venue|outdoor|gym/i;
+    const isModificationRequest = modPatterns.test(userMessage);
+
+    if (isModificationRequest && versionCount >= 3) {
+      alert("You have 3 versions (maximum). Please delete one before requesting a new modification.");
+      return;
+    }
+
     setInput("");
     setMessages((prev) => [...prev, { role: "user", content: userMessage }]);
     setIsLoading(true);
@@ -264,6 +329,10 @@ export default function AIChatWidget() {
         setSearchQuery(userMessage);
         searchParamsRef.current = { query: userMessage, scope: searchScope, lessonId, courseId };
       }
+      if (data.isModificationRequest && data.modificationPreview) {
+        setModificationPreview(data.modificationPreview);
+        setHasModification(true);
+      }
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Unknown error";
       setMessages((prev) => [
@@ -291,6 +360,8 @@ export default function AIChatWidget() {
     setSearchTotalResults(0);
     setSearchHasMore(false);
     setSearchQuery("");
+    setModificationPreview(null);
+    setHasModification(false);
     localStorage.removeItem(CHAT_STORAGE_KEY);
     localStorage.removeItem(SEARCH_STORAGE_KEY);
   };
@@ -726,6 +797,16 @@ export default function AIChatWidget() {
                       )}
                     </button>
                   </div>
+                  {hasModification && index === messages.length - 1 && modificationPreview && (
+                    <button
+                      onClick={() => {
+                        onSaveVersionRequest?.(modificationPreview);
+                      }}
+                      className="mt-2 w-full px-3 py-1.5 bg-[#0d7377] text-white text-xs font-medium rounded hover:bg-[#0a5c5f] transition-colors"
+                    >
+                      Save as Version
+                    </button>
+                  )}
                 </div>
               ) : (
                 <div className="text-sm whitespace-pre-wrap">

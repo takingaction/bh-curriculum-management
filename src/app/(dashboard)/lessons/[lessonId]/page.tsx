@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CompactLessonAssets } from "@/components/lesson-assets-panel";
@@ -13,6 +13,27 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { FindReplacePanel } from "@/components/find-replace-panel";
 import { LessonNavigation } from "@/components/lesson-navigation";
 import { SetChatContext } from "@/components/set-chat-context";
+import { useChatContext } from "@/components/chat-context";
+import { VersionTabBar } from "@/components/version-tab-bar";
+import { SaveVersionDialog } from "@/components/save-version-dialog";
+import { GeneratePdfDialog } from "@/components/generate-pdf-dialog";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { type LessonVersion, TEXT_FIELDS_LIST } from "@/lib/version-utils";
 
 interface Lesson {
   id: string;
@@ -101,6 +122,43 @@ export default function LessonContentPage({
   const [pdfExists, setPdfExists] = useState(false);
   const [sectionPickerOpen, setSectionPickerOpen] = useState(false);
 
+  const canUseAI = profile?.email === "ron@myherocreative.com" || profile?.email === "emili@betterhumanseducation.com";
+
+  const [versions, setVersions] = useState<LessonVersion[]>([]);
+  const [activeVersionId, setActiveVersionId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'original' | 'version'>('original');
+  const [showBanner, setShowBanner] = useState(false);
+  const [pendingPreview, setPendingPreview] = useState<Record<string, unknown> | null>(null);
+  const [lastSavedContent, setLastSavedContent] = useState<Record<string, any> | null>(null);
+  const [currentContent, setCurrentContent] = useState<Record<string, any> | null>(null);
+  const [showSwitchModal, setShowSwitchModal] = useState(false);
+  const [switchTarget, setSwitchTarget] = useState<{ id: string; name: string } | null>(null);
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [saveDialogMode, setSaveDialogMode] = useState<'new' | 'existing'>('new');
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
+  const [pdfDialogOpen, setPdfDialogOpen] = useState(false);
+  const [pdfVersion, setPdfVersion] = useState<LessonVersion | null>(null);
+
+  const { clearModificationCallback, setVersionCount } = useChatContext();
+
+  const handleSaveVersionRequest = useCallback((preview: Record<string, unknown>) => {
+    setPendingPreview(preview);
+    setSaveDialogMode('new');
+    setShowSaveDialog(true);
+  }, []);
+
+  useEffect(() => {
+    setVersionCount(versions.length);
+  }, [versions.length, setVersionCount]);
+
+  useEffect(() => {
+    if (showSaveDialog === false && clearModificationCallback) {
+      clearModificationCallback();
+    }
+  }, [showSaveDialog, clearModificationCallback]);
+
   const isBlocked = profile?.enrollment_status === "inactive" ||
     (profile?.enrollment_status === "trial" && 
      profile?.trial_ends_at && 
@@ -167,6 +225,25 @@ export default function LessonContentPage({
   }, [lesson?.id, profile?.id]);
 
   useEffect(() => {
+    if (lesson?.id) {
+      fetchVersions();
+    }
+  }, [lesson?.id]);
+
+  const fetchVersions = async () => {
+    if (!lesson?.id) return;
+    try {
+      const res = await fetch(`/api/lessons/${lesson.id}/versions`);
+      if (res.ok) {
+        const data = await res.json();
+        setVersions(data.versions || []);
+      }
+    } catch (err) {
+      console.error("Failed to fetch versions:", err);
+    }
+  };
+
+  useEffect(() => {
     if (lesson?.course_id) {
       fetch(`/api/courses/${lesson.course_id}/assets`)
         .then((res) => res.json())
@@ -205,6 +282,12 @@ export default function LessonContentPage({
       }
     }
   }, [loading]);
+
+  useEffect(() => {
+    if (showSaveDialog === false && pendingPreview !== null) {
+      setPendingPreview(null);
+    }
+  }, [showSaveDialog]);
 
   useEffect(() => {
     if (loading) return;
@@ -262,6 +345,9 @@ export default function LessonContentPage({
   }
 
   const getContent = (key: string): string => {
+    if (viewMode === 'version' && currentContent && currentContent[key]) {
+      return (currentContent[key] as { html: string })?.html || "";
+    }
     return (lesson as any)[key] || "";
   };
 
@@ -324,10 +410,219 @@ export default function LessonContentPage({
     }
   };
 
+  const handleVersionSelect = (version: LessonVersion) => {
+    if (hasUnsavedChanges && activeVersionId !== version.id) {
+      setSwitchTarget({ id: version.id, name: version.version_name || `Version ${version.version_number}` });
+      setShowSwitchModal(true);
+      return;
+    }
+    loadVersion(version);
+  };
+
+  const loadVersion = (version: LessonVersion) => {
+    const versionContent = version.content as Record<string, { html: string }>;
+    const content: Record<string, { html: string }> = {};
+    for (const field of TEXT_FIELDS_LIST) {
+      if (versionContent[field]?.html) {
+        content[field] = { html: versionContent[field].html };
+      } else {
+        const originalHtml = (lesson as any)[field] || "";
+        content[field] = { html: originalHtml };
+      }
+    }
+    setActiveVersionId(version.id);
+    setViewMode('version');
+    setCurrentContent(content);
+    setLastSavedContent(content);
+    setHasUnsavedChanges(false);
+    setShowBanner(false);
+  };
+
+  const handleSaveVersion = async (name: string, reason: string | null) => {
+    if (!lesson) return;
+
+    let contentToSave: Record<string, unknown>;
+
+    if (saveDialogMode === 'new' && pendingPreview) {
+      const preview = pendingPreview as any;
+      if (preview.modifiedFields && Array.isArray(preview.modifiedFields)) {
+        contentToSave = {};
+        for (const field of preview.modifiedFields) {
+          if (field.field && field.html) {
+            contentToSave[field.field] = { html: field.html };
+          }
+        }
+      } else {
+        contentToSave = pendingPreview;
+      }
+    } else if (currentContent) {
+      contentToSave = currentContent;
+    } else {
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/lessons/${lesson.id}/versions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          version_name: name,
+          content: contentToSave,
+          modification_reason: reason,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const newVersion = data.version as LessonVersion;
+        setVersions(prev => [...prev, newVersion]);
+        setShowSaveDialog(false);
+        setPendingPreview(null);
+        setSuccessMessage(`"${name}" created successfully!`);
+        setShowSuccessModal(true);
+        loadVersion(newVersion);
+      } else {
+        const error = await res.json();
+        alert(error.error || "Failed to save version");
+      }
+    } catch (err) {
+      console.error("Failed to save version:", err);
+      alert("Failed to save version");
+    }
+  };
+
+  const handleSave = () => {
+    if (!activeVersionId || !currentContent) return;
+
+    const updatedVersions = versions.map(v =>
+      v.id === activeVersionId
+        ? { ...v, content: currentContent }
+        : v
+    );
+    setVersions(updatedVersions);
+    setLastSavedContent(currentContent);
+    setHasUnsavedChanges(false);
+    setShowBanner(false);
+
+    fetch(`/api/lessons/${lesson?.id}/versions/${activeVersionId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content: currentContent }),
+    }).catch(err => console.error("Failed to update version:", err));
+  };
+
+  const handleRevert = () => {
+    setCurrentContent(lastSavedContent);
+    setHasUnsavedChanges(false);
+    setShowBanner(false);
+    setPendingPreview(null);
+  };
+
+  const handleDeleteVersion = async (versionId: string) => {
+    try {
+      const res = await fetch(`/api/lessons/${lesson?.id}/versions/${versionId}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        setVersions(prev => prev.filter(v => v.id !== versionId));
+        if (activeVersionId === versionId) {
+          setActiveVersionId(null);
+          setViewMode('original');
+          setCurrentContent(null);
+          setLastSavedContent(null);
+          setHasUnsavedChanges(false);
+          setShowBanner(false);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to delete version:", err);
+    }
+  };
+
+  const handleRenameVersion = async (versionId: string, name: string) => {
+    try {
+      const res = await fetch(`/api/lessons/${lesson?.id}/versions/${versionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ version_name: name }),
+      });
+      if (res.ok) {
+        setVersions(prev =>
+          prev.map(v => v.id === versionId ? { ...v, version_name: name } : v)
+        );
+      }
+    } catch (err) {
+      console.error("Failed to rename version:", err);
+    }
+  };
+
+  const handleGeneratePdf = (versionId: string) => {
+    const version = versions.find(v => v.id === versionId);
+    if (version) {
+      setPdfVersion(version);
+      setPdfDialogOpen(true);
+    }
+  };
+
+  const handleGeneratePdfConfirm = async (versionId: string) => {
+    try {
+      const res = await fetch(`/api/lessons/${lesson?.id}/versions/${versionId}/pdf`, {
+        method: "POST",
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error || "Failed to generate PDF");
+      } else {
+        const data = await res.json();
+        setVersions(prev =>
+          prev.map(v =>
+            v.id === versionId
+              ? { ...v, pdf_storage_path: data.filename, pdf_generated_at: data.generated_at }
+              : v
+          )
+        );
+        if (data.filename) {
+          window.open(`/api/lessons/${lesson?.id}/versions/${versionId}/pdf`, "_blank");
+        }
+      }
+    } catch (err) {
+      console.error("Failed to generate PDF:", err);
+      alert("Failed to generate PDF");
+    }
+  };
+
+  const handleViewPdf = (versionId: string) => {
+    window.open(`/api/lessons/${lesson?.id}/versions/${versionId}/pdf`, "_blank");
+  };
+
+  const handleSwitchVersion = (action: 'save' | 'discard' | 'cancel') => {
+    if (action === 'save' && activeVersionId) {
+      handleSave();
+    }
+
+    if (action !== 'cancel' && switchTarget) {
+      const targetVersion = versions.find(v => v.id === switchTarget.id);
+      if (targetVersion) {
+        if (action === 'discard') {
+          setHasUnsavedChanges(false);
+          setCurrentContent(null);
+        }
+        loadVersion(targetVersion);
+      }
+    }
+
+    setShowSwitchModal(false);
+    setSwitchTarget(null);
+  };
+
   return (
     <div className="min-h-screen bg-white">
       {lesson && course && (
-        <SetChatContext lessonId={lesson.id} courseId={course.id} />
+        <SetChatContext
+          lessonId={lesson.id}
+          courseId={course.id}
+          onSaveVersionRequest={canUseAI ? handleSaveVersionRequest : undefined}
+        />
       )}
       <style jsx global>{`
         html { scroll-behavior: smooth; }
@@ -573,6 +868,50 @@ export default function LessonContentPage({
                 </>
               )}
             </div>
+
+            {canUseAI && versions.length > 0 && (
+              <div className="mt-4 pt-4 border-t border-gray-200">
+                <VersionTabBar
+                  versions={versions}
+                  activeVersionId={activeVersionId}
+                  onSelect={handleVersionSelect}
+                  onDelete={handleDeleteVersion}
+                  onRename={handleRenameVersion}
+                  onGeneratePdf={handleGeneratePdf}
+                  onViewPdf={handleViewPdf}
+                />
+              </div>
+            )}
+
+            {canUseAI && (
+              <div className="mt-4 pt-4 border-t border-gray-200 space-y-1">
+                <span className="text-xs font-medium text-gray-500">View:</span>
+                <button
+                  onClick={() => {
+                    setViewMode('original');
+                    setActiveVersionId(null);
+                    setCurrentContent(null);
+                    setHasUnsavedChanges(false);
+                    setShowBanner(false);
+                  }}
+                  className={`block w-full text-left px-2 py-1 text-xs rounded ${
+                    viewMode === 'original' ? 'bg-[#0d7377] text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  Original
+                </button>
+                {activeVersionId && versions.find(v => v.id === activeVersionId) && (
+                  <button
+                    onClick={() => setViewMode('version')}
+                    className={`block w-full text-left px-2 py-1 text-xs rounded ${
+                      viewMode === 'version' ? 'bg-[#0d7377] text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    {versions.find(v => v.id === activeVersionId)?.version_name || 'Version'}
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="flex-1">
@@ -714,6 +1053,68 @@ export default function LessonContentPage({
           ) : null}
         </div>
       )}
+
+      <Dialog open={showSwitchModal} onOpenChange={setShowSwitchModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Unsaved Changes</DialogTitle>
+            <DialogDescription>
+              You have unsaved changes on &quot;{switchTarget?.name}&quot;.
+              What would you like to do?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => handleSwitchVersion('cancel')}>
+              Cancel
+            </Button>
+            <Button variant="outline" onClick={() => handleSwitchVersion('discard')}>
+              Discard
+            </Button>
+            <Button onClick={() => handleSwitchVersion('save')}>
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <SaveVersionDialog
+        open={showSaveDialog}
+        onOpenChange={setShowSaveDialog}
+        onSave={handleSaveVersion}
+      />
+
+      {pdfVersion && (
+        <GeneratePdfDialog
+          open={pdfDialogOpen}
+          onOpenChange={(open) => {
+            setPdfDialogOpen(open);
+            if (!open) setPdfVersion(null);
+          }}
+          lessonId={lesson.id}
+          version={pdfVersion}
+          onPdfGenerated={(filename) => {
+            setVersions(prev =>
+              prev.map(v =>
+                v.id === pdfVersion.id
+                  ? { ...v, pdf_storage_path: filename, pdf_generated_at: new Date().toISOString() }
+                  : v
+              )
+            );
+          }}
+        />
+      )}
+
+      <Dialog open={showSuccessModal} onOpenChange={setShowSuccessModal}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Success</DialogTitle>
+            <DialogDescription>{successMessage}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button onClick={() => setShowSuccessModal(false)}>OK</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

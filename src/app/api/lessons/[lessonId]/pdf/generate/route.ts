@@ -193,7 +193,7 @@ export async function POST(
       .from("lesson-pdfs")
       .upload(storagePath, pdfBuffer, {
         contentType: "application/pdf",
-        // Don't use upsert - always upload fresh after delete
+        upsert: true,
       });
 
     if (uploadError) {

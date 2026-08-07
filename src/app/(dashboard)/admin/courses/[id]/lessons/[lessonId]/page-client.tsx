@@ -14,6 +14,11 @@ import { LessonAssetsPanel } from "@/components/lesson-assets-panel";
 import { FindReplacePanel } from "@/components/find-replace-panel";
 import { LessonNavigation } from "@/components/lesson-navigation";
 import { PresentationModal, PresentationLink } from "@/components/presentation-modal";
+import { VersionTabs } from "@/components/version-tabs";
+
+import { TEXT_FIELDS_LIST } from "@/lib/html-utils";
+import type { LessonVersion, VersionContent } from "@/lib/version-utils";
+import { buildVersionContent } from "@/lib/version-utils";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
@@ -134,6 +139,11 @@ export default function EditLessonPage({
     assessment: "",
   });
 
+  const [versions, setVersions] = useState<LessonVersion[]>([]);
+  const [activeVersionId, setActiveVersionId] = useState<string | null>(null);
+  const [editingVersion, setEditingVersion] = useState<LessonVersion | null>(null);
+
+
   useEffect(() => {
     params.then(async (p) => {
       try {
@@ -192,6 +202,24 @@ export default function EditLessonPage({
         .catch(() => setPdfInfo({ exists: false }));
     }
   }, [lesson?.id]);
+
+  useEffect(() => {
+    if (lesson?.id) {
+      fetchVersions(lesson.id);
+    }
+  }, [lesson?.id]);
+
+  const fetchVersions = async (lessonId: string) => {
+    try {
+      const res = await fetch(`/api/lessons/${lessonId}/versions`);
+      if (res.ok) {
+        const data = await res.json();
+        setVersions(data.versions || []);
+      }
+    } catch (err) {
+      console.error("Failed to fetch versions:", err);
+    }
+  };
 
   useEffect(() => {
     fetch("/api/debug-auth")
@@ -332,6 +360,49 @@ export default function EditLessonPage({
     }
   };
 
+  const handleVersionSelect = (version: LessonVersion) => {
+    setActiveVersionId(version.id);
+  };
+
+  const handleVersionDelete = async (versionId: string) => {
+    try {
+      const res = await fetch(`/api/lessons/${lesson?.id}/versions/${versionId}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        setVersions((prev) => prev.filter((v) => v.id !== versionId));
+        if (activeVersionId === versionId) {
+          setActiveVersionId(null);
+          setEditingVersion(null);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to delete version:", err);
+    }
+  };
+
+  const handleUseVersion = (version: LessonVersion) => {
+    setEditingVersion(version);
+    const versionContent = version.content as VersionContent;
+    const newFields = { ...fields };
+
+    for (const fieldName of TEXT_FIELDS_LIST) {
+      if (versionContent[fieldName]?.html !== undefined) {
+        (newFields as Record<string, string>)[fieldName] = versionContent[fieldName].html;
+      }
+    }
+
+    setFields(newFields as Fields);
+    setActivePanel("section");
+  };
+
+  const handleEditWithAi = (version: LessonVersion) => {
+    setEditingVersion(version);
+    setActiveVersionId(version.id);
+  };
+
+
+
   if (fetching) {
     return (
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -391,6 +462,7 @@ export default function EditLessonPage({
               >
                 {loading ? "Saving..." : saved ? "Saved!" : "Save"}
               </Button>
+
               <Button
                 type="button"
                 variant="outline"
@@ -479,6 +551,45 @@ export default function EditLessonPage({
 
           {/* Right Content - Based on activePanel */}
           <div className="flex-1">
+            {(userEmail === "ron@myherocreative.com" || userEmail === "emili@betterhumanseducation.com") && versions.length > 0 && (
+              <div className="mb-4 pb-4 border-b border-[#e5e5e0]">
+                <VersionTabs
+                  lessonId={lesson.id}
+                  versions={versions}
+                  activeVersionId={activeVersionId}
+                  onSelectVersion={handleVersionSelect}
+                  onCreateNew={() => {}}
+                  onDeleteVersion={handleVersionDelete}
+                  onUseVersion={handleUseVersion}
+                  onEditWithAi={handleEditWithAi}
+                />
+              </div>
+            )}
+
+            {editingVersion && (
+              <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-yellow-800">
+                    Editing: {editingVersion.version_name || `Version ${editingVersion.version_number}`}
+                  </span>
+                  {editingVersion.modification_reason && (
+                    <span className="text-xs bg-yellow-100 px-2 py-0.5 rounded-full">
+                      {editingVersion.modification_reason}
+                    </span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingVersion(null);
+                    setActiveVersionId(null);
+                  }}
+                  className="text-xs text-yellow-700 hover:text-yellow-900"
+                >
+                  Exit Version Edit
+                </button>
+              </div>
+            )}
             {/* General Info Panel */}
             {activePanel === 'general' && (
               <div className="bg-white rounded-lg border border-[#e5e5e0] p-4 space-y-4">
@@ -730,6 +841,7 @@ export default function EditLessonPage({
           </div>
         </SheetContent>
       </Sheet>
+
     </div>
   );
 }

@@ -4,9 +4,45 @@ import { findMatchesInContent, generateSnippet, TEXT_FIELDS_LIST } from "@/lib/h
 
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
 const MODEL = "claude-haiku-4-5";
+const MODIFICATION_MODEL = "claude-sonnet-4-5";
 const MAX_TOKENS = 1024;
 
 const CURRICULUM_TRIGGER = "imc";
+
+function stripHtmlForAI(html: string): string {
+  if (!html) return "";
+  let text = html;
+
+  text = text.replace(/<strong([^>]*)>/gi, "**");
+  text = text.replace(/<\/strong>/gi, "**");
+  text = text.replace(/<b([^>]*)>/gi, "**");
+  text = text.replace(/<\/b>/gi, "**");
+  text = text.replace(/<em([^>]*)>/gi, "*");
+  text = text.replace(/<\/em>/gi, "*");
+  text = text.replace(/<i([^>]*)>/gi, "*");
+  text = text.replace(/<\/i>/gi, "*");
+
+  text = text
+    .replace(/<\/p>/gi, "\n\n")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/li>/gi, "\n")
+    .replace(/<li[^>]*>/gi, "- ")
+    .replace(/<\/h[1-6]>/gi, "\n\n")
+    .replace(/<h[1-6][^>]*>/gi, "\n\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\*{4,}/g, "**")
+    .replace(/\*{3,}/g, "**")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
+  return text;
+}
 
 interface Course {
   id: string;
@@ -139,6 +175,133 @@ function isStandardQuery(message: string): boolean {
   const hasVapaStandard = /vapa standard/i.test(message);
   const hasNcasStandard = /ncas standard/i.test(message);
   return hasAnchorStandard || hasVapaStandard || hasNcasStandard;
+}
+
+type ModificationType = "duration" | "special_needs" | "materials" | "venue";
+
+interface ModificationDetection {
+  isModification: boolean;
+  type: ModificationType | null;
+  direction: "shorter" | "longer" | null;
+  targetFields: string[] | null;
+}
+
+const MODIFICATION_PATTERNS: Record<ModificationType, string[]> = {
+  duration: [
+    "shorter", "longer", "reduce", "expand", "condense", "more time",
+    "less time", "cut down", "scale down", "scale up", "brief", "concise",
+    "30 min", "45 min", "60 min", "20 minute", "30 minute", "40 minute",
+    "30 minutes", "45 minutes", "60 minutes", "20 minutes", "40 minutes",
+    "not enough time", "too long", "too short", "time constraint"
+  ],
+  special_needs: [
+    "special needs", "adapt", "accommodation", "iep", "504", "different abilities",
+    "modification", "accessible", "inclusive", "autism", "adhd", "physical disability",
+    "visual impairment", "hearing impairment", "cognitive", "behavioral"
+  ],
+  materials: [
+    "no instruments", "missing materials", "don't have", "only have", "without",
+    "lack of", "no piano", "no keyboard", "no drums", "no guitars", "no recorder",
+    "limited instruments", "no technology", "no computers", "no projector"
+  ],
+  venue: [
+    "outdoor", "gym", "cafeteria", "no piano", "small space", "large group",
+    "assembly", "multipurpose room", "classroom too small", "limited space",
+    "outside", "indoor", "covered", "open air"
+  ]
+};
+
+const DIRECTION_PATTERNS = {
+  shorter: ["shorter", "reduce", "cut down", "condense", "brief", "scale down", "less", "not enough time", "too long"],
+  longer: ["longer", "expand", "more time", "scale up", "more", "too short", "add more"]
+};
+
+function detectModificationRequest(message: string): ModificationDetection {
+  const lower = message.toLowerCase();
+
+  let detectedType: ModificationType | null = null;
+  let maxMatches = 0;
+
+  for (const [type, patterns] of Object.entries(MODIFICATION_PATTERNS)) {
+    const matches = patterns.filter(p => lower.includes(p)).length;
+    if (matches > maxMatches) {
+      maxMatches = matches;
+      detectedType = type as ModificationType;
+    }
+  }
+
+  if (!detectedType || maxMatches < 1) {
+    return { isModification: false, type: null, direction: null, targetFields: null };
+  }
+
+  let direction: "shorter" | "longer" | null = null;
+  for (const [dir, patterns] of Object.entries(DIRECTION_PATTERNS)) {
+    if (patterns.some(p => lower.includes(p))) {
+      direction = dir as "shorter" | "longer";
+      break;
+    }
+  }
+
+  const targetFields = lower.includes("all") || lower.includes("entire") || lower.includes("whole")
+    ? null
+    : null;
+
+  return {
+    isModification: true,
+    type: detectedType,
+    direction,
+    targetFields
+  };
+}
+
+function getModificationSystemPrompt(type: ModificationType, direction: "shorter" | "longer" | null): string {
+  const baseInstructions = {
+    duration: "The teacher wants to modify lesson length/duration.",
+    special_needs: "The teacher wants to adapt the lesson for students with special needs or accommodations.",
+    materials: "The teacher wants to modify the lesson due to missing or limited materials.",
+    venue: "The teacher wants to adapt the lesson for a different venue or space constraints."
+  };
+
+  let prompt = `You are an AI assistant helping a teacher modify lesson content.
+
+CRITICAL RULES:
+1. Return a valid JSON object with ALL fields included
+2. Preserve all formatting and HTML structure
+3. For DURATION modifications ONLY: You MUST update the lesson_outline field with new timing durations
+4. Every field in modifiedFields MUST have an "html" property with the complete HTML content
+
+${baseInstructions[type]}`;
+
+  if (direction) {
+    prompt += `\n\nThe teacher wants to make the content ${direction}.`;
+    if (direction === "shorter") {
+      prompt += " Reduce content by approximately 20-40% while keeping key points.";
+    } else {
+      prompt += " Expand content slightly if needed to fill time.";
+    }
+  }
+
+  prompt += `\n\nReturn a JSON object with this EXACT structure:
+{
+  "summary": "Brief description of changes",
+  "modifiedFields": [
+    {
+      "field": "field_name",
+      "html": "COMPLETE HTML CONTENT HERE - include all tags like <p>, <h3>, <table>, <tr>, <td>, <strong>, <ul>, <li>, etc.",
+      "originalLength": NUMBER,
+      "newLength": NUMBER
+    }
+  ]
+}
+
+CRITICAL: 
+- The "html" value must be the FULL, COMPLETE HTML content for that field, not a summary
+- For lesson_outline: include a table with the activities and their new durations
+- Do NOT use placeholder text like "..." or "content shortened"
+- Do NOT use triple backticks or markdown code blocks
+- Your response must be raw JSON starting with { and ending with }`;
+
+  return prompt;
 }
 
 export async function POST(request: Request) {
@@ -465,6 +628,7 @@ export async function POST(request: Request) {
     }
 
     let fullLessonContent = "";
+    let modificationLessonContent = "";
     let currentLessonInfo = "";
     let currentCourseInfo = "";
     let courseLessons: { id: string; lesson_number: number; title: string }[] = [];
@@ -580,18 +744,161 @@ ${fullLesson.closing_ceremony || "(empty)"}
 --- ASSESSMENT ---
 ${fullLesson.assessment || "(empty)"}
 `;
+        modificationLessonContent = `FULL CONTENT OF THIS LESSON:
+
+Lesson: ${fullLesson.title}
+Course: ${course?.title || "Unknown"}
+Grade: ${course?.grade || "Unknown"}
+Lesson Number: ${fullLesson.lesson_number}
+
+--- LESSON OUTLINE ---
+${fullLesson.lesson_outline || "(empty)"}
+
+--- WELCOME AND OPENING CHECK-IN ---
+${fullLesson.welcome_opening || "(empty)"}
+
+--- CLASS EXPECTATIONS AND PROCEDURES ---
+${fullLesson.actual_class_expectations || "(empty)"}
+
+--- WARM UP ---
+${fullLesson.warm_up || "(empty)"}
+
+--- LESSON HOOK ---
+${fullLesson.lesson_hook || "(empty)"}
+
+--- MAIN ACTIVITY ---
+${fullLesson.main_activity || "(empty)"}
+
+--- REFLECTION ---
+${fullLesson.reflection || "(empty)"}
+
+--- CLOSING CEREMONY ---
+${fullLesson.closing_ceremony || "(empty)"}
+`;
       }
     }
 
     const hasCurriculumResults = searchResults.length > 0;
-    const directResults = hasCurriculumResults
-      ? formatDirectResults(searchResults)
-      : "";
+    const directResults = hasCurriculumResults ? formatDirectResults(searchResults) : "";
+    const modificationDetection = detectModificationRequest(message);
 
     let aiResponse = "";
     let links: { label: string; url: string }[] = [];
+    let modificationPreview: Record<string, unknown> | null = null;
 
-    if (effectiveScope === "lesson" && fullLessonContent && !(explicitQuery && hasCurriculumResults)) {
+    if (effectiveScope === "lesson" && lessonId && modificationDetection.isModification && modificationLessonContent) {
+      console.log("[MODIFICATION] Condition matched:", {
+        effectiveScope,
+        lessonId,
+        isModification: modificationDetection.isModification,
+        hasContent: !!modificationLessonContent,
+        type: modificationDetection.type
+      });
+      const modType = modificationDetection.type!;
+      const modDirection = modificationDetection.direction;
+      const systemPrompt = getModificationSystemPrompt(modType, modDirection);
+
+      const userMessage = `Please modify the lesson content below according to the teacher's request: "${message}"
+
+${modificationLessonContent}
+
+Return a JSON object with the modified fields and summary.`;
+
+      const apiKey = process.env.ANTHROPIC_API_KEY;
+      if (!apiKey) {
+        return NextResponse.json({
+          response: "AI is not configured. Please contact an administrator.",
+          links: [],
+          results: [],
+          isModificationRequest: true,
+        });
+      }
+
+      const messages = conversationHistory
+        ? [...conversationHistory, { role: "user", content: userMessage }]
+        : [{ role: "user", content: userMessage }];
+
+      console.log("[MODIFICATION] Sending request to Anthropic API");
+      console.log("[MODIFICATION] Model:", MODIFICATION_MODEL);
+      console.log("[MODIFICATION] Message length:", userMessage.length);
+
+      let response;
+      try {
+        response = await fetch(ANTHROPIC_API_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": apiKey,
+            "anthropic-version": "2023-06-01",
+          },
+          body: JSON.stringify({
+            model: MODIFICATION_MODEL,
+            max_tokens: 8192,
+            system: systemPrompt,
+            messages: messages.map((m: { role: string; content: string }) => ({
+              role: m.role,
+              content: m.content,
+            })),
+          }),
+        });
+      } catch (fetchError) {
+        console.error("[MODIFICATION] Fetch error:", fetchError);
+        return NextResponse.json({
+          response: "Network error. Please try again.",
+          links: [],
+          results: [],
+          isModificationRequest: true,
+        });
+      }
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("[MODIFICATION] Anthropic API error:", response.status, errorText);
+        return NextResponse.json({
+          response: "AI encountered an error. Please try again.",
+          links: [],
+          results: [],
+          isModificationRequest: true,
+        });
+      }
+
+      const result = await response.json();
+      const rawResponse = result.content?.[0]?.text || "";
+
+      console.log("[MODIFICATION DEBUG] Raw response length:", rawResponse.length);
+      console.log("[MODIFICATION DEBUG] Raw response preview:", rawResponse.substring(0, 500));
+      console.log("[MODIFICATION DEBUG] Raw response ends with:", rawResponse.substring(rawResponse.length - 100));
+
+      try {
+        const jsonMatch = rawResponse.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          modificationPreview = JSON.parse(jsonMatch[0]);
+          console.log("[MODIFICATION DEBUG] JSON parsed successfully");
+        } else {
+          console.log("[MODIFICATION DEBUG] No JSON found in response, checking if it's markdown...");
+          console.log("[MODIFICATION DEBUG] Starts with #:", rawResponse.trim().startsWith("#"));
+          console.log("[MODIFICATION DEBUG] Starts with {:", rawResponse.trim().startsWith("{"));
+        }
+      } catch (e) {
+        console.error("[MODIFICATION DEBUG] JSON parse error:", e);
+        console.error("[MODIFICATION DEBUG] Raw response was:", rawResponse);
+      }
+
+      let summary = modificationPreview?.summary || "Modified content ready for review.";
+      if (typeof summary === 'object' && summary !== null) {
+        summary = (summary as any).text || (summary as any).description || JSON.stringify(summary);
+      }
+
+      return NextResponse.json({
+        response: `I've prepared modifications for the lesson. ${summary}\n\nYou can click "Save as Version" below to save these changes.`,
+        links: [],
+        results: [],
+        isModificationRequest: true,
+        modificationType: modType,
+        modificationDirection: modDirection,
+        modificationPreview,
+      });
+    } else if (effectiveScope === "lesson" && fullLessonContent && !(explicitQuery && hasCurriculumResults)) {
       const lessonUrl = `/admin/courses/${courseId}/lessons/${lessonId}`;
       const systemPrompt = `You are an AI assistant helping a teacher explore THEIR CURRENT LESSON.
 
