@@ -77,7 +77,7 @@ export default function AIChatWidget() {
   const [selectedCourseId, setSelectedCourseId] = useState<string>("");
   const [isSearching, setIsSearching] = useState(false);
 
-  const searchParamsRef = useRef({ query: "", scope: "global" as const, lessonId: null as string | null, courseId: null as string | null });
+  const searchParamsRef = useRef<{ query: string; scope: "lesson" | "course" | "global"; lessonId: string | null; courseId: string | null }>({ query: "", scope: "global", lessonId: null, courseId: null });
   const [searchPage, setSearchPage] = useState(0);
   const [searchTotalResults, setSearchTotalResults] = useState(0);
   const [searchHasMore, setSearchHasMore] = useState(false);
@@ -158,7 +158,7 @@ export default function AIChatWidget() {
             setResultsMinimized(false);
             searchParamsRef.current = {
               query: restoredQuery,
-              scope: state.scope || "global",
+              scope: (state.scope || "global") as "lesson" | "course" | "global",
               lessonId: state.lessonId || null,
               courseId: state.courseId || null,
             };
@@ -310,7 +310,6 @@ export default function AIChatWidget() {
       ]);
     } finally {
       setIsSearching(false);
-      setSearchQuery("");
     }
   };
 
