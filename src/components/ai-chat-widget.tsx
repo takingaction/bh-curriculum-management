@@ -76,6 +76,8 @@ export default function AIChatWidget() {
   const [courses, setCourses] = useState<Course[]>([]);
   const [selectedCourseId, setSelectedCourseId] = useState<string>("");
   const [isSearching, setIsSearching] = useState(false);
+
+  const searchParamsRef = useRef({ query: "", scope: "global" as const, lessonId: null as string | null, courseId: null as string | null });
   const [searchPage, setSearchPage] = useState(0);
   const [searchTotalResults, setSearchTotalResults] = useState(0);
   const [searchHasMore, setSearchHasMore] = useState(false);
@@ -150,9 +152,16 @@ export default function AIChatWidget() {
             setSearchTotalResults(state.totalResults);
             setSearchHasMore(state.hasMore);
             setSearchPage(state.page);
-            setSearchQuery(state.query || "");
+            const restoredQuery = state.query || "";
+            setSearchQuery(restoredQuery);
             if (state.scope) setSearchScope(state.scope);
             setResultsMinimized(false);
+            searchParamsRef.current = {
+              query: restoredQuery,
+              scope: state.scope || "global",
+              lessonId: state.lessonId || null,
+              courseId: state.courseId || null,
+            };
           }
         }
       } catch { }
@@ -207,6 +216,7 @@ export default function AIChatWidget() {
       setSearchHasMore(data.hasMore || false);
       if (data.results && data.results.length > 0 && userMessage) {
         setSearchQuery(userMessage);
+        searchParamsRef.current = { query: userMessage, scope: searchScope, lessonId, courseId };
       }
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Unknown error";
@@ -305,25 +315,30 @@ export default function AIChatWidget() {
   };
 
   const loadMoreResults = async () => {
-    if (isSearching || !searchHasMore || !searchQuery) return;
+    if (isSearching || !searchHasMore) return;
+
+    const query = searchQuery || searchParamsRef.current.query;
+    const scope = searchScope || searchParamsRef.current.scope;
+    const lid = lessonId || searchParamsRef.current.lessonId;
+    const cid = courseId || searchParamsRef.current.courseId;
+
+    if (!query) return;
 
     setIsSearching(true);
     const nextPage = searchPage + 1;
-    const currentSearchQuery = searchQuery;
-    const currentScope = searchScope;
 
     try {
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          message: currentSearchQuery,
-          searchQuery: currentSearchQuery,
-          scope: currentScope,
+          message: query,
+          searchQuery: query,
+          scope: scope,
           page: nextPage,
           pageSize: 10,
-          lessonId: lessonId || undefined,
-          courseId: courseId || undefined,
+          lessonId: lid || undefined,
+          courseId: cid || undefined,
         }),
       });
 
