@@ -692,7 +692,10 @@ export default function AIChatWidget() {
             >
               {message.role === "assistant" ? (
                 <div>
-                  <div className="flex justify-end gap-1 mb-1">
+                  <div className="text-sm whitespace-pre-wrap">
+                    {renderMessage(message.content)}
+                  </div>
+                  <div className="flex justify-end gap-1 mt-1">
                     <button
                       onClick={() => handleCopyMessage(message.content, index)}
                       className="p-1 hover:bg-gray-200 rounded text-gray-500 hover:text-gray-700"
@@ -722,9 +725,6 @@ export default function AIChatWidget() {
                         </svg>
                       )}
                     </button>
-                  </div>
-                  <div className="text-sm whitespace-pre-wrap">
-                    {renderMessage(message.content)}
                   </div>
                 </div>
               ) : (
