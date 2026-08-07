@@ -718,8 +718,7 @@ export default function AIChatWidget() {
                     <a
                       key={i}
                       href={`/lessons/${result.lesson_id}#${result.field_name}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                      {...(searchScope !== "lesson" ? { target: "_blank", rel: "noopener noreferrer" } : {})}
                       className="block p-3 bg-gray-50 rounded border border-gray-200 hover:border-[#0d7377]"
                     >
                       <div className="flex items-center justify-between mb-1">
