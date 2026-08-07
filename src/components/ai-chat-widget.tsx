@@ -168,6 +168,50 @@ export default function AIChatWidget() {
     }
   }, []);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key !== SEARCH_STORAGE_KEY) return;
+      
+      if (e.newValue) {
+        try {
+          const state: SearchState = JSON.parse(e.newValue);
+          if (state.results && state.results.length > 0) {
+            setSearchResults(state.results);
+            setSearchTotalResults(state.totalResults);
+            setSearchHasMore(state.hasMore);
+            setSearchPage(state.page);
+            const restoredQuery = state.query || "";
+            setSearchQuery(restoredQuery);
+            if (state.scope) setSearchScope(state.scope);
+            searchParamsRef.current = {
+              query: restoredQuery,
+              scope: (state.scope || "global") as "lesson" | "course" | "global",
+              lessonId: state.lessonId || null,
+              courseId: state.courseId || null,
+            };
+          } else {
+            setSearchResults([]);
+            setSearchTotalResults(0);
+            setSearchHasMore(false);
+            setSearchPage(0);
+            setSearchQuery("");
+          }
+        } catch { }
+      } else {
+        setSearchResults([]);
+        setSearchTotalResults(0);
+        setSearchHasMore(false);
+        setSearchPage(0);
+        setSearchQuery("");
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
