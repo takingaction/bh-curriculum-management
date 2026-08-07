@@ -733,7 +733,8 @@ export default function AIChatWidget() {
                           <span className="text-gray-500">Grade {result.grade}</span>
                           <span className="text-gray-400">-</span>
                           <span className="font-medium text-gray-600">
-                            {result.field_name === "vapa_text_block" ? "VAPA Standards" :
+                            {result.field_name === "lesson_outline" ? "Lesson Outline" :
+                             result.field_name === "vapa_text_block" ? "VAPA Standards" :
                              result.field_name === "ncas_text_block" ? "NCAS Standards" :
                              result.field_name === "welcome_opening" ? "Welcome and Opening Check-In" :
                              result.field_name === "actual_class_expectations" ? "Class Expectations" :
