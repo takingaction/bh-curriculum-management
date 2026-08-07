@@ -381,9 +381,23 @@ export async function POST(request: Request) {
           .from("lessons")
           .select("id, lesson_number, title, course_id, courses(id, title, discipline, grade), " + TEXT_FIELDS_LIST.join(", "));
 
-        if (effectiveScope === "lesson" && lessonId) {
+        if (effectiveScope === "lesson") {
+          if (!lessonId) {
+            return NextResponse.json({
+              response: "To search within a lesson, please open that lesson first, then run your search.",
+              links: [],
+              results: [],
+            });
+          }
           lessonsQuery = lessonsQuery.eq("id", lessonId);
-        } else if (effectiveScope === "course" && courseId) {
+        } else if (effectiveScope === "course") {
+          if (!courseId) {
+            return NextResponse.json({
+              response: "To search within a course, please select a course from the dropdown first.",
+              links: [],
+              results: [],
+            });
+          }
           lessonsQuery = lessonsQuery.eq("course_id", courseId);
         } else {
           lessonsQuery = lessonsQuery.in("course_id", filteredCourseIds);
@@ -547,7 +561,7 @@ ${fullLesson.assessment || "(empty)"}
     let aiResponse = "";
     let links: { label: string; url: string }[] = [];
 
-    if (effectiveScope === "lesson" && fullLessonContent) {
+    if (effectiveScope === "lesson" && fullLessonContent && !(explicitQuery && hasCurriculumResults)) {
       const lessonUrl = `/admin/courses/${courseId}/lessons/${lessonId}`;
       const systemPrompt = `You are an AI assistant helping a teacher explore THEIR CURRENT LESSON.
 
@@ -613,7 +627,7 @@ ${fullLessonContent}`;
       const result = await response.json();
       aiResponse = result.content?.[0]?.text || "";
       links = extractLinks(aiResponse);
-    } else if (effectiveScope === "course" && currentCourseInfo) {
+    } else if (effectiveScope === "course" && currentCourseInfo && !(explicitQuery && hasCurriculumResults)) {
       const courseUrl = `/dashboard/courses/${courseId}`;
       const systemPrompt = `You are an AI assistant helping a teacher explore THEIR CURRENT COURSE.
 
@@ -762,6 +776,13 @@ Answer based on the search results above.`;
     } else if (effectiveScope === "global" && wantsContentSearch && !hasCurriculumResults) {
       return NextResponse.json({
         response: `I searched all accessible lessons in your curriculum for "${(explicitQuery || message).replace(/^find all instances of\s*/i, '').replace(/^search all for\s*/i, '')}" but found no matches.\n\nThis term doesn't appear in any of your lesson content. If you expected to find it, please verify the exact spelling or try a different search term.`,
+        links: [],
+        results: [],
+      });
+    } else if (explicitScope && explicitQuery && !hasCurriculumResults) {
+      const scopeLabel = effectiveScope === "lesson" ? "this lesson" : effectiveScope === "course" ? "this course" : "all accessible lessons";
+      return NextResponse.json({
+        response: `I searched ${scopeLabel} for "${explicitQuery}" but found no matches.\n\nThis term doesn't appear in any of the content. Please verify the exact spelling or try a different search term.`,
         links: [],
         results: [],
       });
