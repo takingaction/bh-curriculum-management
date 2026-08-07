@@ -327,19 +327,22 @@ export default function AIChatWidget() {
     setIsSearching(true);
     const nextPage = searchPage + 1;
 
+    const requestBody = {
+      message: query,
+      searchQuery: query,
+      scope: scope,
+      page: nextPage,
+      pageSize: 10,
+      lessonId: lid || undefined,
+      courseId: cid || undefined,
+    };
+    console.log("Load More request:", requestBody);
+
     try {
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: query,
-          searchQuery: query,
-          scope: scope,
-          page: nextPage,
-          pageSize: 10,
-          lessonId: lid || undefined,
-          courseId: cid || undefined,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
