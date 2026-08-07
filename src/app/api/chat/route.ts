@@ -142,6 +142,7 @@ function isStandardQuery(message: string): boolean {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
+    console.log("Chat API received:", { message: body.message, scope: body.scope, page: body.page, hasMessage: !!body.message });
     const { message, conversationHistory, lessonId, courseId, scope: explicitScope, searchQuery: explicitQuery, page = 0, pageSize = 10 } = body;
 
     if (!message) {
