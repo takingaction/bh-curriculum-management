@@ -269,7 +269,7 @@ export default function AIChatWidget() {
         { role: "assistant", content: `Error: ${message}. Please try again.` },
       ]);
     } finally {
-      setIsSearching(false);
+      setIsLoading(false);
     }
   };
 
