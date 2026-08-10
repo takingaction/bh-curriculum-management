@@ -177,7 +177,7 @@ function isStandardQuery(message: string): boolean {
   return hasAnchorStandard || hasVapaStandard || hasNcasStandard;
 }
 
-type ModificationType = "duration" | "special_needs" | "materials" | "venue" | "translation";
+type ModificationType = "duration" | "translation";
 
 interface ModificationDetection {
   isModification: boolean;
@@ -215,21 +215,6 @@ const MODIFICATION_PATTERNS: Record<ModificationType, string[]> = {
     "30 min", "45 min", "60 min", "20 minute", "30 minute", "40 minute",
     "30 minutes", "45 minutes", "60 minutes", "20 minutes", "40 minutes",
     "not enough time", "too long", "too short", "time constraint"
-  ],
-  special_needs: [
-    "special needs", "adapt", "accommodation", "iep", "504", "different abilities",
-    "modification", "accessible", "inclusive", "autism", "adhd", "physical disability",
-    "visual impairment", "hearing impairment", "cognitive", "behavioral"
-  ],
-  materials: [
-    "no instruments", "missing materials", "don't have", "only have", "without",
-    "lack of", "no piano", "no keyboard", "no drums", "no guitars", "no recorder",
-    "limited instruments", "no technology", "no computers", "no projector"
-  ],
-  venue: [
-    "outdoor", "gym", "cafeteria", "no piano", "small space", "large group",
-    "assembly", "multipurpose room", "classroom too small", "limited space",
-    "outside", "indoor", "covered", "open air"
   ],
   translation: [
     "translate", "translation", "spanish version", "french version", "german version",
@@ -298,9 +283,6 @@ function detectModificationRequest(message: string): ModificationDetection {
 function getModificationSystemPrompt(type: ModificationType, direction: "shorter" | "longer" | null, isEditingVersion: boolean): string {
   const baseInstructions: Record<ModificationType, string> = {
     duration: "The teacher wants to modify lesson length/duration.",
-    special_needs: "The teacher wants to adapt the lesson for students with special needs or accommodations.",
-    materials: "The teacher wants to modify the lesson due to missing or limited materials.",
-    venue: "The teacher wants to adapt the lesson for a different venue or space constraints.",
     translation: "The teacher wants to translate the lesson to another language."
   };
 
@@ -316,11 +298,13 @@ function getModificationSystemPrompt(type: ModificationType, direction: "shorter
   prompt += "   Example: \"lessonOutline\": {\"html\": \"<table>...\"} NOT \"outline\": {\"html\": \"<table>...\"}\n";
 
   if (type === "duration") {
-    prompt += "4. DURATION CHANGE REQUIRED: You MUST actually modify the lesson content to fit the new duration.\n";
-    prompt += "   - For SHORTER: Remove activities entirely, reduce repetitions (e.g., 3 reps -> 1 rep), shorten all explanations, cut non-essential content.\n";
-    prompt += "   - For LONGER: Add more depth, expand explanations, add more practice repetitions, include extension activities.\n";
-    prompt += "   - Update BOTH the outline table AND the actual content sections.\n";
-    prompt += "   - Example: If reducing from 45 to 30 min, at LEAST 3-4 activities must be removed or significantly shortened.\n";
+    prompt += "4. DURATION CHANGE: To change the lesson duration, you MUST follow this workflow:\n";
+    prompt += "   - First, ask clarifying questions about how to modify (e.g., 'Should I remove activities, reduce repetitions, or shorten explanations?')\n";
+    prompt += "   - Wait for the teacher's answers\n";
+    prompt += "   - Then ask 'Should I proceed with these changes?' and wait for confirmation\n";
+    prompt += "   - Only after teacher confirms, provide the modified JSON with changes\n";
+    prompt += "   - For SHORTER: Remove activities entirely, reduce repetitions, shorten explanations\n";
+    prompt += "   - For LONGER: Add more depth, expand explanations, add practice repetitions\n";
   } else {
     prompt += "4. Every field in modifiedFields MUST have an \"html\" property with the complete HTML content\n";
   }
@@ -400,11 +384,11 @@ function repairJSON(jsonString: string): string | null {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { message, conversationHistory, lessonId, courseId, scope: explicitScope, searchQuery: explicitQuery, page = 0, pageSize = 10, editingVersionId, translationConfirmationPending, context, versionMode } = body;
+    const { message, conversationHistory, lessonId, courseId, scope: explicitScope, searchQuery: explicitQuery, page = 0, pageSize = 10, editingVersionId, waitingForConfirmation, context, versionMode } = body;
 
     console.log("[CHAT API] Received editingVersionId:", editingVersionId);
     console.log("[CHAT API] context:", context, "versionMode:", versionMode);
-    console.log("[CHAT API] translationConfirmationPending:", translationConfirmationPending);
+    console.log("[CHAT API] waitingForConfirmation:", waitingForConfirmation);
 
     if (!message) {
       return NextResponse.json({ error: "Missing message" }, { status: 400 });
@@ -937,20 +921,20 @@ ${fullLesson.closing_ceremony || "(empty)"}` : ''}
     let needsConfirmation = false;
 
     const isEditingVersionFlow = editingVersionId && modificationLessonContent;
-    const isTranslationConfirmation = translationConfirmationPending;
+    const waitingForConfirmation = waitingForConfirmation;
     const userSaidProceed = PROCEED_KEYWORDS.some(k => message.toLowerCase().includes(k));
     const userSaidNo = NEGATIVE_KEYWORDS.some(k => message.toLowerCase().includes(k));
 
     const isVersionMode = context === "versions" && versionMode;
 
-    if (effectiveScope === "lesson" && lessonId && (isVersionMode || modificationDetection.isModification || isEditingVersionFlow || isTranslationConfirmation) && modificationLessonContent) {
+    if (effectiveScope === "lesson" && lessonId && (isVersionMode || modificationDetection.isModification || isEditingVersionFlow || waitingForConfirmation) && modificationLessonContent) {
       console.log("[MODIFICATION] Condition matched:", {
         effectiveScope,
         lessonId,
         isVersionMode,
         isModification: modificationDetection.isModification,
         isEditingVersionFlow,
-        isTranslationConfirmation,
+        waitingForConfirmation,
         hasContent: !!modificationLessonContent,
         type: modificationDetection.type,
         userSaidProceed
@@ -960,9 +944,9 @@ ${fullLesson.closing_ceremony || "(empty)"}` : ''}
       const modDirection = modificationDetection.direction;
       let targetLanguage = modificationDetection.targetLanguage;
 
-      // If translationConfirmationPending is true, we should have stored the language
+      // If waitingForConfirmation is true, we should have stored the language
       // Extract from conversation history if needed
-      if (isTranslationConfirmation && !targetLanguage && conversationHistory && conversationHistory.length > 0) {
+      if (waitingForConfirmation && !targetLanguage && conversationHistory && conversationHistory.length > 0) {
         const allContent = conversationHistory.map((m: { content: string }) => m.content).join(" ");
         targetLanguage = extractTargetLanguage(allContent.toLowerCase());
       }
@@ -973,13 +957,13 @@ ${fullLesson.closing_ceremony || "(empty)"}` : ''}
         modType = "materials";
       }
 
-      if (isTranslationConfirmation && modType !== "translation") {
+      if (waitingForConfirmation && modType !== "translation") {
         modType = "translation";
       }
 
       console.log("[MODIFICATION] modType after translation check:", modType);
 
-      const isFreshTranslationRequest = modType === "translation" && !isTranslationConfirmation;
+      const isFreshTranslationRequest = modType === "translation" && !waitingForConfirmation;
 
       if (isFreshTranslationRequest) {
         const gradeMatch = modificationLessonContent.match(/Grade:\s*([^\n]+)/);
@@ -1090,7 +1074,7 @@ ${modificationLessonContent}`;
         });
       }
 
-      if (modType === "translation" && isTranslationConfirmation && !userSaidProceed) {
+      if (modType === "translation" && waitingForConfirmation && !userSaidProceed) {
         const messageWords = message.trim().split(/\s+/).length;
         const isBriefNo = userSaidNo && messageWords <= 2;
         const lang = targetLanguage || "Spanish";
@@ -1200,7 +1184,7 @@ Please answer their question and confirm if they want to proceed with the transl
         });
       }
 
-      if (modType === "translation" && isTranslationConfirmation && userSaidProceed) {
+      if (modType === "translation" && waitingForConfirmation && userSaidProceed) {
         const lang = targetLanguage || "Spanish";
         const userPrefs = conversationHistory && conversationHistory.length > 0
           ? `\nThe teacher previously indicated:\n${conversationHistory.map((m: { role: string; content: string }) => `${m.role}: ${m.content}`).join('\n')}`
@@ -1570,8 +1554,8 @@ Return a JSON object with the modified fields and summary.`;
         responseMessage = `I've prepared modifications. ${summary}`;
       }
 
-      if (modType === "translation") {
-        if (isTranslationConfirmation && userSaidProceed) {
+      if (modType === "translation" || modType === "duration") {
+        if (waitingForConfirmation && userSaidProceed) {
           needsConfirmation = false;
         } else {
           needsConfirmation = true;

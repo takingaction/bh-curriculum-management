@@ -811,24 +811,35 @@ Feature allowing teachers to create/modify lessons via AI chat and save versions
 
 **Modification Types**:
 - `duration` - Make lesson shorter/longer (e.g., "Make a 30 min version instead of 45")
-- `special_needs` - Adapt for students with accommodations
-- `materials` - Modify due to missing/limited materials
-- `venue` - Adapt for different space constraints
 - `translation` - Translate to another language
+
+**Confirmation Workflow (both duration and translation)**:
+
+AI follows a two-step confirmation process:
+1. **Questions Phase**: AI asks clarifying questions to understand how to modify
+2. **Confirmation Phase**: AI asks "Should I proceed with these changes?"
+3. **Creation Phase**: On user confirmation, AI creates the modified version
+
+**Frontend Flow**:
+- When AI asks questions, "Yes, Proceed" / "No, Cancel" buttons appear
+- If user confirms, version is created and loaded into lesson view
+- If user cancels, conversation continues without creating a version
 
 **Two-Mode Workflow**:
 
 **Create Mode (new version from original)**:
 - User asks AI to modify (e.g., "Make a 30 min version")
-- AI creates version silently with suggested name (e.g., "Shorter Version - 8/10/2026")
-- Version auto-appears in lesson view immediately
-- NO confirmation buttons shown
+- AI asks questions first, waits for answers
+- AI asks "Should I proceed?"
+- On confirmation, version is created with suggested name (e.g., "Shorter Version - 8/10/2026")
 - User can delete unwanted versions from versions modal
 
 **Edit Mode (modify existing version)**:
 - User selects existing version to edit
 - User asks AI to modify
-- AI shows Save/Save As.../Reject buttons
+- AI asks questions first, waits for answers
+- AI asks "Should I proceed?"
+- On confirmation, Save/Save As... buttons appear
 - User can save changes to existing version or create new version from changes
 
 **AI Response Formats**:

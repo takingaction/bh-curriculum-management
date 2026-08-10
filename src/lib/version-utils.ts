@@ -2,7 +2,7 @@ import { TEXT_FIELDS_LIST as _TEXT_FIELDS_LIST, getFieldLabel } from "./html-uti
 
 export const TEXT_FIELDS_LIST = _TEXT_FIELDS_LIST;
 
-export const MODIFICATION_REASONS = ["duration", "special_needs", "materials", "venue"] as const;
+export const MODIFICATION_REASONS = ["duration", "translation"] as const;
 export type ModificationReason = typeof MODIFICATION_REASONS[number];
 
 export interface VersionContentField {
@@ -31,9 +31,7 @@ export interface LessonVersion {
 
 export const REASON_LABELS: Record<ModificationReason, string> = {
   duration: "Duration",
-  special_needs: "Special Needs",
-  materials: "Materials",
-  venue: "Venue",
+  translation: "Translation",
 };
 
 export function stripHtml(html: string): string {

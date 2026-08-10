@@ -79,7 +79,7 @@ export default function AIChatWidget() {
   const [modificationPreview, setModificationPreview] = useState<Record<string, unknown> | null>(null);
   const [previewEditingVersionId, setPreviewEditingVersionId] = useState<string | null>(null);
   const [hasModification, setHasModification] = useState(false);
-  const [translationConfirmationPending, setTranslationConfirmationPending] = useState(false);
+  const [waitingForConfirmation, setWaitingForConfirmation] = useState(false);
   const [searchScope, setSearchScope] = useState<"lesson" | "course" | "global">("global");
   const [searchQuery, setSearchQuery] = useState("");
   const [courses, setCourses] = useState<Course[]>([]);
@@ -237,6 +237,74 @@ export default function AIChatWidget() {
     scrollToBottom();
   }, [messages]);
 
+  const handleConfirmationResponse = async (proceed: boolean) => {
+    if (isLoading) return;
+
+    const userMessage = proceed ? "Yes, proceed" : "No, cancel";
+
+    setMessages((prev) => [...prev, { role: "user", content: userMessage }]);
+    setIsLoading(true);
+
+    try {
+      const conversationHistory = messages.map((m) => ({
+        role: m.role,
+        content: m.content,
+      }));
+
+      const requestBody: Record<string, unknown> = {
+        message: userMessage,
+        lessonId,
+        courseId,
+        conversationHistory,
+        userSaidProceed: proceed,
+      };
+
+      if (activeMode === "versions") {
+        requestBody.context = "versions";
+        requestBody.versionMode = versionMode;
+        requestBody.waitingForConfirmation = true;
+        if (versionMode === 'edit' && editingVersionId) {
+          requestBody.editingVersionId = editingVersionId;
+        }
+      }
+
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(requestBody),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to get response");
+      }
+
+      const data = await response.json();
+      setMessages((prev) => [...prev, { role: "assistant", content: data.response }]);
+      setWaitingForConfirmation(false);
+
+      // Handle the modification if proceed was true and we got a preview
+      if (proceed && data.isModificationRequest && data.modificationPreview) {
+        setModificationPreview(data.modificationPreview);
+        setPreviewEditingVersionId(data.editingVersionId || null);
+        setHasModification(true);
+        onSaveVersionRequest?.(data.modificationPreview, data.editingVersionId || null, data.suggestedVersionName);
+      } else if (!proceed) {
+        // User cancelled - clear any preview
+        setModificationPreview(null);
+        setHasModification(false);
+      }
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: `Error: ${message}. Please try again.` },
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || isLoading) return;
@@ -283,8 +351,8 @@ export default function AIChatWidget() {
         if (versionMode === 'edit' && editingVersionId) {
           requestBody.editingVersionId = editingVersionId;
         }
-        if (translationConfirmationPending) {
-          requestBody.translationConfirmationPending = true;
+        if (waitingForConfirmation) {
+          requestBody.waitingForConfirmation = true;
         }
       }
 
@@ -310,17 +378,17 @@ export default function AIChatWidget() {
         setSearchQuery(userMessage);
         searchParamsRef.current = { query: userMessage, scope: searchScope, lessonId, courseId };
       }
-      // Handle translation clarifying questions
-      if (data.needsConfirmation && data.modificationType === "translation") {
-        setTranslationConfirmationPending(true);
-        // Don't call onSaveVersionRequest yet - just asking questions
+      // Handle confirmation flow for all modification types (translation and duration)
+      if (data.needsConfirmation && (data.modificationType === "translation" || data.modificationType === "duration")) {
+        setWaitingForConfirmation(true);
+        // Don't call onSaveVersionRequest yet - showing "Should I proceed?" buttons instead
       }
-      // Handle actual modifications
-      if (data.isModificationRequest && data.modificationPreview) {
+      // Handle actual modifications - only when not waiting for confirmation
+      if (data.isModificationRequest && data.modificationPreview && !data.needsConfirmation) {
         setModificationPreview(data.modificationPreview);
         setPreviewEditingVersionId(data.editingVersionId || null);
         setHasModification(true);
-        setTranslationConfirmationPending(false);
+        setWaitingForConfirmation(false);
         // Immediately load changes into lesson view and auto-create for create mode
         onSaveVersionRequest?.(data.modificationPreview, data.editingVersionId || null, data.suggestedVersionName);
       }
@@ -871,35 +939,63 @@ export default function AIChatWidget() {
                       )}
                     </button>
                   </div>
-                  {hasModification && index === messages.length - 1 && modificationPreview && versionMode === 'edit' && (
+                  {((hasModification && index === messages.length - 1 && modificationPreview && versionMode === 'edit') || waitingForConfirmation) && (
                     <div className="mt-2 flex gap-2">
-                      <button
-                        onClick={() => {
-                          setModificationPreview(null);
-                          setHasModification(false);
-                          setTranslationConfirmationPending(false);
-                        }}
-                        className="flex-1 px-3 py-1.5 bg-gray-200 text-gray-700 text-xs font-medium rounded hover:bg-gray-300 transition-colors"
-                      >
-                        Reject
-                      </button>
-                      <button
-                        onClick={() => {
-                          onSaveVersionRequest?.(modificationPreview, previewEditingVersionId);
-                        }}
-                        className="flex-1 px-3 py-1.5 bg-[#0d7377] text-white text-xs font-medium rounded hover:bg-[#0a5c5f] transition-colors"
-                      >
-                        Save
-                      </button>
-                      <button
-                        onClick={() => {
-                          onSaveAsRequest?.(modificationPreview);
-                          setTranslationConfirmationPending(false);
-                        }}
-                        className="flex-1 px-3 py-1.5 bg-[#e37c64] text-white text-xs font-medium rounded hover:bg-[#d06a52] transition-colors"
-                      >
-                        Save As...
-                      </button>
+                      {waitingForConfirmation ? (
+                        <>
+                          <button
+                            onClick={() => {
+                              setWaitingForConfirmation(false);
+                              // User said no - cancel and clear
+                              setModificationPreview(null);
+                              setHasModification(false);
+                            }}
+                            className="flex-1 px-3 py-1.5 bg-gray-200 text-gray-700 text-xs font-medium rounded hover:bg-gray-300 transition-colors"
+                          >
+                            No, Cancel
+                          </button>
+                          <button
+                            onClick={() => {
+                              // User said yes - proceed with confirmation
+                              handleConfirmationResponse(true);
+                              setWaitingForConfirmation(false);
+                            }}
+                            className="flex-1 px-3 py-1.5 bg-[#0d7377] text-white text-xs font-medium rounded hover:bg-[#0a5c5f] transition-colors"
+                          >
+                            Yes, Proceed
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => {
+                              setModificationPreview(null);
+                              setHasModification(false);
+                              setWaitingForConfirmation(false);
+                            }}
+                            className="flex-1 px-3 py-1.5 bg-gray-200 text-gray-700 text-xs font-medium rounded hover:bg-gray-300 transition-colors"
+                          >
+                            Reject
+                          </button>
+                          <button
+                            onClick={() => {
+                              onSaveVersionRequest?.(modificationPreview, previewEditingVersionId);
+                            }}
+                            className="flex-1 px-3 py-1.5 bg-[#0d7377] text-white text-xs font-medium rounded hover:bg-[#0a5c5f] transition-colors"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={() => {
+                              onSaveAsRequest?.(modificationPreview);
+                              setWaitingForConfirmation(false);
+                            }}
+                            className="flex-1 px-3 py-1.5 bg-[#e37c64] text-white text-xs font-medium rounded hover:bg-[#d06a52] transition-colors"
+                          >
+                            Save As...
+                          </button>
+                        </>
+                      )}
                     </div>
                   )}
                 </div>
