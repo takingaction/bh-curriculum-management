@@ -126,6 +126,7 @@ export default function LessonContentPage({
 
   const [versions, setVersions] = useState<LessonVersion[]>([]);
   const [activeVersionId, setActiveVersionId] = useState<string | null>(null);
+  const [editingVersionId, setEditingVersionId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'original' | 'version'>('original');
   const [showBanner, setShowBanner] = useState(false);
   const [pendingPreview, setPendingPreview] = useState<Record<string, unknown> | null>(null);
@@ -143,15 +144,97 @@ export default function LessonContentPage({
 
   const { clearModificationCallback, setVersionCount } = useChatContext();
 
-  const handleSaveVersionRequest = useCallback((preview: Record<string, unknown>) => {
+  const handleSaveVersionRequest = useCallback((preview: Record<string, unknown>, versionId: string | null) => {
     setPendingPreview(preview);
-    setSaveDialogMode('new');
-    setShowSaveDialog(true);
+    const previewData = preview as any;
+
+    // Helper to detect placeholder/no content responses
+    const isPlaceholder = (html: string): boolean => {
+      if (!html) return true;
+      const stripped = html.replace(/<[^>]*>/g, '').trim().toLowerCase();
+      return stripped === "" || 
+             stripped === "no content available" ||
+             stripped === "n/a" ||
+             stripped.includes("no content");
+    };
+
+    // Helper to get original lesson content for comparison
+    const getOriginalContent = (field: string): string => {
+      return (lesson as any)?.[field] || "";
+    };
+
+    if (versionId) {
+      setEditingVersionId(versionId);
+      setSaveDialogMode('existing');
+      
+      // Get the current VERSION's full content (not original, not currentContent)
+      const existingVersion = versions.find(v => v.id === versionId);
+      const existingContent = existingVersion?.content as Record<string, { html: string }> || {};
+      
+      if (previewData.modifiedFields) {
+        // Start with VERSION content as base
+        const content: Record<string, { html: string }> = {};
+        for (const field of TEXT_FIELDS_LIST) {
+          content[field] = existingContent[field] || { html: "" };
+        }
+        // Only overlay fields that AI actually modified, aren't placeholder, and aren't copying from original
+        for (const field of TEXT_FIELDS_LIST) {
+          if (previewData.modifiedFields[field]?.html) {
+            const newHtml = previewData.modifiedFields[field].html;
+            const existingHtml = existingContent[field]?.html || "";
+            const originalHtml = getOriginalContent(field);
+            
+            // Skip placeholder - keep existing version content
+            if (isPlaceholder(newHtml)) {
+              continue;
+            }
+            // Skip if AI is just copying from original (not modifying) when version had different content
+            if (existingHtml && newHtml === originalHtml) {
+              // AI is copying from original instead of modifying - skip
+              continue;
+            }
+            content[field] = { html: newHtml };
+          }
+        }
+        setCurrentContent(content);
+        setViewMode('version');
+      }
+    } else {
+      setSaveDialogMode('new');
+      if (previewData.modifiedFields) {
+        // Start with current content as base for new versions
+        const content: Record<string, { html: string }> = {};
+        for (const field of TEXT_FIELDS_LIST) {
+          content[field] = currentContent?.[field] || { html: "" };
+        }
+        for (const field of TEXT_FIELDS_LIST) {
+          if (previewData.modifiedFields[field]?.html) {
+            const newHtml = previewData.modifiedFields[field].html;
+            if (!isPlaceholder(newHtml)) {
+              content[field] = { html: newHtml };
+            }
+          }
+        }
+        setCurrentContent(content);
+        setViewMode('version');
+      }
+    }
+    setShowBanner(true);
   }, []);
 
   useEffect(() => {
     setVersionCount(versions.length);
   }, [versions.length, setVersionCount]);
+
+  // Clear editingVersionId when all versions are deleted
+  useEffect(() => {
+    if (versions.length === 0 && editingVersionId) {
+      setEditingVersionId(null);
+      setSaveDialogMode('new');
+      setShowBanner(false);
+      setPendingPreview(null);
+    }
+  }, [versions.length, editingVersionId]);
 
   useEffect(() => {
     if (showSaveDialog === false && clearModificationCallback) {
@@ -352,7 +435,7 @@ export default function LessonContentPage({
   };
 
   const renderContent = (content: string) => {
-    if (!content) return <p className="text-[#666666] italic">No content available</p>;
+    if (!content || content.trim() === "") return null;
     return (
       <div
         className="prose prose-sm max-w-none lesson-content"
@@ -431,6 +514,7 @@ export default function LessonContentPage({
       }
     }
     setActiveVersionId(version.id);
+    setEditingVersionId(version.id);
     setViewMode('version');
     setCurrentContent(content);
     setLastSavedContent(content);
@@ -443,17 +527,21 @@ export default function LessonContentPage({
 
     let contentToSave: Record<string, unknown>;
 
-    if (saveDialogMode === 'new' && pendingPreview) {
+    if (pendingPreview) {
       const preview = pendingPreview as any;
-      if (preview.modifiedFields && Array.isArray(preview.modifiedFields)) {
-        contentToSave = {};
-        for (const field of preview.modifiedFields) {
-          if (field.field && field.html) {
-            contentToSave[field.field] = { html: field.html };
+      if (preview.modifiedFields) {
+        if (Array.isArray(preview.modifiedFields)) {
+          contentToSave = {};
+          for (const field of preview.modifiedFields) {
+            if (field.field && field.html) {
+              contentToSave[field.field] = { html: field.html };
+            }
           }
+        } else {
+          contentToSave = preview.modifiedFields;
         }
       } else {
-        contentToSave = pendingPreview;
+        contentToSave = currentContent || {};
       }
     } else if (currentContent) {
       contentToSave = currentContent;
@@ -462,28 +550,57 @@ export default function LessonContentPage({
     }
 
     try {
-      const res = await fetch(`/api/lessons/${lesson.id}/versions`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          version_name: name,
-          content: contentToSave,
-          modification_reason: reason,
-        }),
-      });
+      if (saveDialogMode === 'existing' && editingVersionId) {
+        const mergedContent = { ...lastSavedContent, ...contentToSave };
+        const res = await fetch(`/api/lessons/${lesson.id}/versions/${editingVersionId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            content: mergedContent,
+            version_name: name,
+          }),
+        });
 
-      if (res.ok) {
-        const data = await res.json();
-        const newVersion = data.version as LessonVersion;
-        setVersions(prev => [...prev, newVersion]);
-        setShowSaveDialog(false);
-        setPendingPreview(null);
-        setSuccessMessage(`"${name}" created successfully!`);
-        setShowSuccessModal(true);
-        loadVersion(newVersion);
+        if (res.ok) {
+          const data = await res.json();
+          const updatedVersion = data.version as LessonVersion;
+          setVersions(prev => prev.map(v => v.id === editingVersionId ? updatedVersion : v));
+          setShowSaveDialog(false);
+          setShowBanner(false);
+          setPendingPreview(null);
+          setEditingVersionId(null);
+          setSuccessMessage(`"${name}" updated successfully!`);
+          setShowSuccessModal(true);
+          loadVersion(updatedVersion);
+        } else {
+          const error = await res.json();
+          alert(error.error || "Failed to update version");
+        }
       } else {
-        const error = await res.json();
-        alert(error.error || "Failed to save version");
+        const res = await fetch(`/api/lessons/${lesson.id}/versions`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            version_name: name,
+            content: contentToSave,
+            modification_reason: reason,
+          }),
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          const newVersion = data.version as LessonVersion;
+          setVersions(prev => [...prev, newVersion]);
+          setShowSaveDialog(false);
+          setShowBanner(false);
+          setPendingPreview(null);
+          setSuccessMessage(`"${name}" created successfully!`);
+          setShowSuccessModal(true);
+          loadVersion(newVersion);
+        } else {
+          const error = await res.json();
+          alert(error.error || "Failed to save version");
+        }
       }
     } catch (err) {
       console.error("Failed to save version:", err);
@@ -621,6 +738,7 @@ export default function LessonContentPage({
         <SetChatContext
           lessonId={lesson.id}
           courseId={course.id}
+          editingVersionId={editingVersionId}
           onSaveVersionRequest={canUseAI ? handleSaveVersionRequest : undefined}
         />
       )}
@@ -883,6 +1001,40 @@ export default function LessonContentPage({
               </div>
             )}
 
+            {canUseAI && showBanner && (
+              <div className="mt-4 p-3 bg-[#e37c64] rounded-lg flex justify-center">
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      if (editingVersionId) {
+                        const existingVersion = versions.find(v => v.id === editingVersionId);
+                        handleSaveVersion(existingVersion?.version_name || "Untitled Version", null);
+                      } else {
+                        setShowSaveDialog(true);
+                      }
+                    }}
+                    className="px-3 h-8 min-w-[80px] bg-[#0d7377] text-white text-xs font-medium rounded hover:bg-[#0a5c5f]"
+                  >
+                    {editingVersionId ? "Save" : "Save as Version"}
+                  </button>
+                  <button
+                    onClick={() => {
+                      const originalVersion = versions.find(v => v.id === editingVersionId);
+                      if (originalVersion) {
+                        loadVersion(originalVersion);
+                      }
+                      setShowBanner(false);
+                      setPendingPreview(null);
+                      setEditingVersionId(null);
+                    }}
+                    className="px-3 h-8 min-w-[80px] bg-gray-200 text-gray-700 text-xs font-medium rounded hover:bg-gray-300"
+                  >
+                    Reject
+                  </button>
+                </div>
+              </div>
+            )}
+
             {canUseAI && (
               <div className="mt-4 pt-4 border-t border-gray-200 space-y-1">
                 <span className="text-xs font-medium text-gray-500">View:</span>
@@ -890,6 +1042,7 @@ export default function LessonContentPage({
                   onClick={() => {
                     setViewMode('original');
                     setActiveVersionId(null);
+                    setEditingVersionId(null);
                     setCurrentContent(null);
                     setHasUnsavedChanges(false);
                     setShowBanner(false);
@@ -1105,7 +1258,7 @@ export default function LessonContentPage({
       )}
 
       <Dialog open={showSuccessModal} onOpenChange={setShowSuccessModal}>
-        <DialogContent className="max-w-sm">
+        <DialogContent className="w-[90%] md:w-[50%] md:max-w-[50%]">
           <DialogHeader>
             <DialogTitle>Success</DialogTitle>
             <DialogDescription>{successMessage}</DialogDescription>

@@ -561,7 +561,6 @@ export default function EditLessonPage({
                   onCreateNew={() => {}}
                   onDeleteVersion={handleVersionDelete}
                   onUseVersion={handleUseVersion}
-                  onEditWithAi={handleEditWithAi}
                 />
               </div>
             )}

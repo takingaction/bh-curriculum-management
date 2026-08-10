@@ -48,7 +48,7 @@ interface SearchState {
 }
 
 export default function AIChatWidget() {
-  const { lessonId, courseId, versionCount, onSaveVersionRequest, setClearModificationCallback } = useChatContext();
+  const { lessonId, courseId, editingVersionId, versionCount, onSaveVersionRequest, setClearModificationCallback } = useChatContext();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>(() => {
     if (typeof window !== 'undefined') {
@@ -109,6 +109,8 @@ export default function AIChatWidget() {
     }
     return null;
   });
+  const [previewEditingVersionId, setPreviewEditingVersionId] = useState<string | null>(null);
+  const [translationConfirmationPending, setTranslationConfirmationPending] = useState(false);
   const [hasModification, setHasModification] = useState(() => {
     if (typeof window !== 'undefined') {
       try {
@@ -135,10 +137,14 @@ export default function AIChatWidget() {
   useEffect(() => {
     if (modificationPreview) {
       localStorage.setItem('aiModificationPreview', JSON.stringify(modificationPreview));
+      if (previewEditingVersionId) {
+        localStorage.setItem('aiPreviewEditingVersionId', previewEditingVersionId);
+      }
     } else {
       localStorage.removeItem('aiModificationPreview');
+      localStorage.removeItem('aiPreviewEditingVersionId');
     }
-  }, [modificationPreview]);
+  }, [modificationPreview, previewEditingVersionId]);
 
   useEffect(() => {
     if (courseId) {
@@ -310,6 +316,8 @@ export default function AIChatWidget() {
           lessonId,
           courseId,
           conversationHistory,
+          editingVersionId,
+          translationConfirmationPending,
         }),
       });
 
@@ -329,9 +337,28 @@ export default function AIChatWidget() {
         setSearchQuery(userMessage);
         searchParamsRef.current = { query: userMessage, scope: searchScope, lessonId, courseId };
       }
-      if (data.isModificationRequest && data.modificationPreview) {
+      if (data.needsConfirmation) {
+        console.log("[WIDGET] AI is asking for confirmation, showing questions without Save button");
+        setTranslationConfirmationPending(true);
+        setHasModification(false);
+        setModificationPreview(null);
+      } else if (data.isModificationRequest && data.modificationPreview) {
+        console.log("[WIDGET] Received modificationPreview:", Object.keys(data.modificationPreview));
+        console.log("[WIDGET] editingVersionId from API:", data.editingVersionId);
+        console.log("[WIDGET] Setting hasModification=true, needsConfirmation should be:", data.needsConfirmation);
         setModificationPreview(data.modificationPreview);
+        setPreviewEditingVersionId(data.editingVersionId || null);
         setHasModification(true);
+        setTranslationConfirmationPending(false);
+      } else if (data.modificationPreview) {
+        console.log("[WIDGET] Fallback - showing Save button with preview:", Object.keys(data.modificationPreview));
+        setModificationPreview(data.modificationPreview);
+        setPreviewEditingVersionId(data.editingVersionId || null);
+        setHasModification(true);
+        setTranslationConfirmationPending(false);
+      } else {
+        console.log("[WIDGET] No modificationPreview - isModificationRequest:", data.isModificationRequest, "modificationPreview:", data.modificationPreview);
+        setTranslationConfirmationPending(false);
       }
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Unknown error";
@@ -362,6 +389,7 @@ export default function AIChatWidget() {
     setSearchQuery("");
     setModificationPreview(null);
     setHasModification(false);
+    setTranslationConfirmationPending(false);
     localStorage.removeItem(CHAT_STORAGE_KEY);
     localStorage.removeItem(SEARCH_STORAGE_KEY);
   };
@@ -800,11 +828,11 @@ export default function AIChatWidget() {
                   {hasModification && index === messages.length - 1 && modificationPreview && (
                     <button
                       onClick={() => {
-                        onSaveVersionRequest?.(modificationPreview);
+                        onSaveVersionRequest?.(modificationPreview, previewEditingVersionId);
                       }}
                       className="mt-2 w-full px-3 py-1.5 bg-[#0d7377] text-white text-xs font-medium rounded hover:bg-[#0a5c5f] transition-colors"
                     >
-                      Save as Version
+                      {previewEditingVersionId ? "View Update" : "View Version"}
                     </button>
                   )}
                 </div>

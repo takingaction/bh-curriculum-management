@@ -67,24 +67,27 @@ export async function POST(
 
     const supabaseAdmin = await createServiceClient();
 
+    // IMPORTANT: Query ALL versions including soft-deleted ones because the unique constraint
+    // is on (lesson_id, version_number) - soft-deleted versions still occupy their version numbers
     const { data: existingVersions, error: countError } = await supabaseAdmin
       .from("lesson_versions")
       .select("version_number")
       .eq("lesson_id", lessonId)
-      .is("deleted_at", null)
       .order("version_number", { ascending: false })
       .limit(1);
 
-    console.log("[VERSIONS API] Existing versions:", existingVersions, "error:", countError);
+    console.log("[VERSIONS API] Existing versions (including deleted) for lesson", lessonId, ":", existingVersions, "error:", countError);
 
     if (countError) {
       console.error("Error counting versions:", countError);
       return NextResponse.json({ error: "Failed to check version limit" }, { status: 500 });
     }
 
-    const nextVersionNumber = existingVersions && existingVersions.length > 0
-      ? existingVersions[0].version_number + 1
-      : 1;
+    // Calculate next version number from max existing (including soft-deleted)
+    let nextVersionNumber = 1;
+    if (existingVersions && existingVersions.length > 0 && existingVersions[0]?.version_number) {
+      nextVersionNumber = existingVersions[0].version_number + 1;
+    }
 
     console.log("[VERSIONS API] Next version number will be:", nextVersionNumber);
 
@@ -142,6 +145,38 @@ export async function POST(
           { error: "Maximum of 3 active versions allowed per lesson. Please delete one to create a new version." },
           { status: 400 }
         );
+      }
+      // Handle duplicate key error by re-fetching max version number and retrying
+      if (insertError.code === '23505') {
+        console.log("[VERSIONS API] Duplicate key error, re-fetching max version number...");
+        const { data: allVersions } = await supabaseAdmin
+          .from("lesson_versions")
+          .select("version_number")
+          .eq("lesson_id", lessonId)
+          .order("version_number", { ascending: false })
+          .limit(1);
+        
+        const retryVersionNumber = (allVersions?.[0]?.version_number || 0) + 1;
+        console.log("[VERSIONS API] Retrying with version number:", retryVersionNumber);
+        
+        const { data: retryVersion, error: retryError } = await supabaseAdmin
+          .from("lesson_versions")
+          .insert({
+            lesson_id: lessonId,
+            version_number: retryVersionNumber,
+            version_name: version_name || `Version ${retryVersionNumber}`,
+            content: originalContent,
+            modification_reason: modification_reason || null,
+            created_by: userId,
+          })
+          .select()
+          .single();
+        
+        if (retryError) {
+          console.error("Error creating version on retry:", retryError);
+          return NextResponse.json({ error: "Failed to create version" }, { status: 500 });
+        }
+        return NextResponse.json({ version: retryVersion }, { status: 201 });
       }
       console.error("Error creating version:", insertError);
       return NextResponse.json({ error: "Failed to create version" }, { status: 500 });

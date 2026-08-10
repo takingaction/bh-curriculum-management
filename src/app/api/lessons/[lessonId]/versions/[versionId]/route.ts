@@ -139,7 +139,7 @@ export async function DELETE(
 
     const { error: deleteError } = await supabase
       .from("lesson_versions")
-      .update({ deleted_at: new Date().toISOString() })
+      .delete()
       .eq("id", versionId);
 
     if (deleteError) {

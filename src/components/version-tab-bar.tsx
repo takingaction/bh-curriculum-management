@@ -2,6 +2,15 @@
 
 import { useState, useRef, useEffect } from "react";
 import { FileDown, Eye, Pencil, Trash2, Check, X } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import type { LessonVersion } from "@/lib/version-utils";
 
 interface VersionTabBarProps {
@@ -25,6 +34,8 @@ export function VersionTabBar({
 }: VersionTabBarProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [versionToDelete, setVersionToDelete] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -61,11 +72,18 @@ export function VersionTabBar({
     }
   };
 
-  const handleDelete = (versionId: string, e: React.MouseEvent) => {
+  const handleDeleteClick = (versionId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (confirm("Delete this version?")) {
-      onDelete(versionId);
+    setVersionToDelete(versionId);
+    setDeleteConfirmOpen(true);
+  };
+
+  const handleConfirmDelete = () => {
+    if (versionToDelete) {
+      onDelete(versionToDelete);
     }
+    setDeleteConfirmOpen(false);
+    setVersionToDelete(null);
   };
 
   if (versions.length === 0) {
@@ -154,7 +172,7 @@ export function VersionTabBar({
                 </button>
 
                 <button
-                  onClick={(e) => handleDelete(version.id, e)}
+                  onClick={(e) => handleDeleteClick(version.id, e)}
                   className="p-0.5 rounded hover:bg-black/10"
                   title="Delete"
                 >
@@ -165,6 +183,25 @@ export function VersionTabBar({
           )}
         </div>
       ))}
+
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogContent className="w-[90%] md:w-[50%] md:max-w-[50%]">
+          <DialogHeader>
+            <DialogTitle>Delete Version?</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this version? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteConfirmOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleConfirmDelete}>
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

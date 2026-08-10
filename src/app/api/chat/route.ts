@@ -177,7 +177,7 @@ function isStandardQuery(message: string): boolean {
   return hasAnchorStandard || hasVapaStandard || hasNcasStandard;
 }
 
-type ModificationType = "duration" | "special_needs" | "materials" | "venue";
+type ModificationType = "duration" | "special_needs" | "materials" | "venue" | "translation";
 
 interface ModificationDetection {
   isModification: boolean;
@@ -208,8 +208,24 @@ const MODIFICATION_PATTERNS: Record<ModificationType, string[]> = {
     "outdoor", "gym", "cafeteria", "no piano", "small space", "large group",
     "assembly", "multipurpose room", "classroom too small", "limited space",
     "outside", "indoor", "covered", "open air"
+  ],
+  translation: [
+    "translate", "translation", "spanish version", "french version", "german version",
+    "portuguese version", "chinese version", "japanese version", "korean version",
+    "vietnamese version", "in spanish", "in french", "in german", "en español",
+    "create a spanish", "make it french", "english translation", "bilingual"
   ]
 };
+
+const PROCEED_KEYWORDS = [
+  "yes", "yeah", "yep", "sure", "ok", "okay", "do it",
+  "go ahead", "proceed", "create it", "make it", "translate it",
+  "yes please", "that sounds good", "perfect", "sounds good", "lets do it"
+];
+
+const NEGATIVE_KEYWORDS = [
+  "no", "nope", "nah", "no thanks", "never mind", "cancel", "cancelled", "don't"
+];
 
 const DIRECTION_PATTERNS = {
   shorter: ["shorter", "reduce", "cut down", "condense", "brief", "scale down", "less", "not enough time", "too long"],
@@ -254,60 +270,74 @@ function detectModificationRequest(message: string): ModificationDetection {
   };
 }
 
-function getModificationSystemPrompt(type: ModificationType, direction: "shorter" | "longer" | null): string {
-  const baseInstructions = {
+function getModificationSystemPrompt(type: ModificationType, direction: "shorter" | "longer" | null, isEditingVersion: boolean): string {
+  const baseInstructions: Record<ModificationType, string> = {
     duration: "The teacher wants to modify lesson length/duration.",
     special_needs: "The teacher wants to adapt the lesson for students with special needs or accommodations.",
     materials: "The teacher wants to modify the lesson due to missing or limited materials.",
-    venue: "The teacher wants to adapt the lesson for a different venue or space constraints."
+    venue: "The teacher wants to adapt the lesson for a different venue or space constraints.",
+    translation: "The teacher wants to translate the lesson to another language."
   };
 
-  let prompt = `You are an AI assistant helping a teacher modify lesson content.
+  let prompt = "You are an AI assistant helping a teacher modify lesson content.\n\n";
+  prompt += "CRITICAL RULES:\n";
+  prompt += "1. Return ONLY the fields that were ACTUALLY MODIFIED. Do NOT return all 15 fields - only return modified fields.\n";
+  prompt += "2. Preserve all formatting and HTML structure in the modified fields\n";
+  prompt += "3. For DURATION modifications ONLY: You MUST update the lesson_outline field with new timing durations\n";
+  prompt += "4. Every field in modifiedFields MUST have an \"html\" property with the complete HTML content\n";
+  prompt += "5. CRITICAL: Within HTML content, escape all double quotes as \\\" and single quotes as \\\' to ensure valid JSON\n";
+  prompt += "6. IMPORTANT: This platform cannot receive files or images. Only ask for text-based explanations or clarifications.\n";
+  prompt += "7. For FORMATTING ONLY requests (e.g., 'pull in formatting from original', 'apply formatting from another section'):\n";
+  prompt += "   - Extract ONLY HTML ATTRIBUTES (styles, classes, data attributes, inline styles) from the reference\n";
+  prompt += "   - Apply those attributes to the CURRENT content - Do NOT copy text content\n";
+  prompt += "   - Return ONLY the field being formatted, not other fields\n";
+  prompt += "8. For TEXT FORMATTING requests (e.g., 'make X bold', 'add italic', 'change color to red'):\n";
+  prompt += "   - Return proper HTML tags: <strong>, <em>, <u>, <span style=\"color: red\">\n";
+  prompt += "   - Tags must be properly opened and closed for valid HTML\n";
 
-CRITICAL RULES:
-1. Return a valid JSON object with ALL fields included
-2. Preserve all formatting and HTML structure
-3. For DURATION modifications ONLY: You MUST update the lesson_outline field with new timing durations
-4. Every field in modifiedFields MUST have an "html" property with the complete HTML content
-
-${baseInstructions[type]}`;
-
-  if (direction) {
-    prompt += `\n\nThe teacher wants to make the content ${direction}.`;
-    if (direction === "shorter") {
-      prompt += " Reduce content by approximately 20-40% while keeping key points.";
-    } else {
-      prompt += " Expand content slightly if needed to fill time.";
-    }
+  if (type === "translation") {
+    prompt += "\nTRANSLATION SPECIFIC RULES:\n";
+    prompt += "9. IMPORTANT: For translations, you MUST return ALL 15 lesson content fields, not just modified ones.\n";
+    prompt += "10. First, ask clarifying questions about the translation (e.g., target grade level, cultural adaptations, formality level).\n";
+    prompt += "11. After getting answers, ask 'Should I proceed with the translation?' - wait for teacher to confirm before creating the version.\n";
+    prompt += "12. When user confirms, translate ALL 15 fields to the requested language.\n";
+    prompt += "13. Maintain HTML structure and formatting in the translated content.\n";
+  } else if (isEditingVersion) {
+    prompt += "9. EDITING EXISTING VERSION: The \"BASE LESSON\" section shows the ORIGINAL lesson content.\n";
   }
 
-  prompt += `\n\nReturn a JSON object with this EXACT structure:
-{
-  "summary": "Brief description of changes",
-  "modifiedFields": [
-    {
-      "field": "field_name",
-      "html": "COMPLETE HTML CONTENT HERE - include all tags like <p>, <h3>, <table>, <tr>, <td>, <strong>, <ul>, <li>, etc.",
-      "originalLength": NUMBER,
-      "newLength": NUMBER
-    }
-  ]
-}
-
-CRITICAL: 
-- The "html" value must be the FULL, COMPLETE HTML content for that field, not a summary
-- For lesson_outline: include a table with the activities and their new durations
-- Do NOT use placeholder text like "..." or "content shortened"
-- Do NOT use triple backticks or markdown code blocks
-- Your response must be raw JSON starting with { and ending with }`;
+  prompt += baseInstructions[type];
 
   return prompt;
+}
+
+function repairJSON(jsonString: string): string | null {
+  try {
+    let fixed = jsonString;
+    fixed = fixed.replace(/"/g, '\\"').replace(/"/g, '\\"');
+    fixed = fixed.replace(/'/g, "\\'");
+    const testParse = JSON.parse(fixed);
+    if (testParse && typeof testParse === 'object') {
+      return fixed;
+    }
+  } catch {
+    const htmlValueMatch = jsonString.match(/"html":\s*"([^"]*(?:<[^>]*>[^"]*)*)"/);
+    if (htmlValueMatch) {
+      const originalHtml = htmlValueMatch[1];
+      const fixedHtml = originalHtml.replace(/"/g, '\\"');
+      return jsonString.replace(htmlValueMatch[1], fixedHtml);
+    }
+  }
+  return null;
 }
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { message, conversationHistory, lessonId, courseId, scope: explicitScope, searchQuery: explicitQuery, page = 0, pageSize = 10 } = body;
+    const { message, conversationHistory, lessonId, courseId, scope: explicitScope, searchQuery: explicitQuery, page = 0, pageSize = 10, editingVersionId, translationConfirmationPending } = body;
+
+    console.log("[CHAT API] Received editingVersionId:", editingVersionId);
+    console.log("[CHAT API] translationConfirmationPending:", translationConfirmationPending);
 
     if (!message) {
       return NextResponse.json({ error: "Missing message" }, { status: 400 });
@@ -680,6 +710,8 @@ export async function POST(request: Request) {
       }
     }
 
+    let editingVersionContent: Record<string, { html: string }> | null = null;
+
     if (effectiveScope === "lesson" && lessonId) {
       const { data: fullLesson } = await supabase
         .from("lessons")
@@ -691,7 +723,27 @@ export async function POST(request: Request) {
         const lessonWithCourse = fullLesson as unknown as LessonBasic;
         const courseData = lessonWithCourse.courses as { id?: string; title?: string; grade?: string } | null;
         const course = Array.isArray(courseData) ? courseData[0] : courseData;
-        currentLessonInfo = `Current lesson context: "${fullLesson.title}" (Course: ${course?.title || "Unknown"}, Grade: ${course?.grade || "Unknown"}, Lesson #: ${fullLesson.lesson_number})`;
+
+        if (editingVersionId) {
+          console.log("[MODIFICATION] Fetching version data for:", editingVersionId);
+          const { data: versionData } = await supabase
+            .from("lesson_versions")
+            .select("content, version_name")
+            .eq("id", editingVersionId)
+            .single();
+          console.log("[MODIFICATION] Version data fetched:", !!versionData, "content keys:", versionData?.content ? Object.keys(versionData.content).length : 0);
+          if (versionData?.content) {
+            editingVersionContent = versionData.content as Record<string, { html: string }>;
+            console.log("[MODIFICATION] Version content fields:", Object.keys(editingVersionContent));
+          }
+        }
+
+        const lessonTitle = fullLesson.title;
+        const lessonNumber = fullLesson.lesson_number;
+        const courseTitle = course?.title || "Unknown";
+        const courseGrade = course?.grade || "Unknown";
+
+        currentLessonInfo = `Current lesson context: "${lessonTitle}" (Course: ${courseTitle}, Grade: ${courseGrade}, Lesson #: ${lessonNumber})`;
         fullLessonContent = `FULL CONTENT OF THIS LESSON:
 
 Lesson: ${fullLesson.title}
@@ -746,34 +798,64 @@ ${fullLesson.assessment || "(empty)"}
 `;
         modificationLessonContent = `FULL CONTENT OF THIS LESSON:
 
-Lesson: ${fullLesson.title}
-Course: ${course?.title || "Unknown"}
-Grade: ${course?.grade || "Unknown"}
-Lesson Number: ${fullLesson.lesson_number}
+Lesson: ${lessonTitle}
+Course: ${courseTitle}
+Grade: ${courseGrade}
+Lesson Number: ${lessonNumber}
 
 --- LESSON OUTLINE ---
-${fullLesson.lesson_outline || "(empty)"}
+${editingVersionContent?.lesson_outline?.html || fullLesson.lesson_outline || "(empty)"}
 
 --- WELCOME AND OPENING CHECK-IN ---
-${fullLesson.welcome_opening || "(empty)"}
+${editingVersionContent?.welcome_opening?.html || fullLesson.welcome_opening || "(empty)"}
 
 --- CLASS EXPECTATIONS AND PROCEDURES ---
-${fullLesson.actual_class_expectations || "(empty)"}
+${editingVersionContent?.actual_class_expectations?.html || fullLesson.actual_class_expectations || "(empty)"}
 
 --- WARM UP ---
-${fullLesson.warm_up || "(empty)"}
+${editingVersionContent?.warm_up?.html || fullLesson.warm_up || "(empty)"}
 
 --- LESSON HOOK ---
-${fullLesson.lesson_hook || "(empty)"}
+${editingVersionContent?.lesson_hook?.html || fullLesson.lesson_hook || "(empty)"}
 
 --- MAIN ACTIVITY ---
-${fullLesson.main_activity || "(empty)"}
+${editingVersionContent?.main_activity?.html || fullLesson.main_activity || "(empty)"}
 
 --- REFLECTION ---
-${fullLesson.reflection || "(empty)"}
+${editingVersionContent?.reflection?.html || fullLesson.reflection || "(empty)"}
 
 --- CLOSING CEREMONY ---
-${fullLesson.closing_ceremony || "(empty)"}
+${editingVersionContent?.closing_ceremony?.html || fullLesson.closing_ceremony || "(empty)"}
+${editingVersionId ? `
+
+================================================================================
+BASE LESSON (original) - This is the original lesson content BEFORE modifications.
+Use this as reference if the user asks to "revert", "restore original", or compare.
+================================================================================
+
+--- BASE LESSON OUTLINE ---
+${fullLesson.lesson_outline || "(empty)"}
+
+--- BASE LESSON WELCOME AND OPENING CHECK-IN ---
+${fullLesson.welcome_opening || "(empty)"}
+
+--- BASE LESSON CLASS EXPECTATIONS AND PROCEDURES ---
+${fullLesson.actual_class_expectations || "(empty)"}
+
+--- BASE LESSON WARM UP ---
+${fullLesson.warm_up || "(empty)"}
+
+--- BASE LESSON LESSON HOOK ---
+${fullLesson.lesson_hook || "(empty)"}
+
+--- BASE LESSON MAIN ACTIVITY ---
+${fullLesson.main_activity || "(empty)"}
+
+--- BASE LESSON REFLECTION ---
+${fullLesson.reflection || "(empty)"}
+
+--- BASE LESSON CLOSING CEREMONY ---
+${fullLesson.closing_ceremony || "(empty)"}` : ''}
 `;
       }
     }
@@ -785,18 +867,442 @@ ${fullLesson.closing_ceremony || "(empty)"}
     let aiResponse = "";
     let links: { label: string; url: string }[] = [];
     let modificationPreview: Record<string, unknown> | null = null;
+    let needsConfirmation = false;
 
-    if (effectiveScope === "lesson" && lessonId && modificationDetection.isModification && modificationLessonContent) {
+    const isEditingVersionFlow = editingVersionId && modificationLessonContent;
+    const isTranslationConfirmation = translationConfirmationPending;
+    const userSaidProceed = PROCEED_KEYWORDS.some(k => message.toLowerCase().includes(k));
+    const userSaidNo = NEGATIVE_KEYWORDS.some(k => message.toLowerCase().includes(k));
+
+    if (effectiveScope === "lesson" && lessonId && (modificationDetection.isModification || isEditingVersionFlow || isTranslationConfirmation) && modificationLessonContent) {
       console.log("[MODIFICATION] Condition matched:", {
         effectiveScope,
         lessonId,
         isModification: modificationDetection.isModification,
+        isEditingVersionFlow,
+        isTranslationConfirmation,
         hasContent: !!modificationLessonContent,
-        type: modificationDetection.type
+        type: modificationDetection.type,
+        userSaidProceed
       });
-      const modType = modificationDetection.type!;
+
+      let modType = modificationDetection.type || "materials";
       const modDirection = modificationDetection.direction;
-      const systemPrompt = getModificationSystemPrompt(modType, modDirection);
+
+      if (isTranslationConfirmation && modType !== "translation") {
+        modType = "translation";
+      }
+
+      console.log("[MODIFICATION] modType after translation check:", modType);
+
+      const isFreshTranslationRequest = modType === "translation" && !isTranslationConfirmation;
+
+      if (isFreshTranslationRequest) {
+        const gradeMatch = modificationLessonContent.match(/Grade:\s*([^\n]+)/);
+        const grade = gradeMatch ? gradeMatch[1].trim() : "the lesson's grade level";
+        const formattedGrade = grade.match(/^\d+$/) ? `Grade ${grade}` : grade;
+
+        const systemPrompt = `You are helping prepare a lesson for Spanish translation. This is a ${formattedGrade} music lesson.
+
+Analyze the lesson content below and:
+
+1. Identify any elements that don't translate directly to Spanish:
+   - Songs, chants, or rhymes
+   - Tongue twisters
+   - Rhyming activities
+   - Cultural references specific to English
+   - Wordplay or puns
+   - Musical terms that may not have direct Spanish equivalents
+
+2. Explain what you found in a conversational way - be honest about limitations but helpful
+
+3. Ask the teacher:
+   - What tone they prefer (formal or informal)
+   - Any cultural considerations or adaptations they want you to keep in mind
+   - Whether there are specific sections they're most concerned about
+
+Be conversational, helpful, and honest. Don't just ask yes/no questions - engage with the content and show the teacher you actually looked at what they're working with.`;
+
+        const userMessage = `Please analyze this lesson for Spanish translation and tell me what you find:
+
+${modificationLessonContent}`;
+
+        const apiKey = process.env.ANTHROPIC_API_KEY;
+        if (!apiKey) {
+          return NextResponse.json({
+            response: "AI is not configured. Please contact an administrator.",
+            links: [],
+            results: [],
+            isModificationRequest: true,
+            needsConfirmation: true,
+            modificationType: "translation",
+            modificationPreview: null,
+            editingVersionId: editingVersionId || null,
+          });
+        }
+
+        const messages = conversationHistory
+          ? [...conversationHistory, { role: "user", content: userMessage }]
+          : [{ role: "user", content: userMessage }];
+
+        let response;
+        try {
+          response = await fetch(ANTHROPIC_API_URL, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-api-key": apiKey,
+              "anthropic-version": "2023-06-01",
+            },
+            body: JSON.stringify({
+              model: MODEL,
+              max_tokens: MAX_TOKENS,
+              system: systemPrompt,
+              messages: messages.map((m: { role: string; content: string }) => ({
+                role: m.role,
+                content: m.content,
+              })),
+            }),
+          });
+        } catch {
+          return NextResponse.json({
+            response: "Network error. Please try again.",
+            links: [],
+            results: [],
+            isModificationRequest: true,
+            needsConfirmation: true,
+            modificationType: "translation",
+            modificationPreview: null,
+            editingVersionId: editingVersionId || null,
+          });
+        }
+
+        if (!response.ok) {
+          return NextResponse.json({
+            response: "AI encountered an error. Please try again.",
+            links: [],
+            results: [],
+            isModificationRequest: true,
+            needsConfirmation: true,
+            modificationType: "translation",
+            modificationPreview: null,
+            editingVersionId: editingVersionId || null,
+          });
+        }
+
+        const result = await response.json();
+        const aiResponseText = result.content?.[0]?.text || "";
+
+        return NextResponse.json({
+          response: aiResponseText,
+          links: [],
+          results: [],
+          isModificationRequest: true,
+          needsConfirmation: true,
+          modificationType: "translation",
+          modificationPreview: null,
+          editingVersionId: editingVersionId || null,
+        });
+      }
+
+      if (modType === "translation" && isTranslationConfirmation && !userSaidProceed) {
+        const messageWords = message.trim().split(/\s+/).length;
+        const isBriefNo = userSaidNo && messageWords <= 2;
+
+        if (isBriefNo) {
+          return NextResponse.json({
+            response: "OK, I've cancelled the Spanish translation. Let me know if you'd like to try again or need something else!",
+            links: [],
+            results: [],
+            isModificationRequest: false,
+            needsConfirmation: false,
+            modificationType: null,
+            modificationPreview: null,
+            editingVersionId: null,
+          });
+        }
+
+        const systemPrompt = `You are a helpful teaching assistant helping translate a lesson to Spanish.
+
+The teacher is asking questions about your proposed translation approach or has provided additional context.
+Please:
+1. Directly answer their question about the translation
+2. Acknowledge any specific context they provided (grade level input, cultural notes, tone preferences, etc.)
+3. Then ask "Should I proceed with creating the Spanish translation? (Please answer yes or no to confirm)"
+
+Keep your response conversational and helpful.`;
+
+        const userMessage = `The teacher said: "${message}"
+
+Please answer their question and confirm if they want to proceed with the translation.`;
+
+        const apiKey = process.env.ANTHROPIC_API_KEY;
+        if (!apiKey) {
+          return NextResponse.json({
+            response: "AI is not configured. Please contact an administrator.",
+            links: [],
+            results: [],
+            isModificationRequest: true,
+            needsConfirmation: true,
+            modificationType: "translation",
+            modificationPreview: null,
+            editingVersionId: editingVersionId || null,
+          });
+        }
+
+        const messages = conversationHistory
+          ? [...conversationHistory, { role: "user", content: userMessage }]
+          : [{ role: "user", content: userMessage }];
+
+        let response;
+        try {
+          response = await fetch(ANTHROPIC_API_URL, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-api-key": apiKey,
+              "anthropic-version": "2023-06-01",
+            },
+            body: JSON.stringify({
+              model: MODEL,
+              max_tokens: MAX_TOKENS,
+              system: systemPrompt,
+              messages: messages.map((m: { role: string; content: string }) => ({
+                role: m.role,
+                content: m.content,
+              })),
+            }),
+          });
+        } catch {
+          return NextResponse.json({
+            response: "Network error. Please try again.",
+            links: [],
+            results: [],
+            isModificationRequest: true,
+            needsConfirmation: true,
+            modificationType: "translation",
+            modificationPreview: null,
+            editingVersionId: editingVersionId || null,
+          });
+        }
+
+        if (!response.ok) {
+          return NextResponse.json({
+            response: "AI encountered an error. Please try again.",
+            links: [],
+            results: [],
+            isModificationRequest: true,
+            needsConfirmation: true,
+            modificationType: "translation",
+            modificationPreview: null,
+            editingVersionId: editingVersionId || null,
+          });
+        }
+
+        const result = await response.json();
+        const aiResponseText = result.content?.[0]?.text || "Should I proceed with creating the Spanish translation?";
+
+        return NextResponse.json({
+          response: aiResponseText,
+          links: [],
+          results: [],
+          isModificationRequest: true,
+          needsConfirmation: true,
+          modificationType: "translation",
+          modificationPreview: null,
+          editingVersionId: editingVersionId || null,
+        });
+      }
+
+      if (modType === "translation" && isTranslationConfirmation && userSaidProceed) {
+        const userPrefs = conversationHistory && conversationHistory.length > 0
+          ? `\nThe teacher previously indicated:\n${conversationHistory.map((m: { role: string; content: string }) => `${m.role}: ${m.content}`).join('\n')}`
+          : "";
+
+        const translateSystemPrompt = `You are an AI assistant helping a teacher translate lesson content to Spanish.
+
+You MUST return ONLY a JSON object with the following structure - NO TEXT BEFORE OR AFTER:
+{
+  "modifiedFields": {
+    "lesson_outline": { "html": "<p>Translated content here</p>" },
+    "learning_objectives": { "html": "<p>Translated content here</p>" },
+    "vocabulary": { "html": "<p>Translated content here</p>" },
+    "materials": { "html": "<p>Translated content here</p>" },
+    "vapa_text_block": { "html": "<p>Translated content here</p>" },
+    "ncas_text_block": { "html": "<p>Translated content here</p>" },
+    "welcome_opening": { "html": "<p>Translated content here</p>" },
+    "actual_class_expectations": { "html": "<p>Translated content here</p>" },
+    "warm_up": { "html": "<p>Translated content here</p>" },
+    "lesson_hook": { "html": "<p>Translated content here</p>" },
+    "main_activity": { "html": "<p>Translated content here</p>" },
+    "instrument_expectations": { "html": "<p>Translated content here</p>" },
+    "reflection": { "html": "<p>Translated content here</p>" },
+    "closing_ceremony": { "html": "<p>Translated content here</p>" },
+    "assessment": { "html": "<p>Translated content here</p>" }
+  },
+  "summary": "Brief description of what was translated"
+}
+
+CRITICAL RULES:
+1. Return ONLY the JSON object - no explanatory text before or after
+2. You MUST return ALL 15 lesson content fields with translated HTML content
+3. Use proper HTML tags: <p>, <h3>, <ul>, <li>, <strong>, <em>, etc.
+4. Preserve the structure and formatting of the original
+5. Keep the grade-level vocabulary appropriate for the students
+6. For songs/chants, ADAPT the rhyme scheme to work in Spanish - do not keep English rhymes
+7. Escape all double quotes as \\\" and single quotes as \\\' in HTML content
+8. Each field's html must contain the COMPLETE translated content
+9. Do NOT ask questions - only return the JSON${userPrefs}`;
+
+        const apiKey = process.env.ANTHROPIC_API_KEY;
+        if (!apiKey) {
+          return NextResponse.json({
+            response: "AI is not configured. Please contact an administrator.",
+            links: [],
+            results: [],
+            isModificationRequest: true,
+            needsConfirmation: false,
+            modificationPreview: null,
+            editingVersionId: editingVersionId || null,
+          });
+        }
+
+        let translateLessonContent = modificationLessonContent;
+        const baseLessonIndex = translateLessonContent.indexOf("BASE LESSON");
+        if (baseLessonIndex !== -1) {
+          translateLessonContent = translateLessonContent.substring(0, baseLessonIndex);
+        }
+        translateLessonContent = translateLessonContent.replace(/<[^>]+>/g, " ");
+        translateLessonContent = translateLessonContent.replace(/\s+/g, " ").trim();
+
+        const translateMessages = [
+          { role: "user", content: `Translate this lesson to Spanish. Return ONLY a JSON object with keys: lesson_outline, learning_objectives, vocabulary, materials, vapa_text_block, ncas_text_block, welcome_opening, actual_class_expectations, warm_up, lesson_hook, main_activity, instrument_expectations, reflection, closing_ceremony, assessment. Each value should be the translated text as a string.\n\n${translateLessonContent}` }
+        ];
+
+        let translateResponse;
+        try {
+          translateResponse = await fetch(ANTHROPIC_API_URL, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-api-key": apiKey,
+              "anthropic-version": "2023-06-01",
+            },
+            body: JSON.stringify({
+              model: MODIFICATION_MODEL,
+              max_tokens: 8192,
+              system: translateSystemPrompt,
+              messages: translateMessages.map((m: { role: string; content: string }) => ({
+                role: m.role,
+                content: m.content,
+              })),
+            }),
+          });
+        } catch {
+          return NextResponse.json({
+            response: "Network error. Please try again.",
+            links: [],
+            results: [],
+            isModificationRequest: true,
+            needsConfirmation: true,
+            modificationPreview: null,
+            editingVersionId: editingVersionId || null,
+          });
+        }
+
+        if (!translateResponse.ok) {
+          return NextResponse.json({
+            response: "AI encountered an error. Please try again.",
+            links: [],
+            results: [],
+            isModificationRequest: true,
+            needsConfirmation: true,
+            modificationPreview: null,
+            editingVersionId: editingVersionId || null,
+          });
+        }
+
+        const translateResult = await translateResponse.json();
+        const rawResponse = translateResult.content?.[0]?.text || "";
+
+        let modificationPreview: Record<string, unknown> | null = null;
+        try {
+          const jsonMatch = rawResponse.match(/```json\n?([\s\S]*?)\n?```|(\{[\s\S]*?\})/);
+          if (jsonMatch) {
+            let jsonString = jsonMatch[1] || jsonMatch[2];
+            try {
+              modificationPreview = JSON.parse(jsonString);
+              console.log("[TRANSLATION] Parsed modificationPreview keys:", modificationPreview ? Object.keys(modificationPreview) : "null");
+            } catch {
+              const repaired = repairJSON(jsonString);
+              if (repaired) {
+                try {
+                  modificationPreview = JSON.parse(repaired);
+                  console.log("[TRANSLATION] Successfully parsed repaired JSON");
+                } catch {
+                  console.log("[TRANSLATION] Repair failed");
+                }
+              }
+            }
+          } else {
+            console.log("[TRANSLATION] No JSON found in response, raw response length:", rawResponse.length);
+            console.log("[TRANSLATION] Raw response preview:", rawResponse.substring(0, 1000));
+            const firstBrace = rawResponse.indexOf('{');
+            const lastBrace = rawResponse.lastIndexOf('}');
+            if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+              let potentialJson = rawResponse.substring(firstBrace, lastBrace + 1);
+              try {
+                modificationPreview = JSON.parse(potentialJson);
+                console.log("[TRANSLATION] Successfully parsed JSON found between braces");
+              } catch {
+                const repaired = repairJSON(potentialJson);
+                if (repaired) {
+                  try {
+                    modificationPreview = JSON.parse(repaired);
+                    console.log("[TRANSLATION] Repaired JSON between braces");
+                  } catch {
+                    console.log("[TRANSLATION] Could not parse JSON between braces either");
+                  }
+                }
+              }
+            }
+          }
+        } catch (e) {
+          console.log("[TRANSLATION] JSON parse error:", e);
+          modificationPreview = null;
+        }
+
+        if (!modificationPreview) {
+          console.log("[TRANSLATION] Failed to parse. Raw response was:", rawResponse.substring(0, 500));
+          return NextResponse.json({
+            response: `I had trouble generating the translation. The AI returned: ${rawResponse.substring(0, 200)}... Please try again.`,
+            links: [],
+            results: [],
+            isModificationRequest: true,
+            needsConfirmation: true,
+            modificationType: modType,
+            modificationPreview: null,
+            editingVersionId: editingVersionId || null,
+          });
+        }
+
+        const wrappedPreview = modificationPreview && !modificationPreview.modifiedFields
+          ? { modifiedFields: modificationPreview }
+          : modificationPreview;
+
+        return NextResponse.json({
+          response: "I've prepared the Spanish translation. You can click 'Save as Version' below to save these changes.",
+          links: [],
+          results: [],
+          isModificationRequest: true,
+          needsConfirmation: false,
+          modificationType: modType,
+          modificationPreview: wrappedPreview,
+          editingVersionId: editingVersionId || null,
+        });
+      }
+
+      const systemPrompt = getModificationSystemPrompt(modType, modDirection, !!editingVersionId);
 
       const userMessage = `Please modify the lesson content below according to the teacher's request: "${message}"
 
@@ -811,6 +1317,7 @@ Return a JSON object with the modified fields and summary.`;
           links: [],
           results: [],
           isModificationRequest: true,
+          editingVersionId: editingVersionId || null,
         });
       }
 
@@ -821,6 +1328,11 @@ Return a JSON object with the modified fields and summary.`;
       console.log("[MODIFICATION] Sending request to Anthropic API");
       console.log("[MODIFICATION] Model:", MODIFICATION_MODEL);
       console.log("[MODIFICATION] Message length:", userMessage.length);
+      console.log("[MODIFICATION] Editing version:", editingVersionId);
+      console.log("[MODIFICATION] Has version content:", !!editingVersionContent);
+      console.log("[MODIFICATION] modificationLessonContent length:", modificationLessonContent.length);
+      console.log("[MODIFICATION] Contains BASE LESSON:", modificationLessonContent.includes("BASE LESSON"));
+      console.log("[MODIFICATION] Contains BASE LESSON CLASS EXPECTATIONS:", modificationLessonContent.includes("BASE LESSON CLASS EXPECTATIONS"));
 
       let response;
       try {
@@ -848,6 +1360,7 @@ Return a JSON object with the modified fields and summary.`;
           links: [],
           results: [],
           isModificationRequest: true,
+          editingVersionId: editingVersionId || null,
         });
       }
 
@@ -859,6 +1372,7 @@ Return a JSON object with the modified fields and summary.`;
           links: [],
           results: [],
           isModificationRequest: true,
+          editingVersionId: editingVersionId || null,
         });
       }
 
@@ -870,18 +1384,34 @@ Return a JSON object with the modified fields and summary.`;
       console.log("[MODIFICATION DEBUG] Raw response ends with:", rawResponse.substring(rawResponse.length - 100));
 
       try {
-        const jsonMatch = rawResponse.match(/\{[\s\S]*\}/);
+        const jsonMatch = rawResponse.match(/```json\n([\s\S]*?)\n```|(\{[\s\S]*?\})/);
+        console.log("[MODIFICATION DEBUG] jsonMatch found:", !!jsonMatch);
+        let jsonString = "";
         if (jsonMatch) {
-          modificationPreview = JSON.parse(jsonMatch[0]);
-          console.log("[MODIFICATION DEBUG] JSON parsed successfully");
+          jsonString = jsonMatch[1] || jsonMatch[2];
+          console.log("[MODIFICATION DEBUG] jsonString length:", jsonString.length);
+        }
+        if (jsonString) {
+          try {
+            modificationPreview = JSON.parse(jsonString);
+            console.log("[MODIFICATION DEBUG] JSON parsed successfully, keys:", modificationPreview ? Object.keys(modificationPreview) : "null");
+          } catch (innerErr: unknown) {
+            console.error("[MODIFICATION DEBUG] JSON parse FAILED, trying repair:", innerErr instanceof Error ? innerErr.message : String(innerErr));
+            const repaired = repairJSON(jsonString);
+            if (repaired) {
+              try {
+                modificationPreview = JSON.parse(repaired);
+                console.log("[MODIFICATION DEBUG] Repaired JSON parsed successfully");
+              } catch (repairedErr: unknown) {
+                console.error("[MODIFICATION DEBUG] Repaired JSON also FAILED:", repairedErr instanceof Error ? repairedErr.message : String(repairedErr));
+              }
+            }
+          }
         } else {
-          console.log("[MODIFICATION DEBUG] No JSON found in response, checking if it's markdown...");
-          console.log("[MODIFICATION DEBUG] Starts with #:", rawResponse.trim().startsWith("#"));
-          console.log("[MODIFICATION DEBUG] Starts with {:", rawResponse.trim().startsWith("{"));
+          console.log("[MODIFICATION DEBUG] No JSON found in response");
         }
       } catch (e) {
-        console.error("[MODIFICATION DEBUG] JSON parse error:", e);
-        console.error("[MODIFICATION DEBUG] Raw response was:", rawResponse);
+        console.error("[MODIFICATION DEBUG] Outer error:", e);
       }
 
       let summary = modificationPreview?.summary || "Modified content ready for review.";
@@ -889,14 +1419,34 @@ Return a JSON object with the modified fields and summary.`;
         summary = (summary as any).text || (summary as any).description || JSON.stringify(summary);
       }
 
+      const isEditingExisting = !!editingVersionId;
+      const responseMessage = isEditingExisting
+        ? `I've prepared modifications for this version. ${summary}\n\nClick "View Update" to preview the changes.`
+        : `I've prepared modifications for the lesson. ${summary}\n\nYou can click "Save as Version" below to save these changes.`;
+
+      if (modType === "translation") {
+        if (isTranslationConfirmation && userSaidProceed) {
+          needsConfirmation = false;
+        } else {
+          needsConfirmation = true;
+          modificationPreview = null;
+        }
+      }
+
+      console.log("[MODIFICATION DEBUG] Final return - needsConfirmation:", needsConfirmation);
+      console.log("[MODIFICATION DEBUG] Final return - modificationPreview is null?:", modificationPreview === null);
+      console.log("[MODIFICATION DEBUG] Final return - modificationPreview keys:", modificationPreview ? Object.keys(modificationPreview) : "null");
+
       return NextResponse.json({
-        response: `I've prepared modifications for the lesson. ${summary}\n\nYou can click "Save as Version" below to save these changes.`,
+        response: responseMessage,
         links: [],
         results: [],
         isModificationRequest: true,
+        needsConfirmation,
         modificationType: modType,
         modificationDirection: modDirection,
         modificationPreview,
+        editingVersionId: editingVersionId || null,
       });
     } else if (effectiveScope === "lesson" && fullLessonContent && !(explicitQuery && hasCurriculumResults)) {
       const lessonUrl = `/admin/courses/${courseId}/lessons/${lessonId}`;
@@ -911,6 +1461,7 @@ CRITICAL RULES:
 6. Do NOT make up content - only use what's in the lesson content below
 7. Be helpful, concise, and specific
 8. If user asks about topics or concepts in the lesson, reference the relevant section
+9. IMPORTANT: This platform cannot receive files or images. Only ask for text-based explanations or clarifications. Never request screenshots, files, or visual examples.
 
 ${currentLessonInfo}
 
@@ -975,6 +1526,7 @@ CRITICAL RULES:
 4. The course URL is: ${courseUrl}
 5. Lesson links should be: ${courseUrl}
 6. Be helpful, concise, and specific
+7. IMPORTANT: This platform cannot receive files or images. Only ask for text-based explanations or clarifications. Never request screenshots, files, or visual examples.
 
 ${currentCourseInfo}
 
@@ -1055,6 +1607,7 @@ CRITICAL RULES:
 5. IMPORTANT: Use the EXACT URLs provided in the search results - do NOT construct your own URLs
 6. Do NOT make up content or attribute quotes not in the results
 7. When mentioning a lesson, include the full markdown link as shown in the search results
+8. IMPORTANT: This platform cannot receive files or images. Only ask for text-based explanations or clarifications. Never request screenshots, files, or visual examples.
 
 Search results are provided below.`;
 
@@ -1126,7 +1679,8 @@ Answer based on the search results above.`;
     } else {
       const systemPrompt = `You are a helpful AI assistant for music, dance, and theatre education.
 You help teachers with questions about VAPA standards, NCAS standards, curriculum design, pedagogy, lesson planning, and general music/dance/theatre education topics.
-Be concise and helpful in your responses.`;
+Be concise and helpful in your responses.
+IMPORTANT: This platform cannot receive files or images. Only ask for text-based explanations or clarifications. Never request screenshots, files, or visual examples.`;
 
       const apiKey = process.env.ANTHROPIC_API_KEY;
       if (apiKey) {
@@ -1243,7 +1797,8 @@ function formatDirectResults(results: SearchResult[]): string {
       fieldLabel,
       url: `/lessons/${first.lesson_id}#${first.field_name}`,
       snippet: chunks[0].chunk_text,
-    };
+  };
+
   });
 
   const lines: string[] = [];

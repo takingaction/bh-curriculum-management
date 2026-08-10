@@ -24,7 +24,6 @@ interface VersionTabsProps {
   onCreateNew: () => void;
   onDeleteVersion: (versionId: string) => void;
   onUseVersion: (version: LessonVersion) => void;
-  onEditWithAi: (version: LessonVersion) => void;
   maxVersions?: number;
   canCreate?: boolean;
 }
@@ -37,7 +36,6 @@ export function VersionTabs({
   onCreateNew,
   onDeleteVersion,
   onUseVersion,
-  onEditWithAi,
   maxVersions = 3,
   canCreate = true,
 }: VersionTabsProps) {
@@ -177,15 +175,6 @@ export function VersionTabs({
             </div>
 
             <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setPreviewOpen(false);
-                  onEditWithAi(selectedVersion);
-                }}
-              >
-                Edit with AI
-              </Button>
               <Button
                 variant="outline"
                 onClick={() => {
