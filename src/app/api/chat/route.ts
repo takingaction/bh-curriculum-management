@@ -921,7 +921,6 @@ ${fullLesson.closing_ceremony || "(empty)"}` : ''}
     let needsConfirmation = false;
 
     const isEditingVersionFlow = editingVersionId && modificationLessonContent;
-    const waitingForConfirmation = waitingForConfirmation;
     const userSaidProceed = PROCEED_KEYWORDS.some(k => message.toLowerCase().includes(k));
     const userSaidNo = NEGATIVE_KEYWORDS.some(k => message.toLowerCase().includes(k));
 
@@ -951,14 +950,14 @@ ${fullLesson.closing_ceremony || "(empty)"}` : ''}
         targetLanguage = extractTargetLanguage(allContent.toLowerCase());
       }
 
-      // Only override to materials if the detected type is a simple edit type
-      // NOT for content modification types like duration, translation, expand, condense, revise, rewrite
-      if (isVersionMode && !["duration", "translation", "expand", "condense", "revise", "rewrite"].includes(modType)) {
-        modType = "materials";
+      // Only process modification requests for duration and translation
+      if (isVersionMode && modType && !["duration", "translation"].includes(modType)) {
+        modType = null;
       }
 
-      if (waitingForConfirmation && modType !== "translation") {
-        modType = "translation";
+      // If waitingForConfirmation, ensure modType is either duration or translation (it should already be set)
+      if (waitingForConfirmation && modType && !["duration", "translation"].includes(modType)) {
+        modType = null;
       }
 
       console.log("[MODIFICATION] modType after translation check:", modType);
