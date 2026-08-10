@@ -789,7 +789,7 @@ Feature allowing teachers to create/modify lessons via AI chat and save versions
 **Version data model**:
 - `id` - UUID primary key
 - `lesson_id` - References lessons table
-- `version_number` - Auto-incremented per lesson (1, 2, 3)
+- `version_number` - Auto-incremented per lesson (1, 2, 3...)
 - `version_name` - Optional custom name
 - `content` - JSONB with field names as keys, each containing `{ html: string, original_length: number }`
 - `modification_reason` - Free-form text (optional)
@@ -802,40 +802,66 @@ Feature allowing teachers to create/modify lessons via AI chat and save versions
 **RLS Policies**:
 - Users can CRUD their own versions only
 - Admins can view all versions (read-only)
-- Max 3 active versions per lesson (enforced by database trigger)
+- Max 10 active versions per lesson (enforced by database trigger)
 
 **Version ownership**:
 - Versions are linked to the user who creates them via `created_by`
 - Teachers can only see/manage their own versions
 - Admins can view all versions but cannot edit/delete others' versions
 
-**Flow**:
-1. Teacher views lesson and opens AI Chat widget
-2. Teacher asks AI to modify content (e.g., "Make this lesson 30 minutes shorter")
-3. AI provides modification preview with `modifiedFields` array
-4. Teacher clicks "Save as Version" button
-5. SaveVersionDialog opens with name and reason fields
-6. Version is saved with modified content merged from original
+**Modification Types**:
+- `duration` - Make lesson shorter/longer (e.g., "Make a 30 min version instead of 45")
+- `special_needs` - Adapt for students with accommodations
+- `materials` - Modify due to missing/limited materials
+- `venue` - Adapt for different space constraints
+- `translation` - Translate to another language
 
-**Version PDF generation**:
-- `POST /api/lessons/[lessonId]/versions/[versionId]/pdf` - Generate PDF for a version
-- `GET /api/lessons/[lessonId]/versions/[versionId]/pdf` - View/download existing PDF
-- Weekly limit: 20 PDFs per user (resets Monday)
-- PDF includes original lesson title in header, version name in page 2 label
+**Two-Mode Workflow**:
+
+**Create Mode (new version from original)**:
+- User asks AI to modify (e.g., "Make a 30 min version")
+- AI creates version silently with suggested name (e.g., "Shorter Version - 8/10/2026")
+- Version auto-appears in lesson view immediately
+- NO confirmation buttons shown
+- User can delete unwanted versions from versions modal
+
+**Edit Mode (modify existing version)**:
+- User selects existing version to edit
+- User asks AI to modify
+- AI shows Save/Save As.../Reject buttons
+- User can save changes to existing version or create new version from changes
+
+**AI Response Formats**:
+AI can return fields in multiple formats - the code handles all:
+1. `{ modifiedFields: { lessonOutline: { html: "..." } } }` - wrapped
+2. `{ modified_fields: { lessonOutline: { html: "..." } } }` - snake_case wrapped
+3. `{ lessonOutline: { html: "..." }, welcomeOpening: { html: "..." } }` - root level
+
+**Field Name Handling**:
+The `convertModifiedFields()` function in `version-utils.ts` handles:
+- CamelCase: `lessonOutline`, `welcomeOpening`
+- Snake_case: `lesson_outline`, `welcome_opening`
+- Abbreviated: `outline`, `opening`, `hook`, `activity`, `closing`
+
+**JSON Repair**:
+The `repairJSON()` function in `chat/route.ts` handles unescaped quotes in HTML attributes like `style="width: 100%"`.
 
 **Key files**:
-- `src/lib/version-utils.ts` - Version utilities, constants, types
+- `src/lib/version-utils.ts` - Version utilities, constants, types, `convertModifiedFields()` function
+- `src/app/api/chat/route.ts` - Chat API with modification handling, `repairJSON()` function
+- `src/components/ai-chat-widget.tsx` - Chat widget UI
 - `src/components/version-tab-bar.tsx` - Version list UI in lesson sidebar
 - `src/components/version-tabs.tsx` - Version tabs for admin editor
 - `src/components/version-preview.tsx` - Version content preview dialog
 - `src/components/generate-pdf-dialog.tsx` - Version PDF generation dialog
 - `src/components/save-version-dialog.tsx` - Save version dialog with name/reason
-- `src/app/(dashboard)/lessons/[lessonId]/page.tsx` - Student lesson view with version support
+- `src/app/(dashboard)/lessons/[lessonId]/page.tsx` - Lesson view with version support
 - `src/app/api/lessons/[lessonId]/versions/route.ts` - GET/POST versions
 - `src/app/api/lessons/[lessonId]/versions/[versionId]/route.ts` - GET/PATCH/DELETE single version
 - `src/app/api/lessons/[lessonId]/versions/[versionId]/pdf/route.ts` - Version PDF generation
 - `src/app/api/pdf-usage/route.ts` - Weekly PDF usage tracking
 - `supabase/migrations/024_lesson_versions.sql` - Database migration
+- `supabase/migrations/025_increase_version_limit.sql` - Increased limit to 10 versions
 
 ### Relevant Files
 - `src/app/(dashboard)/admin/courses/[id]/page.tsx` - Course edit page with Spotify section

@@ -2,6 +2,9 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useChatContext } from "./chat-context";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 interface Message {
   role: "user" | "assistant";
@@ -48,7 +51,7 @@ interface SearchState {
 }
 
 export default function AIChatWidget() {
-  const { lessonId, courseId, editingVersionId, versionCount, onSaveVersionRequest, setClearModificationCallback } = useChatContext();
+  const { lessonId, courseId, editingVersionId, versionCount, setVersionMode, onSaveVersionRequest, onSaveAsRequest } = useChatContext();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>(() => {
     if (typeof window !== 'undefined') {
@@ -70,7 +73,13 @@ export default function AIChatWidget() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  const [activeMode, setActiveMode] = useState<"ask" | "search">("ask");
+  const [activeMode, setActiveMode] = useState<"ask" | "search" | "versions">("ask");
+  const [versionMode, setVersionModeLocal] = useState<'create' | 'edit' | null>(null);
+  const [showNewRequestConfirm, setShowNewRequestConfirm] = useState(false);
+  const [modificationPreview, setModificationPreview] = useState<Record<string, unknown> | null>(null);
+  const [previewEditingVersionId, setPreviewEditingVersionId] = useState<string | null>(null);
+  const [hasModification, setHasModification] = useState(false);
+  const [translationConfirmationPending, setTranslationConfirmationPending] = useState(false);
   const [searchScope, setSearchScope] = useState<"lesson" | "course" | "global">("global");
   const [searchQuery, setSearchQuery] = useState("");
   const [courses, setCourses] = useState<Course[]>([]);
@@ -78,6 +87,8 @@ export default function AIChatWidget() {
   const [isSearching, setIsSearching] = useState(false);
   const [copyFeedback, setCopyFeedback] = useState<number | null>(null);
   const [exportFeedback, setExportFeedback] = useState<number | null>(null);
+  const [alertModalOpen, setAlertModalOpen] = useState(false);
+  const [alertModalMessage, setAlertModalMessage] = useState("");
 
   const searchParamsRef = useRef<{ query: string; scope: "lesson" | "course" | "global"; lessonId: string | null; courseId: string | null }>({ query: "", scope: "global", lessonId: null, courseId: null });
   const [searchPage, setSearchPage] = useState(0);
@@ -98,53 +109,9 @@ export default function AIChatWidget() {
     return [];
   });
 
-  const [modificationPreview, setModificationPreview] = useState<Record<string, unknown> | null>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = localStorage.getItem('aiModificationPreview');
-        return saved ? JSON.parse(saved) : null;
-      } catch {
-        return null;
-      }
-    }
-    return null;
-  });
-  const [previewEditingVersionId, setPreviewEditingVersionId] = useState<string | null>(null);
-  const [translationConfirmationPending, setTranslationConfirmationPending] = useState(false);
-  const [hasModification, setHasModification] = useState(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = localStorage.getItem('aiModificationPreview');
-        return !!saved;
-      } catch {
-        return false;
-      }
-    }
-    return false;
-  });
-
   useEffect(() => {
-    if (lessonId && modificationPreview) {
-      const previewLessonId = (modificationPreview as any).lessonId;
-      if (previewLessonId && previewLessonId !== lessonId) {
-        setModificationPreview(null);
-        setHasModification(false);
-        localStorage.removeItem('aiModificationPreview');
-      }
-    }
-  }, [lessonId, modificationPreview]);
-
-  useEffect(() => {
-    if (modificationPreview) {
-      localStorage.setItem('aiModificationPreview', JSON.stringify(modificationPreview));
-      if (previewEditingVersionId) {
-        localStorage.setItem('aiPreviewEditingVersionId', previewEditingVersionId);
-      }
-    } else {
-      localStorage.removeItem('aiModificationPreview');
-      localStorage.removeItem('aiPreviewEditingVersionId');
-    }
-  }, [modificationPreview, previewEditingVersionId]);
+    setVersionMode(versionMode);
+  }, [versionMode, setVersionMode]);
 
   useEffect(() => {
     if (courseId) {
@@ -219,26 +186,11 @@ export default function AIChatWidget() {
   }, []);
 
   useEffect(() => {
-    const clearFn = () => {
-      setModificationPreview(null);
-      setHasModification(false);
-    };
-    if (setClearModificationCallback) {
-      setClearModificationCallback(clearFn);
-    }
-    return () => {
-      if (setClearModificationCallback) {
-        setClearModificationCallback(null);
-      }
-    };
-  }, [setClearModificationCallback]);
-
-  useEffect(() => {
     if (typeof window === 'undefined') return;
 
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key !== SEARCH_STORAGE_KEY) return;
-      
+
       if (e.newValue) {
         try {
           const state: SearchState = JSON.parse(e.newValue);
@@ -290,11 +242,21 @@ export default function AIChatWidget() {
     if (!input.trim() || isLoading) return;
 
     const userMessage = input.trim();
-    const modPatterns = /30\s*min|45\s*min|60\s*min|shorter|longer|reduce|condense|duration|special\s*needs|adapt|accommodation|materials|venue|outdoor|gym/i;
-    const isModificationRequest = modPatterns.test(userMessage);
 
-    if (isModificationRequest && versionCount >= 3) {
-      alert("You have 3 versions (maximum). Please delete one before requesting a new modification.");
+    if (activeMode === "versions") {
+      if (!versionMode) {
+        alert("Please select Create New or Edit Selected first.");
+        return;
+      }
+      if (versionMode === 'edit' && !editingVersionId) {
+        setAlertModalMessage("Please select a version from the sidebar first.");
+        setAlertModalOpen(true);
+        return;
+      }
+    }
+
+    if (activeMode === "versions" && versionMode === 'create' && versionCount >= 10) {
+      alert("You have 10 versions (maximum). Please delete one before creating a new one.");
       return;
     }
 
@@ -308,17 +270,28 @@ export default function AIChatWidget() {
         content: m.content,
       }));
 
+      const requestBody: Record<string, unknown> = {
+        message: userMessage,
+        lessonId,
+        courseId,
+        conversationHistory,
+      };
+
+      if (activeMode === "versions") {
+        requestBody.context = "versions";
+        requestBody.versionMode = versionMode;
+        if (versionMode === 'edit' && editingVersionId) {
+          requestBody.editingVersionId = editingVersionId;
+        }
+        if (translationConfirmationPending) {
+          requestBody.translationConfirmationPending = true;
+        }
+      }
+
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: userMessage,
-          lessonId,
-          courseId,
-          conversationHistory,
-          editingVersionId,
-          translationConfirmationPending,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
@@ -337,28 +310,19 @@ export default function AIChatWidget() {
         setSearchQuery(userMessage);
         searchParamsRef.current = { query: userMessage, scope: searchScope, lessonId, courseId };
       }
-      if (data.needsConfirmation) {
-        console.log("[WIDGET] AI is asking for confirmation, showing questions without Save button");
+      // Handle translation clarifying questions
+      if (data.needsConfirmation && data.modificationType === "translation") {
         setTranslationConfirmationPending(true);
-        setHasModification(false);
-        setModificationPreview(null);
-      } else if (data.isModificationRequest && data.modificationPreview) {
-        console.log("[WIDGET] Received modificationPreview:", Object.keys(data.modificationPreview));
-        console.log("[WIDGET] editingVersionId from API:", data.editingVersionId);
-        console.log("[WIDGET] Setting hasModification=true, needsConfirmation should be:", data.needsConfirmation);
+        // Don't call onSaveVersionRequest yet - just asking questions
+      }
+      // Handle actual modifications
+      if (data.isModificationRequest && data.modificationPreview) {
         setModificationPreview(data.modificationPreview);
         setPreviewEditingVersionId(data.editingVersionId || null);
         setHasModification(true);
         setTranslationConfirmationPending(false);
-      } else if (data.modificationPreview) {
-        console.log("[WIDGET] Fallback - showing Save button with preview:", Object.keys(data.modificationPreview));
-        setModificationPreview(data.modificationPreview);
-        setPreviewEditingVersionId(data.editingVersionId || null);
-        setHasModification(true);
-        setTranslationConfirmationPending(false);
-      } else {
-        console.log("[WIDGET] No modificationPreview - isModificationRequest:", data.isModificationRequest, "modificationPreview:", data.modificationPreview);
-        setTranslationConfirmationPending(false);
+        // Immediately load changes into lesson view and auto-create for create mode
+        onSaveVersionRequest?.(data.modificationPreview, data.editingVersionId || null, data.suggestedVersionName);
       }
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Unknown error";
@@ -389,7 +353,7 @@ export default function AIChatWidget() {
     setSearchQuery("");
     setModificationPreview(null);
     setHasModification(false);
-    setTranslationConfirmationPending(false);
+    setPreviewEditingVersionId(null);
     localStorage.removeItem(CHAT_STORAGE_KEY);
     localStorage.removeItem(SEARCH_STORAGE_KEY);
   };
@@ -547,6 +511,33 @@ export default function AIChatWidget() {
     }
   };
 
+  const handleCreateNew = () => {
+    if (messages.length > 0) {
+      setShowNewRequestConfirm(true);
+    } else {
+      setVersionModeLocal('create');
+    }
+  };
+
+  const handleEditSelected = () => {
+    if (!editingVersionId) {
+      setAlertModalMessage("Please select a version from the sidebar first.");
+      setAlertModalOpen(true);
+      return;
+    }
+    if (messages.length > 0) {
+      setShowNewRequestConfirm(true);
+    } else {
+      setVersionModeLocal('edit');
+    }
+  };
+
+  const confirmNewRequest = () => {
+    clearChat();
+    setVersionModeLocal(versionMode);
+    setShowNewRequestConfirm(false);
+  };
+
   const renderMessage = (content: string) => {
     const parts = content.split(/(\[[^\]]+\]\([^)]+\))/g);
 
@@ -668,7 +659,7 @@ export default function AIChatWidget() {
 
       <div className="flex border-b border-gray-200">
         <button
-          onClick={() => setActiveMode("ask")}
+          onClick={() => { setActiveMode("ask"); setVersionModeLocal(null); }}
           className={`flex-1 px-4 py-2 text-sm font-medium ${
             activeMode === "ask"
               ? "text-[#0d7377] border-b-2 border-[#0d7377]"
@@ -678,7 +669,17 @@ export default function AIChatWidget() {
           Ask
         </button>
         <button
-          onClick={() => setActiveMode("search")}
+          onClick={() => { setActiveMode("versions"); }}
+          className={`flex-1 px-4 py-2 text-sm font-medium ${
+            activeMode === "versions"
+              ? "text-[#0d7377] border-b-2 border-[#0d7377]"
+              : "text-gray-500 hover:text-gray-700"
+          }`}
+        >
+          Versions
+        </button>
+        <button
+          onClick={() => { setActiveMode("search"); setVersionModeLocal(null); }}
           className={`flex-1 px-4 py-2 text-sm font-medium ${
             activeMode === "search"
               ? "text-[#0d7377] border-b-2 border-[#0d7377]"
@@ -767,13 +768,56 @@ export default function AIChatWidget() {
         </div>
       )}
 
+      {activeMode === "versions" && (
+        <div className="p-4 border-b border-gray-200 bg-gray-50 space-y-3">
+          <div className="flex gap-2">
+            <button
+              onClick={handleCreateNew}
+              className={`flex-1 px-3 py-2 text-sm font-medium rounded transition-colors ${
+                versionMode === 'create'
+                  ? "bg-[#0d7377] text-white"
+                  : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+              }`}
+            >
+              Create New
+            </button>
+            <button
+              onClick={handleEditSelected}
+              className={`flex-1 px-3 py-2 text-sm font-medium rounded transition-colors ${
+                versionMode === 'edit'
+                  ? "bg-[#0d7377] text-white"
+                  : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+              }`}
+            >
+              Edit Selected
+            </button>
+          </div>
+          {versionMode === 'edit' && !editingVersionId && (
+            <p className="text-xs text-orange-600">Select a version from the sidebar first.</p>
+          )}
+          {versionMode && (
+            <p className="text-xs text-gray-500">
+              {versionMode === 'create'
+                ? "Creating a new version. All modifications will be saved as a new version."
+                : "Editing selected version. All modifications will update the selected version."}
+            </p>
+          )}
+        </div>
+      )}
+
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.length === 0 && (
           <div className="text-center text-gray-500 py-8">
-            <p className="text-sm">Ask me about your curriculum or use the Search Content tab!</p>
-            <p className="text-xs mt-2 text-gray-400">
-              Click &quot;Search Content&quot; to search lessons by scope (lesson, course, or global).
+            <p className="text-sm">
+              {activeMode === "versions"
+                ? "Select Create New or Edit Selected to work with versions."
+                : "Ask me about your curriculum or use the Search Content tab!"}
             </p>
+            {activeMode === "versions" && (
+              <p className="text-xs mt-2 text-gray-400">
+                Click the Versions button in the sidebar to select a version to edit.
+              </p>
+            )}
           </div>
         )}
 
@@ -791,8 +835,10 @@ export default function AIChatWidget() {
             >
               {message.role === "assistant" ? (
                 <div>
-                  <div className="text-sm whitespace-pre-wrap">
-                    {renderMessage(message.content)}
+                  <div className="text-sm">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {message.content}
+                    </ReactMarkdown>
                   </div>
                   <div className="flex justify-end gap-1 mt-1">
                     <button
@@ -825,20 +871,43 @@ export default function AIChatWidget() {
                       )}
                     </button>
                   </div>
-                  {hasModification && index === messages.length - 1 && modificationPreview && (
-                    <button
-                      onClick={() => {
-                        onSaveVersionRequest?.(modificationPreview, previewEditingVersionId);
-                      }}
-                      className="mt-2 w-full px-3 py-1.5 bg-[#0d7377] text-white text-xs font-medium rounded hover:bg-[#0a5c5f] transition-colors"
-                    >
-                      {previewEditingVersionId ? "View Update" : "View Version"}
-                    </button>
+                  {hasModification && index === messages.length - 1 && modificationPreview && versionMode === 'edit' && (
+                    <div className="mt-2 flex gap-2">
+                      <button
+                        onClick={() => {
+                          setModificationPreview(null);
+                          setHasModification(false);
+                          setTranslationConfirmationPending(false);
+                        }}
+                        className="flex-1 px-3 py-1.5 bg-gray-200 text-gray-700 text-xs font-medium rounded hover:bg-gray-300 transition-colors"
+                      >
+                        Reject
+                      </button>
+                      <button
+                        onClick={() => {
+                          onSaveVersionRequest?.(modificationPreview, previewEditingVersionId);
+                        }}
+                        className="flex-1 px-3 py-1.5 bg-[#0d7377] text-white text-xs font-medium rounded hover:bg-[#0a5c5f] transition-colors"
+                      >
+                        Save
+                      </button>
+                      <button
+                        onClick={() => {
+                          onSaveAsRequest?.(modificationPreview);
+                          setTranslationConfirmationPending(false);
+                        }}
+                        className="flex-1 px-3 py-1.5 bg-[#e37c64] text-white text-xs font-medium rounded hover:bg-[#d06a52] transition-colors"
+                      >
+                        Save As...
+                      </button>
+                    </div>
                   )}
                 </div>
               ) : (
-                <div className="text-sm whitespace-pre-wrap">
-                  {message.content}
+                <div className="text-sm">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {message.content}
+                  </ReactMarkdown>
                 </div>
               )}
             </div>
@@ -993,14 +1062,20 @@ export default function AIChatWidget() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder='Ask me about your curriculum...'
+            placeholder={
+              activeMode === "versions"
+                ? versionMode
+                  ? "Describe the changes you want to make..."
+                  : "Select Create New or Edit Selected first..."
+                : 'Ask me about your curriculum...'
+            }
             className="flex-1 resize-none border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0d7377] focus:border-transparent"
             rows={1}
-            disabled={isLoading}
+            disabled={isLoading || (activeMode === "versions" && !versionMode)}
           />
           <button
             type="submit"
-            disabled={!input.trim() || isLoading}
+            disabled={!input.trim() || isLoading || (activeMode === "versions" && !versionMode)}
             className="bg-[#0d7377] text-white rounded-lg px-3 py-2 hover:bg-[#0a5c5f] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <svg
@@ -1026,6 +1101,50 @@ export default function AIChatWidget() {
           AI-generated responses may contain inaccuracies. Always verify information.
         </p>
       </div>
+
+      {showNewRequestConfirm && (
+        <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center">
+          <div className="bg-white rounded-lg p-6 max-w-sm mx-4">
+            <h3 className="text-lg font-semibold mb-2">Start New Request?</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              This will clear the current conversation. Continue?
+            </p>
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => setShowNewRequestConfirm(false)}
+                className="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmNewRequest}
+                className="px-4 py-2 text-sm bg-[#0d7377] text-white rounded hover:bg-[#0a5c5f]"
+              >
+                Continue
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <Dialog open={alertModalOpen} onOpenChange={setAlertModalOpen}>
+        <DialogContent className="w-96">
+          <DialogHeader>
+            <DialogTitle>Notice</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-gray-600">{alertModalMessage}</p>
+          </div>
+          <div className="flex justify-end">
+            <button
+              onClick={() => setAlertModalOpen(false)}
+              className="px-4 py-2 bg-[#0d7377] text-white text-sm rounded hover:bg-[#0a5c5f]"
+            >
+              OK
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

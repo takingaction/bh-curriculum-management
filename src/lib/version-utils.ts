@@ -142,3 +142,60 @@ export function parseVersionContentForDisplay(
       originalLength: content[fieldName].original_length,
     }));
 }
+
+const CAMEL_TO_SNAKE_MAP: Record<string, string> = {
+  lessonOutline: 'lesson_outline',
+  outline: 'lesson_outline',
+  learningObjectives: 'learning_objectives',
+  objectives: 'learning_objectives',
+  vocabulary: 'vocabulary',
+  vocab: 'vocabulary',
+  materials: 'materials',
+  vapaTextBlock: 'vapa_text_block',
+  vapa: 'vapa_text_block',
+  vapaStandards: 'vapa_text_block',
+  ncasTextBlock: 'ncas_text_block',
+  ncas: 'ncas_text_block',
+  ncasStandards: 'ncas_text_block',
+  welcomeAndOpeningCheckIn: 'welcome_opening',
+  welcomeOpeningCheckIn: 'welcome_opening',
+  welcomeOpening: 'welcome_opening',
+  opening: 'welcome_opening',
+  classExpectationsAndProcedures: 'actual_class_expectations',
+  classExpectationsProcedures: 'actual_class_expectations',
+  classExpectations: 'actual_class_expectations',
+  expectations: 'actual_class_expectations',
+  warmUp: 'warm_up',
+  warmup: 'warm_up',
+  lessonHook: 'lesson_hook',
+  hook: 'lesson_hook',
+  mainActivity: 'main_activity',
+  mainActivity: 'main_activity',
+  activity: 'main_activity',
+  instrumentExpectations: 'instrument_expectations',
+  instruments: 'instrument_expectations',
+  reflection: 'reflection',
+  closingCeremony: 'closing_ceremony',
+  closing: 'closing_ceremony',
+  assessment: 'assessment',
+};
+
+export function convertModifiedFields(
+  modifiedFields: Record<string, { html?: string }>,
+  originalFields?: Record<string, string>
+): Record<string, { html: string }> {
+  const result: Record<string, { html: string }> = {};
+
+  for (const field of TEXT_FIELDS_LIST) {
+    result[field] = { html: "" };
+  }
+
+  for (const [key, value] of Object.entries(modifiedFields)) {
+    const snakeKey = CAMEL_TO_SNAKE_MAP[key] || key;
+    if (result[snakeKey] && value?.html) {
+      result[snakeKey] = { html: value.html };
+    }
+  }
+
+  return result;
+}

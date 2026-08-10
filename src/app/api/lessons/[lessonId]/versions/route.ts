@@ -55,17 +55,36 @@ export async function POST(
 
     const userId = session.user.id;
     const body = await request.json();
-    const { version_name, content, modification_reason } = body as {
+    const { version_name, content, modification_reason, copyFromVersionId } = body as {
       version_name?: string;
-      content: VersionContent;
+      content?: VersionContent;
       modification_reason?: string;
+      copyFromVersionId?: string;
     };
 
-    if (!content || typeof content !== "object") {
-      return NextResponse.json({ error: "Content is required" }, { status: 400 });
+    const supabaseAdmin = await createServiceClient();
+
+    // If copyFromVersionId is provided, fetch that version's content
+    let versionContent = content;
+    if (copyFromVersionId && !content) {
+      const { data: sourceVersion, error: sourceError } = await supabaseAdmin
+        .from("lesson_versions")
+        .select("content")
+        .eq("id", copyFromVersionId)
+        .eq("lesson_id", lessonId)
+        .is("deleted_at", null)
+        .single();
+
+      if (sourceError || !sourceVersion) {
+        return NextResponse.json({ error: "Source version not found" }, { status: 404 });
+      }
+
+      versionContent = sourceVersion.content as VersionContent;
     }
 
-    const supabaseAdmin = await createServiceClient();
+    if (!versionContent || typeof versionContent !== "object") {
+      return NextResponse.json({ error: "Content is required" }, { status: 400 });
+    }
 
     // IMPORTANT: Query ALL versions including soft-deleted ones because the unique constraint
     // is on (lesson_id, version_number) - soft-deleted versions still occupy their version numbers
@@ -111,11 +130,11 @@ export async function POST(
       return NextResponse.json({ error: "Course not found" }, { status: 404 });
     }
 
-    console.log("[VERSIONS API] Creating version with content keys:", Object.keys(content));
+    console.log("[VERSIONS API] Creating version with content keys:", Object.keys(versionContent));
 
     const originalContent: VersionContent = {};
     for (const field of TEXT_FIELDS_LIST) {
-      const fieldData = content[field] as { html?: string } | undefined;
+      const fieldData = versionContent[field] as { html?: string } | undefined;
       const html = fieldData?.html || "";
       originalContent[field] = {
         html,
@@ -140,9 +159,9 @@ export async function POST(
       .single();
 
     if (insertError) {
-      if (insertError.message.includes("Maximum of 3 active versions")) {
+      if (insertError.message.includes("Maximum of 10 active versions")) {
         return NextResponse.json(
-          { error: "Maximum of 3 active versions allowed per lesson. Please delete one to create a new version." },
+          { error: "Maximum of 10 active versions allowed per lesson. Please delete one to create a new version." },
           { status: 400 }
         );
       }

@@ -184,6 +184,28 @@ interface ModificationDetection {
   type: ModificationType | null;
   direction: "shorter" | "longer" | null;
   targetFields: string[] | null;
+  targetLanguage: string | null;
+}
+
+const LANGUAGE_PATTERNS: Record<string, string[]> = {
+  spanish: ["spanish", "español", "in spanish", "create a spanish", "make it spanish"],
+  french: ["french", "in french", "create a french", "make it french", "français"],
+  german: ["german", "in german", "create a german", "make it german", "deutsch"],
+  portuguese: ["portuguese", "in portuguese", "create a portuguese"],
+  chinese: ["chinese", "in chinese", "create a chinese", "mandarin"],
+  japanese: ["japanese", "in japanese", "create a japanese"],
+  korean: ["korean", "in korean", "create a korean"],
+  vietnamese: ["vietnamese", "in vietnamese", "create a vietnamese"],
+};
+
+function extractTargetLanguage(message: string): string | null {
+  const lower = message.toLowerCase();
+  for (const [lang, patterns] of Object.entries(LANGUAGE_PATTERNS)) {
+    if (patterns.some(p => lower.includes(p))) {
+      return lang.charAt(0).toUpperCase() + lang.slice(1);
+    }
+  }
+  return null;
 }
 
 const MODIFICATION_PATTERNS: Record<ModificationType, string[]> = {
@@ -228,8 +250,8 @@ const NEGATIVE_KEYWORDS = [
 ];
 
 const DIRECTION_PATTERNS = {
-  shorter: ["shorter", "reduce", "cut down", "condense", "brief", "scale down", "less", "not enough time", "too long"],
-  longer: ["longer", "expand", "more time", "scale up", "more", "too short", "add more"]
+  shorter: ["shorter", "reduce", "cut down", "condense", "brief", "scale down", "less", "not enough time", "too long", "instead of", "decrease", "min version", "cut to"],
+  longer: ["longer", "expand", "more time", "scale up", "more", "too short", "add more", "increase", "max version"]
 };
 
 function detectModificationRequest(message: string): ModificationDetection {
@@ -247,7 +269,7 @@ function detectModificationRequest(message: string): ModificationDetection {
   }
 
   if (!detectedType || maxMatches < 1) {
-    return { isModification: false, type: null, direction: null, targetFields: null };
+    return { isModification: false, type: null, direction: null, targetFields: null, targetLanguage: null };
   }
 
   let direction: "shorter" | "longer" | null = null;
@@ -262,11 +284,14 @@ function detectModificationRequest(message: string): ModificationDetection {
     ? null
     : null;
 
+  const targetLanguage = detectedType === "translation" ? extractTargetLanguage(lower) : null;
+
   return {
     isModification: true,
     type: detectedType,
     direction,
-    targetFields
+    targetFields,
+    targetLanguage
   };
 }
 
@@ -281,11 +306,30 @@ function getModificationSystemPrompt(type: ModificationType, direction: "shorter
 
   let prompt = "You are an AI assistant helping a teacher modify lesson content.\n\n";
   prompt += "CRITICAL RULES:\n";
-  prompt += "1. Return ONLY the fields that were ACTUALLY MODIFIED. Do NOT return all 15 fields - only return modified fields.\n";
-  prompt += "2. Preserve all formatting and HTML structure in the modified fields\n";
-  prompt += "3. For DURATION modifications ONLY: You MUST update the lesson_outline field with new timing durations\n";
-  prompt += "4. Every field in modifiedFields MUST have an \"html\" property with the complete HTML content\n";
-  prompt += "5. CRITICAL: Within HTML content, escape all double quotes as \\\" and single quotes as \\\' to ensure valid JSON\n";
+  prompt += "1. You MUST ACTUALLY MODIFY THE CONTENT. Do not just copy the original - make real changes.\n";
+  prompt += "2. Return ONLY the fields that were ACTUALLY MODIFIED. Do NOT return all 15 fields - only return modified fields.\n";
+  prompt += "3. Preserve all formatting and HTML structure in the modified fields\n";
+  prompt += "4. Use EXACT field names from this list:\n";
+  prompt += "   lessonOutline, learningObjectives, vocabulary, materials, vapaTextBlock, ncasTextBlock,\n";
+  prompt += "   welcomeOpening, actualClassExpectations, warmUp, lessonHook, mainActivity,\n";
+  prompt += "   instrumentExpectations, reflection, closingCeremony, assessment\n";
+  prompt += "   Example: \"lessonOutline\": {\"html\": \"<table>...\"} NOT \"outline\": {\"html\": \"<table>...\"}\n";
+
+  if (type === "duration") {
+    prompt += "4. DURATION CHANGE REQUIRED: You MUST actually modify the lesson content to fit the new duration.\n";
+    prompt += "   - For SHORTER: Remove activities entirely, reduce repetitions (e.g., 3 reps -> 1 rep), shorten all explanations, cut non-essential content.\n";
+    prompt += "   - For LONGER: Add more depth, expand explanations, add more practice repetitions, include extension activities.\n";
+    prompt += "   - Update BOTH the outline table AND the actual content sections.\n";
+    prompt += "   - Example: If reducing from 45 to 30 min, at LEAST 3-4 activities must be removed or significantly shortened.\n";
+  } else {
+    prompt += "4. Every field in modifiedFields MUST have an \"html\" property with the complete HTML content\n";
+  }
+
+  prompt += "5. CRITICAL JSON ESCAPING - FOLLOW THIS EXACTLY:\n";
+  prompt += "   - In your JSON response, ALL double quotes inside HTML attribute values MUST be escaped as \\\"\n";
+  prompt += "   - Example: <td style=\"width: 50%\"> must become <td style=\\\"width: 50%\\\">\n";
+  prompt += "   - Example: class=\\\"cfu-left\\\" must stay as class=\\\"cfu-left\\\"\n";
+  prompt += "   - If you do not escape these quotes, the JSON will be invalid and the request will fail\n";
   prompt += "6. IMPORTANT: This platform cannot receive files or images. Only ask for text-based explanations or clarifications.\n";
   prompt += "7. For FORMATTING ONLY requests (e.g., 'pull in formatting from original', 'apply formatting from another section'):\n";
   prompt += "   - Extract ONLY HTML ATTRIBUTES (styles, classes, data attributes, inline styles) from the reference\n";
@@ -312,31 +356,54 @@ function getModificationSystemPrompt(type: ModificationType, direction: "shorter
 }
 
 function repairJSON(jsonString: string): string | null {
-  try {
-    let fixed = jsonString;
-    fixed = fixed.replace(/"/g, '\\"').replace(/"/g, '\\"');
-    fixed = fixed.replace(/'/g, "\\'");
-    const testParse = JSON.parse(fixed);
-    if (testParse && typeof testParse === 'object') {
-      return fixed;
-    }
-  } catch {
-    const htmlValueMatch = jsonString.match(/"html":\s*"([^"]*(?:<[^>]*>[^"]*)*)"/);
-    if (htmlValueMatch) {
-      const originalHtml = htmlValueMatch[1];
-      const fixedHtml = originalHtml.replace(/"/g, '\\"');
-      return jsonString.replace(htmlValueMatch[1], fixedHtml);
+  // Strategy: Only escape quotes that appear INSIDE HTML attribute values
+  // HTML attributes look like: attribute="value" where value might contain quotes
+  // We need to find these patterns and escape only the quotes inside the attribute values
+  
+  // Pattern to match HTML attribute values that might contain unescaped quotes
+  // This regex finds attribute="value" patterns where value contains quotes
+  const attrPattern = /(\w+(?:-\w+)*)="([^"\\]*(?:\\.[^"\\]*)*)"/g;
+  
+  let fixed = jsonString;
+  let match;
+  let modified = false;
+  
+  // Find all attribute="value" patterns and escape any quotes within the value
+  while ((match = attrPattern.exec(jsonString)) !== null) {
+    const attrName = match[1];
+    const attrValue = match[2];
+    const fullMatch = match[0];
+    
+    // If the attribute value contains an unescaped quote, we need to escape it
+    // Check if there are any quotes that would break JSON
+    if (attrValue.includes('"')) {
+      // The value has quotes that need escaping
+      const escapedValue = attrValue.replace(/"/g, '\\"');
+      const escapedFullMatch = `${attrName}="${escapedValue}"`;
+      fixed = fixed.replace(fullMatch, escapedFullMatch);
+      modified = true;
     }
   }
-  return null;
+  
+  if (!modified) {
+    return null; // No HTML attribute quotes to fix
+  }
+  
+  try {
+    JSON.parse(fixed);
+    return fixed;
+  } catch {
+    return null;
+  }
 }
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { message, conversationHistory, lessonId, courseId, scope: explicitScope, searchQuery: explicitQuery, page = 0, pageSize = 10, editingVersionId, translationConfirmationPending } = body;
+    const { message, conversationHistory, lessonId, courseId, scope: explicitScope, searchQuery: explicitQuery, page = 0, pageSize = 10, editingVersionId, translationConfirmationPending, context, versionMode } = body;
 
     console.log("[CHAT API] Received editingVersionId:", editingVersionId);
+    console.log("[CHAT API] context:", context, "versionMode:", versionMode);
     console.log("[CHAT API] translationConfirmationPending:", translationConfirmationPending);
 
     if (!message) {
@@ -874,10 +941,13 @@ ${fullLesson.closing_ceremony || "(empty)"}` : ''}
     const userSaidProceed = PROCEED_KEYWORDS.some(k => message.toLowerCase().includes(k));
     const userSaidNo = NEGATIVE_KEYWORDS.some(k => message.toLowerCase().includes(k));
 
-    if (effectiveScope === "lesson" && lessonId && (modificationDetection.isModification || isEditingVersionFlow || isTranslationConfirmation) && modificationLessonContent) {
+    const isVersionMode = context === "versions" && versionMode;
+
+    if (effectiveScope === "lesson" && lessonId && (isVersionMode || modificationDetection.isModification || isEditingVersionFlow || isTranslationConfirmation) && modificationLessonContent) {
       console.log("[MODIFICATION] Condition matched:", {
         effectiveScope,
         lessonId,
+        isVersionMode,
         isModification: modificationDetection.isModification,
         isEditingVersionFlow,
         isTranslationConfirmation,
@@ -888,6 +958,20 @@ ${fullLesson.closing_ceremony || "(empty)"}` : ''}
 
       let modType = modificationDetection.type || "materials";
       const modDirection = modificationDetection.direction;
+      let targetLanguage = modificationDetection.targetLanguage;
+
+      // If translationConfirmationPending is true, we should have stored the language
+      // Extract from conversation history if needed
+      if (isTranslationConfirmation && !targetLanguage && conversationHistory && conversationHistory.length > 0) {
+        const allContent = conversationHistory.map((m: { content: string }) => m.content).join(" ");
+        targetLanguage = extractTargetLanguage(allContent.toLowerCase());
+      }
+
+      // Only override to materials if the detected type is a simple edit type
+      // NOT for content modification types like duration, translation, expand, condense, revise, rewrite
+      if (isVersionMode && !["duration", "translation", "expand", "condense", "revise", "rewrite"].includes(modType)) {
+        modType = "materials";
+      }
 
       if (isTranslationConfirmation && modType !== "translation") {
         modType = "translation";
@@ -901,18 +985,19 @@ ${fullLesson.closing_ceremony || "(empty)"}` : ''}
         const gradeMatch = modificationLessonContent.match(/Grade:\s*([^\n]+)/);
         const grade = gradeMatch ? gradeMatch[1].trim() : "the lesson's grade level";
         const formattedGrade = grade.match(/^\d+$/) ? `Grade ${grade}` : grade;
+        const lang = targetLanguage || "Spanish";
 
-        const systemPrompt = `You are helping prepare a lesson for Spanish translation. This is a ${formattedGrade} music lesson.
+        const systemPrompt = `You are helping prepare a lesson for ${lang} translation. This is a ${formattedGrade} music lesson.
 
 Analyze the lesson content below and:
 
-1. Identify any elements that don't translate directly to Spanish:
+1. Identify any elements that don't translate directly to ${lang}:
    - Songs, chants, or rhymes
    - Tongue twisters
    - Rhyming activities
    - Cultural references specific to English
    - Wordplay or puns
-   - Musical terms that may not have direct Spanish equivalents
+   - Musical terms that may not have direct ${lang} equivalents
 
 2. Explain what you found in a conversational way - be honest about limitations but helpful
 
@@ -923,7 +1008,7 @@ Analyze the lesson content below and:
 
 Be conversational, helpful, and honest. Don't just ask yes/no questions - engage with the content and show the teacher you actually looked at what they're working with.`;
 
-        const userMessage = `Please analyze this lesson for Spanish translation and tell me what you find:
+        const userMessage = `Please analyze this lesson for ${lang} translation and tell me what you find:
 
 ${modificationLessonContent}`;
 
@@ -1008,10 +1093,11 @@ ${modificationLessonContent}`;
       if (modType === "translation" && isTranslationConfirmation && !userSaidProceed) {
         const messageWords = message.trim().split(/\s+/).length;
         const isBriefNo = userSaidNo && messageWords <= 2;
+        const lang = targetLanguage || "Spanish";
 
         if (isBriefNo) {
           return NextResponse.json({
-            response: "OK, I've cancelled the Spanish translation. Let me know if you'd like to try again or need something else!",
+            response: `OK, I've cancelled the ${lang} translation. Let me know if you'd like to try again or need something else!`,
             links: [],
             results: [],
             isModificationRequest: false,
@@ -1022,13 +1108,13 @@ ${modificationLessonContent}`;
           });
         }
 
-        const systemPrompt = `You are a helpful teaching assistant helping translate a lesson to Spanish.
+        const systemPrompt = `You are a helpful teaching assistant helping translate a lesson to ${lang}.
 
 The teacher is asking questions about your proposed translation approach or has provided additional context.
 Please:
 1. Directly answer their question about the translation
 2. Acknowledge any specific context they provided (grade level input, cultural notes, tone preferences, etc.)
-3. Then ask "Should I proceed with creating the Spanish translation? (Please answer yes or no to confirm)"
+3. Then ask "Should I proceed with creating the ${lang} translation? (Please answer yes or no to confirm)"
 
 Keep your response conversational and helpful.`;
 
@@ -1115,11 +1201,24 @@ Please answer their question and confirm if they want to proceed with the transl
       }
 
       if (modType === "translation" && isTranslationConfirmation && userSaidProceed) {
+        const lang = targetLanguage || "Spanish";
         const userPrefs = conversationHistory && conversationHistory.length > 0
           ? `\nThe teacher previously indicated:\n${conversationHistory.map((m: { role: string; content: string }) => `${m.role}: ${m.content}`).join('\n')}`
           : "";
 
-        const translateSystemPrompt = `You are an AI assistant helping a teacher translate lesson content to Spanish.
+        const translateSystemPrompt = `You are an AI assistant helping a teacher translate lesson content to ${lang}.
+
+CRITICAL FORMATTING PRESERVATION:
+1. You are translating TEXT CONTENT only - NEVER modify HTML tags, attributes, or structure
+2. Preserve ALL original HTML tags exactly: <p>, <h3>, <ul>, <li>, <strong>, <em>, <table>, <colgroup>, <col>, <tr>, <td>, <th>, <div>, <span>, <a>, <br>, etc.
+3. Preserve ALL HTML attributes exactly as they appear:
+   - Table attributes: data-width, data-alignment, data-column-widths, data-show-grid, style (width, margin-left, margin-right, etc.)
+   - CFU attributes: data-cfu-id, data-background-image, data-png-image, data-alignment, data-check-for-understanding, class, style
+   - Link attributes: target, rel, class (section-link, resource-link, youtube-link, etc.)
+4. For tables: Keep ALL <colgroup>, <col>, <thead>, <tbody>, <tr>, <th>, <td> structure intact
+5. For CFU blocks: Keep the complete div>table>tr>td structure with all attributes
+6. Keep ALL inline styles: margin-left, padding, font-weight, color, etc.
+7. Keep ALL data-* attributes and class names exactly as they appear
 
 You MUST return ONLY a JSON object with the following structure - NO TEXT BEFORE OR AFTER:
 {
@@ -1140,16 +1239,17 @@ You MUST return ONLY a JSON object with the following structure - NO TEXT BEFORE
     "closing_ceremony": { "html": "<p>Translated content here</p>" },
     "assessment": { "html": "<p>Translated content here</p>" }
   },
-  "summary": "Brief description of what was translated"
+  "summary": "Brief description of what was translated",
+  "suggestedVersionName": "${lang} Translation - ${new Date().toLocaleDateString()}"
 }
 
 CRITICAL RULES:
 1. Return ONLY the JSON object - no explanatory text before or after
 2. You MUST return ALL 15 lesson content fields with translated HTML content
-3. Use proper HTML tags: <p>, <h3>, <ul>, <li>, <strong>, <em>, etc.
-4. Preserve the structure and formatting of the original
+3. Translate the TEXT CONTENT between tags - keep all tags and attributes exactly as they are
+4. Preserve the complete HTML structure of the original lesson
 5. Keep the grade-level vocabulary appropriate for the students
-6. For songs/chants, ADAPT the rhyme scheme to work in Spanish - do not keep English rhymes
+6. For songs/chants, ADAPT the rhyme scheme to work in ${lang} - do not keep English rhymes
 7. Escape all double quotes as \\\" and single quotes as \\\' in HTML content
 8. Each field's html must contain the COMPLETE translated content
 9. Do NOT ask questions - only return the JSON${userPrefs}`;
@@ -1167,16 +1267,26 @@ CRITICAL RULES:
           });
         }
 
+        // Keep the HTML structure intact for translation
         let translateLessonContent = modificationLessonContent;
         const baseLessonIndex = translateLessonContent.indexOf("BASE LESSON");
         if (baseLessonIndex !== -1) {
           translateLessonContent = translateLessonContent.substring(0, baseLessonIndex);
         }
-        translateLessonContent = translateLessonContent.replace(/<[^>]+>/g, " ");
-        translateLessonContent = translateLessonContent.replace(/\s+/g, " ").trim();
 
         const translateMessages = [
-          { role: "user", content: `Translate this lesson to Spanish. Return ONLY a JSON object with keys: lesson_outline, learning_objectives, vocabulary, materials, vapa_text_block, ncas_text_block, welcome_opening, actual_class_expectations, warm_up, lesson_hook, main_activity, instrument_expectations, reflection, closing_ceremony, assessment. Each value should be the translated text as a string.\n\n${translateLessonContent}` }
+          { role: "user", content: `Translate this lesson to ${lang}.
+
+CRITICAL FORMATTING RULES:
+1. Preserve ALL HTML tags, attributes, and structure exactly as they appear
+2. For tables: Keep data-width, data-alignment, data-column-widths, style attributes, and colgroup elements
+3. For CFU blocks: Keep data-cfu-id, data-background-image, data-png-image, data-alignment, and all style attributes
+4. Translate the TEXT CONTENT only - never change tag names, attribute values, or structure
+5. Return COMPLETE HTML for each field - do not truncate or omit any content
+
+Return ONLY a JSON object with keys: lesson_outline, learning_objectives, vocabulary, materials, vapa_text_block, ncas_text_block, welcome_opening, actual_class_expectations, warm_up, lesson_hook, main_activity, instrument_expectations, reflection, closing_ceremony, assessment. Each value should be the complete translated HTML content.
+
+${translateLessonContent}` }
         ];
 
         let translateResponse;
@@ -1290,8 +1400,10 @@ CRITICAL RULES:
           ? { modifiedFields: modificationPreview }
           : modificationPreview;
 
+        const versionName = (wrappedPreview as any)?.suggestedVersionName || `${lang} Translation`;
+
         return NextResponse.json({
-          response: "I've prepared the Spanish translation. You can click 'Save as Version' below to save these changes.",
+          response: `I've created "${versionName}". This version is now loaded in the lesson view.`,
           links: [],
           results: [],
           isModificationRequest: true,
@@ -1299,6 +1411,7 @@ CRITICAL RULES:
           modificationType: modType,
           modificationPreview: wrappedPreview,
           editingVersionId: editingVersionId || null,
+          suggestedVersionName: versionName,
         });
       }
 
@@ -1419,10 +1532,43 @@ Return a JSON object with the modified fields and summary.`;
         summary = (summary as any).text || (summary as any).description || JSON.stringify(summary);
       }
 
+      // Generate suggested version name based on modification type
+      let suggestedVersionName = modificationPreview?.suggestedVersionName;
+      if (!suggestedVersionName) {
+        const date = new Date().toLocaleDateString();
+        switch (modType) {
+          case "translation":
+            suggestedVersionName = `${targetLanguage || "Translated"} Version - ${date}`;
+            break;
+          case "duration":
+            suggestedVersionName = modDirection === "shorter"
+              ? `Shorter Version - ${date}`
+              : `Extended Version - ${date}`;
+            break;
+          case "special_needs":
+            suggestedVersionName = `Adapted Version - ${date}`;
+            break;
+          case "materials":
+            suggestedVersionName = `Materials Version - ${date}`;
+            break;
+          case "venue":
+            suggestedVersionName = `Venue Version - ${date}`;
+            break;
+          default:
+            suggestedVersionName = `Modified Version - ${date}`;
+        }
+      }
+
       const isEditingExisting = !!editingVersionId;
-      const responseMessage = isEditingExisting
-        ? `I've prepared modifications for this version. ${summary}\n\nClick "View Update" to preview the changes.`
-        : `I've prepared modifications for the lesson. ${summary}\n\nYou can click "Save as Version" below to save these changes.`;
+      const isCreatingNew = isVersionMode && versionMode === 'create';
+      let responseMessage;
+      if (isCreatingNew) {
+        responseMessage = `I've created "${suggestedVersionName}". This version is now loaded in the lesson view.`;
+      } else if (isEditingExisting) {
+        responseMessage = `I've prepared modifications for this version. Review the changes and click Save to update, Save As... to create a new version, or Reject to discard.`;
+      } else {
+        responseMessage = `I've prepared modifications. ${summary}`;
+      }
 
       if (modType === "translation") {
         if (isTranslationConfirmation && userSaidProceed) {
@@ -1447,6 +1593,7 @@ Return a JSON object with the modified fields and summary.`;
         modificationDirection: modDirection,
         modificationPreview,
         editingVersionId: editingVersionId || null,
+        suggestedVersionName,
       });
     } else if (effectiveScope === "lesson" && fullLessonContent && !(explicitQuery && hasCurriculumResults)) {
       const lessonUrl = `/admin/courses/${courseId}/lessons/${lessonId}`;

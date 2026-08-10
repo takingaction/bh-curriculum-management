@@ -1,21 +1,21 @@
 "use client";
 
-import { createContext, useContext, useState, useRef, useCallback, useEffect, ReactNode } from "react";
-
-interface ClearCallback {
-  fn: (() => void) | null;
-}
+import { createContext, useContext, useState, useRef, useCallback, ReactNode } from "react";
 
 interface ChatContextType {
   lessonId: string | null;
   courseId: string | null;
   editingVersionId: string | null;
   versionCount: number;
+  versionMode: 'create' | 'edit' | null;
   setPageContext: (lessonId: string | null, courseId: string | null) => void;
   setEditingVersionId: (versionId: string | null) => void;
   setVersionCount: (count: number) => void;
-  onSaveVersionRequest: ((preview: Record<string, unknown>, editingVersionId: string | null) => void) | null;
-  setSaveVersionCallback: (callback: ((preview: Record<string, unknown>, editingVersionId: string | null) => void) | null) => void;
+  setVersionMode: (mode: 'create' | 'edit' | null) => void;
+  onSaveVersionRequest: ((preview: Record<string, unknown>, editingVersionId: string | null, suggestedVersionName?: string) => void) | null;
+  onSaveAsRequest: ((preview: Record<string, unknown>) => void) | null;
+  setSaveVersionCallback: (callback: ((preview: Record<string, unknown>, editingVersionId: string | null, suggestedVersionName?: string) => void) | null) => void;
+  setSaveAsCallback: (callback: ((preview: Record<string, unknown>) => void) | null) => void;
   clearModificationCallback: (() => void) | null;
   setClearModificationCallback: (callback: (() => void) | null) => void;
 }
@@ -25,11 +25,15 @@ const ChatContext = createContext<ChatContextType>({
   courseId: null,
   editingVersionId: null,
   versionCount: 0,
+  versionMode: null,
   setPageContext: () => {},
   setEditingVersionId: () => {},
   setVersionCount: () => {},
+  setVersionMode: () => {},
   onSaveVersionRequest: null,
+  onSaveAsRequest: null,
   setSaveVersionCallback: () => {},
+  setSaveAsCallback: () => {},
   clearModificationCallback: null,
   setClearModificationCallback: () => {},
 });
@@ -47,8 +51,10 @@ export function ChatProvider({ children }: ChatProviderProps) {
   const [courseId, setCourseId] = useState<string | null>(null);
   const [editingVersionId, setEditingVersionId] = useState<string | null>(null);
   const [versionCount, setVersionCount] = useState(0);
+  const [versionMode, setVersionMode] = useState<'create' | 'edit' | null>(null);
   const [callbackVersion, setCallbackVersion] = useState(0);
-  const saveCallbackRef = useRef<((preview: Record<string, unknown>, editingVersionId: string | null) => void) | null>(null);
+  const saveCallbackRef = useRef<((preview: Record<string, unknown>, editingVersionId: string | null, suggestedVersionName?: string) => void) | null>(null);
+  const saveAsCallbackRef = useRef<((preview: Record<string, unknown>) => void) | null>(null);
   const clearCallbackRef = useRef<(() => void) | null>(null);
 
   const setPageContext = useCallback((lesson: string | null, course: string | null) => {
@@ -60,8 +66,13 @@ export function ChatProvider({ children }: ChatProviderProps) {
     setEditingVersionId(versionId);
   }, []);
 
-  const setSaveVersionCallback = useCallback((callback: ((preview: Record<string, unknown>, editingVersionId: string | null) => void) | null) => {
+  const setSaveVersionCallback = useCallback((callback: ((preview: Record<string, unknown>, editingVersionId: string | null, suggestedVersionName?: string) => void) | null) => {
     saveCallbackRef.current = callback;
+    setCallbackVersion(v => v + 1);
+  }, []);
+
+  const setSaveAsCallback = useCallback((callback: ((preview: Record<string, unknown>) => void) | null) => {
+    saveAsCallbackRef.current = callback;
     setCallbackVersion(v => v + 1);
   }, []);
 
@@ -75,11 +86,15 @@ export function ChatProvider({ children }: ChatProviderProps) {
     courseId,
     editingVersionId,
     versionCount,
+    versionMode,
     setPageContext,
     setEditingVersionId: setEditingVersionIdCallback,
     setVersionCount,
+    setVersionMode,
     onSaveVersionRequest: saveCallbackRef.current,
+    onSaveAsRequest: saveAsCallbackRef.current,
     setSaveVersionCallback,
+    setSaveAsCallback,
     clearModificationCallback: clearCallbackRef.current,
     setClearModificationCallback,
   };
