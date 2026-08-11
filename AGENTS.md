@@ -734,7 +734,7 @@ Feature for exploring lesson content and answering questions about music/dance/t
 - Returns: `{ response: string, links: [], results: SearchResult[], totalResults?, hasMore? }`
 
 **Widget UI** (`src/components/ai-chat-widget.tsx`):
-- **Two modes**: "Ask" (chat with AI) and "Search Content" (explicit keyword search)
+- **Three modes**: "Ask" (chat with AI), "Search Content" (explicit keyword search), "Versions" (lesson versioning)
 - **Search Content tab** has scope selector: Lesson, Course, Global
 - **Course dropdown** shows when scope is "Course" (defaults to current course)
 - **Results panel**: Shows paginated results with "Load More" button
@@ -743,7 +743,34 @@ Feature for exploring lesson content and answering questions about music/dance/t
 - **Chat history**: Persists in localStorage (max 50 messages), cleared on "Clear chat"
 - **Back to Top button**: Moved to bottom-left on lesson pages to avoid overlap with widget
 
-**Keyword Search** (via Search Content tab):
+**Ask Mode - Tool Use (Claude Haiku)**:
+Claude Haiku uses tool use to search the curriculum intelligently. Available tools:
+
+1. **search_lessons**: Search for lessons matching a query
+   - Parameters: `query` (required), `grade`, `course_id`, `discipline`, `max_results`
+   - Searches all 15 lesson content fields
+   - Returns lessons with field-level matches and snippets
+
+2. **get_lesson_details**: Get full content of a specific lesson
+   - Parameters: `lesson_id` (required), `sections` (optional array)
+   - Returns all lesson content organized by section
+
+3. **list_my_courses**: List all courses user has access to
+   - No parameters
+   - Returns courses grouped by discipline/grade
+
+**Ask Mode - Scope Prefixes**:
+Use prefixes to explicitly control search scope (Ask mode only):
+- `curriculum:` - Search all enrolled courses (e.g., `curriculum: voice lessons`)
+- `course:` - Search within current course context
+- `lesson:` - Answer about current lesson content directly
+
+Examples:
+- `curriculum: 4th grade notation` - Searches all courses for grade 4 lessons about notation
+- `course: what's covered` - Asks about the current course overview
+- `lesson: what standards` - Asks about standards in the current lesson
+
+**Search Content tab**:
 - Uses `findMatchesInContent()` from `html-utils.ts` (same as Find & Replace)
 - Searches all 15 lesson content fields
 - Case-insensitive substring matching across HTML content
@@ -759,7 +786,7 @@ Feature for exploring lesson content and answering questions about music/dance/t
    - Extracts "Anchor Standard N" as exact phrase (not generic "Standard N")
    - Returns results with "Found X references across Y lessons" message
 
-3. **General AI questions**: Falls through to Anthropic Claude for music/dance/theatre education questions
+3. **General AI questions**: Falls through to Claude Haiku which can use tools as needed
 
 **Response formatting**:
 - Search results show: Course, Grade, Lesson #, Section label, snippet with `<mark>` highlighting
@@ -767,8 +794,9 @@ Feature for exploring lesson content and answering questions about music/dance/t
 - CSS for `<mark>`: yellow background (#fef08a)
 
 **Files**:
-- `src/app/api/chat/route.ts` - API endpoint with query detection and search
-- `src/components/ai-chat-widget.tsx` - Chat widget UI with two modes
+- `src/app/api/chat/route.ts` - API endpoint with tool use and query detection
+- `src/lib/search-utils.ts` - Tool implementations (searchLessons, getLessonDetails, listMyCourses)
+- `src/components/ai-chat-widget.tsx` - Chat widget UI with three modes
 - `src/components/chat-context.tsx` - React context for page context (lessonId/courseId)
 - `src/components/set-chat-context.tsx` - Sets context on lesson/course pages
 - `src/app/(dashboard)/layout.tsx` - Conditionally renders widget for authorized users

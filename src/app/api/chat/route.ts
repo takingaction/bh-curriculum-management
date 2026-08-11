@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { findMatchesInContent, generateSnippet, TEXT_FIELDS_LIST } from "@/lib/html-utils";
+import { searchLessons, getLessonDetails, listMyCourses } from "@/lib/search-utils";
 
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
 const MODEL = "claude-haiku-4-5";
@@ -8,6 +9,76 @@ const MODIFICATION_MODEL = "claude-sonnet-4-5";
 const MAX_TOKENS = 1024;
 
 const CURRICULUM_TRIGGER = "imc";
+
+const TOOLS = [
+  {
+    name: "search_lessons",
+    description: `Searches the curriculum database for lessons matching a query string.
+
+Use this tool when the user wants to find lessons about a specific topic, concept, standard, or keyword.
+The search looks across all lesson content including: lesson outlines, learning objectives, vocabulary,
+materials, VAPA standards, NCAS standards, welcome activities, warm-ups, main activities, reflections, assessments, and more.
+
+Returns a list of matching lessons with their titles, course information, grade levels, and relevant content snippets.
+
+This tool accesses ONLY lessons the user has permission to view (based on their enrollment).`,
+    input_schema: {
+      type: "object",
+      properties: {
+        query: {
+          type: "string",
+          description: "The search query - can be a keyword, topic, concept, standard reference (e.g., 'voice', 'rhythm', 'Anchor Standard 4', 'notation', 'dynamics')"
+        },
+        grade: {
+          type: "string",
+          description: "Optional filter: Filter by grade level. Valid values: 'PK', 'K', '1', '2', '3', '4', '5', '6', or comma-separated list like '3,4,5'"
+        },
+        course_id: {
+          type: "string",
+          description: "Optional filter: Limit search to a specific course UUID"
+        },
+        discipline: {
+          type: "string",
+          description: "Optional filter: Filter by discipline. Values: 'MUSIC', 'DANCE', 'THEATRE'",
+          enum: ["MUSIC", "DANCE", "THEATRE"]
+        },
+        max_results: {
+          type: "number",
+          description: "Maximum number of results to return (default: 10, max: 50)",
+          default: 10
+        }
+      },
+      required: ["query"]
+    }
+  },
+  {
+    name: "get_lesson_details",
+    description: "Retrieves the full content of a specific lesson by ID. Use this to get complete lesson content after identifying a relevant lesson via search.",
+    input_schema: {
+      type: "object",
+      properties: {
+        lesson_id: {
+          type: "string",
+          description: "The UUID of the lesson"
+        },
+        sections: {
+          type: "array",
+          items: { type: "string" },
+          description: "Optional: Specific sections to retrieve. If not provided, returns all 15 sections. Valid sections: lesson_outline, learning_objectives, vocabulary, materials, vapa_text_block, ncas_text_block, welcome_opening, actual_class_expectations, warm_up, lesson_hook, main_activity, instrument_expectations, reflection, closing_ceremony, assessment"
+        }
+      },
+      required: ["lesson_id"]
+    }
+  },
+  {
+    name: "list_my_courses",
+    description: "Lists all courses the user has access to, grouped by discipline and grade.",
+    input_schema: {
+      type: "object",
+      properties: {}
+    }
+  }
+];
 
 function stripHtmlForAI(html: string): string {
   if (!html) return "";
@@ -100,6 +171,24 @@ function filterCoursesByEnrollment(courses: Course[], enrollments: string[]): Co
 }
 
 type SearchScope = "lesson" | "course" | "global" | "ask";
+
+type ScopePrefix = "curriculum" | "course" | "lesson" | null;
+
+function detectScopePrefix(message: string): { scope: ScopePrefix; query: string } {
+  const lower = message.toLowerCase().trim();
+
+  if (lower.startsWith("curriculum:")) {
+    return { scope: "curriculum", query: message.slice(11).trim() };
+  }
+  if (lower.startsWith("course:")) {
+    return { scope: "course", query: message.slice(7).trim() };
+  }
+  if (lower.startsWith("lesson:")) {
+    return { scope: "lesson", query: message.slice(7).trim() };
+  }
+
+  return { scope: null, query: message };
+}
 
 function detectSearchScope(message: string, pageLessonId: string | null, pageCourseId: string | null): SearchScope {
   const lower = message.toLowerCase();
@@ -384,11 +473,8 @@ function repairJSON(jsonString: string): string | null {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { message, conversationHistory, lessonId, courseId, scope: explicitScope, searchQuery: explicitQuery, page = 0, pageSize = 10, editingVersionId, waitingForConfirmation, context, versionMode } = body;
-
-    console.log("[CHAT API] Received editingVersionId:", editingVersionId);
-    console.log("[CHAT API] context:", context, "versionMode:", versionMode);
-    console.log("[CHAT API] waitingForConfirmation:", waitingForConfirmation);
+    const { message, conversationHistory, lessonId, courseId, scope, searchQuery: explicitQuery, page = 0, pageSize = 10, editingVersionId, waitingForConfirmation, context, versionMode } = body;
+    let explicitScope = scope;
 
     if (!message) {
       return NextResponse.json({ error: "Missing message" }, { status: 400 });
@@ -417,10 +503,130 @@ export async function POST(request: Request) {
       effectiveScope = detectSearchScope(message, lessonId, courseId);
     }
 
+    const { scope: prefixScope, query: prefixQuery } = detectScopePrefix(message);
+    let processedMessage = message;
+    if (prefixScope) {
+      processedMessage = prefixQuery;
+      effectiveScope = "ask";
+      explicitScope = null;
+    }
+
     const wantsContentSearch = explicitScope ? true : (shouldReadContent(message) || effectiveScope !== "ask");
 
     let searchResults: SearchResult[] = [];
+    let aiResponse = "";
     let curriculumContext = "";
+    let links: { label: string; url: string }[] = [];
+
+    if (effectiveScope === "ask" && !explicitScope) {
+      const systemPrompt = `TOOL USE REQUIRED: When asked to find/search/list lessons or courses, you MUST use the search_lessons tool. Do NOT say you cannot access curriculum.
+
+You are a helpful AI assistant for music, dance, and theatre education.
+You help teachers with questions about VAPA standards, NCAS standards, curriculum design, pedagogy, lesson planning, and general music/dance/theatre education topics.
+
+CRITICAL: You have access to tools to search the teacher's curriculum. You MUST use these tools when answering questions about lessons, courses, or curriculum content:
+- search_lessons: Search all lessons for a topic/keyword (use this when user asks to find lessons)
+- get_lesson_details: Get full content of a specific lesson
+- list_my_courses: List all courses the teacher has access to
+
+When the user asks to find, locate, search for, or list lessons or courses, you MUST call the appropriate tool. Do NOT say you cannot access lesson content - use the tools to search and provide results.
+
+Be concise and helpful in your responses.
+IMPORTANT: This platform cannot receive files or images. Only ask for text-based explanations or clarifications. Never request screenshots, files, or visual examples.`;
+
+      const apiKey = process.env.ANTHROPIC_API_KEY;
+      if (apiKey) {
+        const messages = conversationHistory
+          ? [...conversationHistory.map((m: { role: string; content: string }) => ({ role: m.role, content: m.content })), { role: "user" as const, content: processedMessage }]
+          : [{ role: "user" as const, content: processedMessage }];
+
+        let toolResponse = await fetch(ANTHROPIC_API_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": apiKey,
+            "anthropic-version": "2023-06-01",
+          },
+          body: JSON.stringify({
+            model: MODEL,
+            max_tokens: MAX_TOKENS,
+            tools: TOOLS,
+            tool_choice: { type: "any" },
+            system: systemPrompt,
+            messages,
+          }),
+        });
+
+        let toolResult = await toolResponse.json();
+
+        while (toolResult.stop_reason === "tool_use") {
+          const toolUses = toolResult.content.filter((c: { type: string }) => c.type === "tool_use");
+
+          for (const toolUse of toolUses) {
+            const toolName = toolUse.name;
+            const toolInput = toolUse.input;
+
+            let result: unknown;
+            try {
+              if (toolName === "search_lessons") {
+                result = await searchLessons({
+                  query: toolInput.query,
+                  grade: toolInput.grade,
+                  courseId: toolInput.course_id,
+                  discipline: toolInput.discipline,
+                  maxResults: toolInput.max_results || 10,
+                  userId,
+                });
+              } else if (toolName === "get_lesson_details") {
+                result = await getLessonDetails({
+                  lesson_id: toolInput.lesson_id,
+                  sections: toolInput.sections,
+                });
+              } else if (toolName === "list_my_courses") {
+                result = await listMyCourses(userId);
+              } else {
+                result = { error: `Unknown tool: ${toolName}` };
+              }
+            } catch (err) {
+              console.error(`Tool ${toolName} error:`, err);
+              result = { error: String(err) };
+            }
+
+              messages.push({
+              role: "assistant",
+              content: toolResult.content
+            });
+            messages.push({
+              role: "user",
+              content: [{ type: "tool_result", tool_use_id: toolUse.id, content: JSON.stringify(result) }]
+            });
+          }
+
+          toolResponse = await fetch(ANTHROPIC_API_URL, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-api-key": apiKey,
+              "anthropic-version": "2023-06-01",
+            },
+            body: JSON.stringify({
+              model: MODEL,
+              max_tokens: MAX_TOKENS,
+              tools: TOOLS,
+              system: systemPrompt,
+              messages,
+            }),
+          });
+
+          toolResult = await toolResponse.json();
+        }
+
+        aiResponse = toolResult.content?.[0]?.text || "";
+        links = extractLinks(aiResponse);
+      } else {
+        aiResponse = "AI is not configured. Please contact an administrator.";
+      }
+    }
 
     if (isCourseListQuery(message)) {
       const { data: allCourses } = await supabase
@@ -585,14 +791,7 @@ export async function POST(request: Request) {
       });
     }
 
-    if (effectiveScope === "ask" && !explicitScope) {
-      return NextResponse.json({
-        response: "I can help you explore your curriculum or answer general questions about music, dance, and theatre education.\n\nWould you like me to:\n**A)** Search your lesson content for specific terms or topics\n**B)** Answer a general question about music/dance/theatre education\n\nJust tell me what you'd like to do, or specify: \"search all content for [topic]\", \"search this course for [topic]\", or \"search this lesson for [topic]\".",
-        links: [],
-        results: [],
-        needsScope: true,
-      });
-    }
+    // Second AI tool use block removed (duplicate) - keeping only the first one at line 529
 
     if (wantsContentSearch) {
       if (enrollments.length === 0) {
@@ -915,8 +1114,7 @@ ${fullLesson.closing_ceremony || "(empty)"}` : ''}
     const directResults = hasCurriculumResults ? formatDirectResults(searchResults) : "";
     const modificationDetection = detectModificationRequest(message);
 
-    let aiResponse = "";
-    let links: { label: string; url: string }[] = [];
+    links = [];
     let modificationPreview: Record<string, unknown> | null = null;
     let needsConfirmation = false;
 
