@@ -1137,7 +1137,7 @@ ${fullLesson.closing_ceremony || "(empty)"}` : ''}
         userSaidProceed
       });
 
-      let modType = modificationDetection.type || "materials";
+      let modType: string | null = modificationDetection.type || "materials";
       const modDirection = modificationDetection.direction;
       let targetLanguage = modificationDetection.targetLanguage;
 
@@ -1596,7 +1596,7 @@ ${translateLessonContent}` }
         });
       }
 
-      const systemPrompt = getModificationSystemPrompt(modType, modDirection, !!editingVersionId);
+      const systemPrompt = getModificationSystemPrompt(modType as "duration" | "translation", modDirection, !!editingVersionId);
 
       const userMessage = `Please modify the lesson content below according to the teacher's request: "${message}"
 

@@ -979,7 +979,7 @@ export default function AIChatWidget() {
                           </button>
                           <button
                             onClick={() => {
-                              onSaveVersionRequest?.(modificationPreview, previewEditingVersionId);
+                              onSaveVersionRequest?.(modificationPreview!, previewEditingVersionId);
                             }}
                             className="flex-1 px-3 py-1.5 bg-[#0d7377] text-white text-xs font-medium rounded hover:bg-[#0a5c5f] transition-colors"
                           >
@@ -987,7 +987,7 @@ export default function AIChatWidget() {
                           </button>
                           <button
                             onClick={() => {
-                              onSaveAsRequest?.(modificationPreview);
+                              onSaveAsRequest?.(modificationPreview!);
                               setWaitingForConfirmation(false);
                             }}
                             className="flex-1 px-3 py-1.5 bg-[#e37c64] text-white text-xs font-medium rounded hover:bg-[#d06a52] transition-colors"

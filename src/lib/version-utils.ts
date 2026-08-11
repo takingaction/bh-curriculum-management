@@ -168,7 +168,6 @@ const CAMEL_TO_SNAKE_MAP: Record<string, string> = {
   lessonHook: 'lesson_hook',
   hook: 'lesson_hook',
   mainActivity: 'main_activity',
-  mainActivity: 'main_activity',
   activity: 'main_activity',
   instrumentExpectations: 'instrument_expectations',
   instruments: 'instrument_expectations',
