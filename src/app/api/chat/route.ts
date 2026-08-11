@@ -511,6 +511,10 @@ export async function POST(request: Request) {
       explicitScope = null;
     }
 
+    // Determine context for AI tools based on prefix
+    const searchCourseId = prefixScope === "course" ? courseId : undefined;
+    const searchLessonId = prefixScope === "lesson" ? lessonId : undefined;
+
     const wantsContentSearch = explicitScope ? true : (shouldReadContent(message) || effectiveScope !== "ask");
 
     let searchResults: SearchResult[] = [];
@@ -572,14 +576,14 @@ IMPORTANT: This platform cannot receive files or images. Only ask for text-based
                 result = await searchLessons({
                   query: toolInput.query,
                   grade: toolInput.grade,
-                  courseId: toolInput.course_id,
+                  courseId: searchCourseId || toolInput.course_id,
                   discipline: toolInput.discipline,
                   maxResults: toolInput.max_results || 10,
                   userId,
                 });
               } else if (toolName === "get_lesson_details") {
                 result = await getLessonDetails({
-                  lesson_id: toolInput.lesson_id,
+                  lesson_id: searchLessonId || toolInput.lesson_id,
                   sections: toolInput.sections,
                 });
               } else if (toolName === "list_my_courses") {

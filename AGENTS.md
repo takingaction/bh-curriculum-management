@@ -757,18 +757,18 @@ Claude Haiku uses tool use to search the curriculum intelligently. Available too
 
 3. **list_my_courses**: List all courses user has access to
    - No parameters
-   - Returns courses grouped by discipline/grade
+    - Returns courses grouped by discipline/grade
 
 **Ask Mode - Scope Prefixes**:
-Use prefixes to explicitly control search scope (Ask mode only):
-- `curriculum:` - Search all enrolled courses (e.g., `curriculum: voice lessons`)
-- `course:` - Search within current course context
-- `lesson:` - Answer about current lesson content directly
+Use prefixes to explicitly control search scope (Ask mode only). All prefixes use Claude Haiku tool use:
+- `curriculum:` - Search all enrolled courses using `search_lessons` tool (e.g., `curriculum: voice lessons`)
+- `course:` - Search within current course context using `search_lessons` tool with `courseId` filter
+- `lesson:` - Get current lesson details using `get_lesson_details` tool
 
 Examples:
 - `curriculum: 4th grade notation` - Searches all courses for grade 4 lessons about notation
-- `course: what's covered` - Asks about the current course overview
-- `lesson: what standards` - Asks about standards in the current lesson
+- `course: what's covered` - Searches within the current course context
+- `lesson: what standards` - Retrieves full details of the current lesson
 
 **Search Content tab**:
 - Uses `findMatchesInContent()` from `html-utils.ts` (same as Find & Replace)
