@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { UserMenu } from "@/components/user-menu";
 import Link from "next/link";
 import Footer from "@/components/home/Footer";
-import AIChatWidget from "@/components/ai-chat-widget";
+import { AIChatContainer } from "@/components/ai-chat-container";
 import { ChatProvider } from "@/components/chat-context";
 
 export default async function DashboardLayout({
@@ -56,7 +56,7 @@ export default async function DashboardLayout({
         </header>
         <main className="py-2">{children}</main>
         <Footer />
-        {(user.email === "ron@myherocreative.com" || user.email === "emili@betterhumanseducation.com") && <AIChatWidget />}
+        {(user.email === "ron@myherocreative.com" || user.email === "emili@betterhumanseducation.com") && <AIChatContainer />}
       </div>
     </ChatProvider>
   );

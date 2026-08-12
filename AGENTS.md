@@ -729,19 +729,18 @@ Feature for exploring lesson content and answering questions about music/dance/t
 - `ron@myherocreative.com`
 - `emili@betterhumanseducation.com`
 
-**API Route**: `POST /api/chat`
-- Accepts: `{ message, scope?, lessonId?, courseId?, conversationHistory?, searchQuery?, page?, pageSize? }`
-- Returns: `{ response: string, links: [], results: SearchResult[], totalResults?, hasMore? }`
+**Architecture**: Three separate API endpoints and components for Ask, Search, and Versions modes.
 
-**Widget UI** (`src/components/ai-chat-widget.tsx`):
-- **Three modes**: "Ask" (chat with AI), "Search Content" (explicit keyword search), "Versions" (lesson versioning)
-- **Search Content tab** has scope selector: Lesson, Course, Global
-- **Course dropdown** shows when scope is "Course" (defaults to current course)
-- **Results panel**: Shows paginated results with "Load More" button
-- **Results styling**: Match Find & Replace - Lesson # - Course - Grade - Section with highlighted snippet
-- **Result links**: Point to teacher lesson view (`/lessons/{id}`) NOT admin
-- **Chat history**: Persists in localStorage (max 50 messages), cleared on "Clear chat"
-- **Back to Top button**: Moved to bottom-left on lesson pages to avoid overlap with widget
+**API Routes**:
+- `POST /api/chat/ask` - Ask tab API with prefix detection (`curriculum:`, `course:`, `lesson:`)
+- `POST /api/chat/modify` - Versions tab API with modification flow
+- `POST /api/search` - Search tab API with direct DB query
+
+**Widget Components**:
+- `src/components/ai-chat-container.tsx` - Tabbed container (Ask | Versions | Search)
+- `src/components/ask-chat-widget.tsx` - Ask tab with localStorage chat history
+- `src/components/search-chat-widget.tsx` - Search tab with scope selector (Lesson/Course/Global)
+- `src/components/versions-chat-widget.tsx` - Versions tab with Create/Edit/Reset/Proceed buttons
 
 **Ask Mode - Tool Use (Claude Haiku)**:
 Claude Haiku uses tool use to search the curriculum intelligently. Available tools:
@@ -776,27 +775,42 @@ Examples:
 - Case-insensitive substring matching across HTML content
 - Results capped at 10 per page with pagination
 
-**Smart Query Detection**:
-1. **Course list queries** (`isCourseListQuery`): "list my courses", "show courses", etc.
-   - Queries courses table directly, filtered by user enrollments
-   - Returns formatted list grouped by discipline/grade
+**Versions Tab - Modification Flow**:
+1. User says "Translate into Spanish" or "Make 30 min version"
+2. AI asks 3 questions (one at a time)
+3. User answers each question
+4. AI says "Click 'Proceed' when ready"
+5. User clicks **Proceed**
+6. API executes modification, returns JSON with `modifiedFields`
+7. Frontend auto-saves version
 
-2. **Standard queries** (`isStandardQuery`): "Anchor Standard X", "VAPA standard", "NCAS standard"
-   - Auto-searches VAPA and NCAS text blocks specifically
-   - Extracts "Anchor Standard N" as exact phrase (not generic "Standard N")
-   - Returns results with "Found X references across Y lessons" message
+**Versions Tab - API Details** (`/api/chat/modify`):
+- Detects modification type from initial message (translation vs duration)
+- `originalTargetLanguage` preserved from first message (not overwritten by Q&A answers)
+- System prompts: `getModificationSystemPrompt()`, `getTranslationQuestionsSystemPrompt()`, `getDurationQuestionsSystemPrompt()`
+- JSON extraction: Handles markdown code blocks, truncated JSON, and field-by-field extraction
+- Field extraction regex handles HTML with nested braces (style attributes, entities like `&gt;`)
 
-3. **General AI questions**: Falls through to Claude Haiku which can use tools as needed
+**AI Response Formats**:
+AI can return fields in multiple formats - the code handles all:
+1. `{ modifiedFields: { lessonOutline: { html: "..." } } }` - wrapped
+2. `{ modified_fields: { lessonOutline: { html: "..." } } }` - snake_case wrapped
+3. `{ lessonOutline: { html: "..." }, welcomeOpening: { html: "..." } }` - root level
 
-**Response formatting**:
-- Search results show: Course, Grade, Lesson #, Section label, snippet with `<mark>` highlighting
-- Uses `dangerouslySetInnerHTML` for snippet rendering
-- CSS for `<mark>`: yellow background (#fef08a)
+**Field Name Handling**:
+The `convertModifiedFields()` function in `version-utils.ts` handles:
+- CamelCase: `lessonOutline`, `welcomeOpening`
+- Snake_case: `lesson_outline`, `welcome_opening`
+- Abbreviated: `outline`, `opening`, `hook`, `activity`, `closing`
 
-**Files**:
-- `src/app/api/chat/route.ts` - API endpoint with tool use and query detection
-- `src/lib/search-utils.ts` - Tool implementations (searchLessons, getLessonDetails, listMyCourses)
-- `src/components/ai-chat-widget.tsx` - Chat widget UI with three modes
+**Key files**:
+- `src/app/api/chat/ask/route.ts` - Ask tab API with prefix detection
+- `src/app/api/chat/modify/route.ts` - Versions tab API with modification flow
+- `src/app/api/search/route.ts` - Search tab API with direct DB query
+- `src/components/ai-chat-container.tsx` - Tabbed container
+- `src/components/ask-chat-widget.tsx` - Ask tab component
+- `src/components/search-chat-widget.tsx` - Search tab component
+- `src/components/versions-chat-widget.tsx` - Versions tab component
 - `src/components/chat-context.tsx` - React context for page context (lessonId/courseId)
 - `src/components/set-chat-context.tsx` - Sets context on lesson/course pages
 - `src/app/(dashboard)/layout.tsx` - Conditionally renders widget for authorized users
@@ -845,30 +859,34 @@ Feature allowing teachers to create/modify lessons via AI chat and save versions
 
 AI follows a two-step confirmation process:
 1. **Questions Phase**: AI asks clarifying questions to understand how to modify
-2. **Confirmation Phase**: AI asks "Should I proceed with these changes?"
-3. **Creation Phase**: On user confirmation, AI creates the modified version
+2. **Confirmation Phase**: AI asks "Click 'Proceed' when ready"
+3. **Creation Phase**: On user Proceed click, API executes modification and returns JSON
 
 **Frontend Flow**:
-- When AI asks questions, "Yes, Proceed" / "No, Cancel" buttons appear
-- If user confirms, version is created and loaded into lesson view
-- If user cancels, conversation continues without creating a version
+- When AI asks questions, user answers each one
+- After answering all questions, AI says "Click 'Proceed' when ready"
+- User clicks **Proceed**
+- Modification executes immediately and version is auto-created
+- **Reset button**: Clears chat AND versionMode (back to Create/Edit selection)
 
 **Two-Mode Workflow**:
 
 **Create Mode (new version from original)**:
 - User asks AI to modify (e.g., "Make a 30 min version")
 - AI asks questions first, waits for answers
-- AI asks "Should I proceed?"
-- On confirmation, version is created with suggested name (e.g., "Shorter Version - 8/10/2026")
-- User can delete unwanted versions from versions modal
+- AI asks "Click 'Proceed' when ready"
+- On Proceed, version is created with suggested name (e.g., "Shorter Version - 8/10/2026")
 
 **Edit Mode (modify existing version)**:
 - User selects existing version to edit
 - User asks AI to modify
 - AI asks questions first, waits for answers
-- AI asks "Should I proceed?"
-- On confirmation, Save/Save As... buttons appear
-- User can save changes to existing version or create new version from changes
+- AI asks "Click 'Proceed' when ready"
+- On Proceed, modifications are applied
+
+**Original Target Language Preservation**:
+- When user mentions another language during Q&A (e.g., "keep terms in italian"), `originalTargetLanguage` is preserved
+- The version name uses the ORIGINAL language request (from "Translate into French"), not subsequent mentions
 
 **AI Response Formats**:
 AI can return fields in multiple formats - the code handles all:
@@ -882,18 +900,23 @@ The `convertModifiedFields()` function in `version-utils.ts` handles:
 - Snake_case: `lesson_outline`, `welcome_opening`
 - Abbreviated: `outline`, `opening`, `hook`, `activity`, `closing`
 
-**JSON Repair**:
-The `repairJSON()` function in `chat/route.ts` handles unescaped quotes in HTML attributes like `style="width: 100%"`.
+**JSON Extraction**:
+The `extractFieldsFromTruncatedJson()` function handles:
+- AI responses wrapped in markdown code blocks
+- Truncated JSON (when AI hits token limits)
+- HTML content with nested braces (style attributes, entities like `&gt;`)
 
 **Key files**:
 - `src/lib/version-utils.ts` - Version utilities, constants, types, `convertModifiedFields()` function
-- `src/app/api/chat/route.ts` - Chat API with modification handling, `repairJSON()` function
-- `src/components/ai-chat-widget.tsx` - Chat widget UI
+- `src/app/api/chat/modify/route.ts` - Versions API with modification flow and JSON extraction
+- `src/app/api/chat/ask/route.ts` - Ask tab API with prefix detection
+- `src/app/api/search/route.ts` - Search tab API
+- `src/components/versions-chat-widget.tsx` - Versions tab UI with Create/Edit/Reset/Proceed
+- `src/components/ai-chat-container.tsx` - Tabbed container (Ask | Versions | Search)
 - `src/components/version-tab-bar.tsx` - Version list UI in lesson sidebar
 - `src/components/version-tabs.tsx` - Version tabs for admin editor
 - `src/components/version-preview.tsx` - Version content preview dialog
 - `src/components/generate-pdf-dialog.tsx` - Version PDF generation dialog
-- `src/components/save-version-dialog.tsx` - Save version dialog with name/reason
 - `src/app/(dashboard)/lessons/[lessonId]/page.tsx` - Lesson view with version support
 - `src/app/api/lessons/[lessonId]/versions/route.ts` - GET/POST versions
 - `src/app/api/lessons/[lessonId]/versions/[versionId]/route.ts` - GET/PATCH/DELETE single version

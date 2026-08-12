@@ -306,10 +306,51 @@ const MODIFICATION_PATTERNS: Record<ModificationType, string[]> = {
     "not enough time", "too long", "too short", "time constraint"
   ],
   translation: [
-    "translate", "translation", "spanish version", "french version", "german version",
-    "portuguese version", "chinese version", "japanese version", "korean version",
-    "vietnamese version", "in spanish", "in french", "in german", "en español",
-    "create a spanish", "make it french", "english translation", "bilingual"
+    "translate", "translation",
+    // Spanish
+    "spanish version", "in spanish", "en español", "create a spanish", "make it spanish",
+    // French
+    "french version", "in french", "create a french", "make it french",
+    // German
+    "german version", "in german",
+    // Portuguese
+    "portuguese version", "in portuguese", "brazilian",
+    // Chinese
+    "chinese version", "in chinese", "mandarin",
+    // Japanese
+    "japanese version", "in japanese",
+    // Korean
+    "korean version", "in korean",
+    // Russian
+    "russian version", "in russian",
+    // Arabic
+    "arabic version", "in arabic",
+    // Hindi
+    "hindi version", "in hindi",
+    // Italian
+    "italian version", "in italian",
+    // Dutch
+    "dutch version", "in dutch",
+    // Polish
+    "polish version", "in polish",
+    // Vietnamese
+    "vietnamese version", "in vietnamese",
+    // Greek
+    "greek version", "in greek",
+    // Hebrew
+    "hebrew version", "in hebrew",
+    // Thai
+    "thai version", "in thai",
+    // Urdu
+    "urdu version", "in urdu",
+    // Swahili
+    "swahili version", "in swahili",
+    // Tagalog
+    "tagalog version", "in tagalog",
+    // Creole
+    "creole version", "in creole", "haitian creole",
+    // Other
+    "bilingual", "dual language", "english translation"
   ]
 };
 
@@ -514,6 +555,22 @@ export async function POST(request: Request) {
     // Determine context for AI tools based on prefix
     const searchCourseId = prefixScope === "course" ? courseId : undefined;
     const searchLessonId = prefixScope === "lesson" ? lessonId : undefined;
+    console.log("[DEBUG] BEFORE AI BLOCK - prefixScope:", prefixScope, "effectiveScope:", effectiveScope, "explicitScope:", explicitScope);
+
+    // Check for "translate into [language]" - this is a modification request, redirect to Versions tab
+    const lowerMessage = message.toLowerCase();
+    const isTranslateIntoRequest = /translate\s+into\s+\w+/i.test(lowerMessage) ||
+      /create\s+a\s+\w+\s+version/i.test(lowerMessage) ||
+      /make\s+it\s+\w+/i.test(lowerMessage) ||
+      /make\s+this\s+lesson\s+\w+/i.test(lowerMessage);
+    
+    if (isTranslateIntoRequest) {
+      return NextResponse.json({
+        response: "To create a translated version of this lesson, please use the Versions tab.",
+        links: [],
+        results: [],
+      });
+    }
 
     const wantsContentSearch = explicitScope ? true : (shouldReadContent(message) || effectiveScope !== "ask");
 
@@ -528,21 +585,30 @@ export async function POST(request: Request) {
 You are a helpful AI assistant for music, dance, and theatre education.
 You help teachers with questions about VAPA standards, NCAS standards, curriculum design, pedagogy, lesson planning, and general music/dance/theatre education topics.
 
-CRITICAL: You have access to tools to search the teacher's curriculum. You MUST use these tools when answering questions about lessons, courses, or curriculum content:
-- search_lessons: Search all lessons for a topic/keyword (use this when user asks to find lessons)
-- get_lesson_details: Get full content of a specific lesson
-- list_my_courses: List all courses the teacher has access to
+UNDERSTANDING PREFIXES:
+- "curriculum: <question>" → Search ALL enrolled courses (use search_lessons WITHOUT course_id filter)
+- "course: <question>" → Search WITHIN CURRENT COURSE (use search_lessons WITH course_id = current course)
+- "lesson: <question>" → Get details about CURRENT LESSON (use get_lesson_details WITH lesson_id = current lesson)
 
-When the user asks to find, locate, search for, or list lessons or courses, you MUST call the appropriate tool. Do NOT say you cannot access lesson content - use the tools to search and provide results.
+EXAMPLES:
+- "curriculum: which lessons cover rhythm?" → search all courses using search_lessons tool
+- "course: how many lessons are in it?" → search current course using search_lessons tool with course_id
+- "lesson: what are the learning objectives?" → get current lesson using get_lesson_details tool
+
+CRITICAL: When a prefix is used, NEVER ask for clarification. The course_id/lesson_id are already provided automatically!
+
+If the user asks to "translate into" another language, tell them to use the Versions tab for creating translated versions.
 
 Be concise and helpful in your responses.
 IMPORTANT: This platform cannot receive files or images. Only ask for text-based explanations or clarifications. Never request screenshots, files, or visual examples.`;
 
       const apiKey = process.env.ANTHROPIC_API_KEY;
       if (apiKey) {
+        console.log("[DEBUG] conversationHistory length:", conversationHistory?.length || 0);
         const messages = conversationHistory
           ? [...conversationHistory.map((m: { role: string; content: string }) => ({ role: m.role, content: m.content })), { role: "user" as const, content: processedMessage }]
           : [{ role: "user" as const, content: processedMessage }];
+        console.log("[DEBUG] messages array length after setup:", messages.length);
 
         let toolResponse = await fetch(ANTHROPIC_API_URL, {
           method: "POST",
@@ -562,6 +628,8 @@ IMPORTANT: This platform cannot receive files or images. Only ask for text-based
         });
 
         let toolResult = await toolResponse.json();
+        console.log("[DEBUG] Initial toolResult stop_reason:", toolResult.stop_reason);
+        console.log("[DEBUG] toolResult content:", JSON.stringify(toolResult.content?.slice(0, 2)));
 
         while (toolResult.stop_reason === "tool_use") {
           const toolUses = toolResult.content.filter((c: { type: string }) => c.type === "tool_use");
@@ -569,14 +637,17 @@ IMPORTANT: This platform cannot receive files or images. Only ask for text-based
           for (const toolUse of toolUses) {
             const toolName = toolUse.name;
             const toolInput = toolUse.input;
+            console.log("[DEBUG] Tool call:", toolName, "searchCourseId:", searchCourseId, "searchLessonId:", searchLessonId);
 
             let result: unknown;
             try {
               if (toolName === "search_lessons") {
+                const finalCourseId = searchCourseId || toolInput.course_id;
+                console.log("[DEBUG] search_lessons - finalCourseId:", finalCourseId);
                 result = await searchLessons({
                   query: toolInput.query,
                   grade: toolInput.grade,
-                  courseId: searchCourseId || toolInput.course_id,
+                  courseId: finalCourseId,
                   discipline: toolInput.discipline,
                   maxResults: toolInput.max_results || 10,
                   userId,
@@ -627,9 +698,19 @@ IMPORTANT: This platform cannot receive files or images. Only ask for text-based
 
         aiResponse = toolResult.content?.[0]?.text || "";
         links = extractLinks(aiResponse);
+        console.log("[DEBUG] After while loop, aiResponse:", aiResponse.substring(0, 200));
       } else {
         aiResponse = "AI is not configured. Please contact an administrator.";
       }
+    }
+
+    // For prefix queries (curriculum:, course:, lesson:), return immediately after AI tool use
+    if (prefixScope) {
+      return NextResponse.json({
+        response: aiResponse,
+        links,
+        results: [],
+      });
     }
 
     if (isCourseListQuery(message)) {

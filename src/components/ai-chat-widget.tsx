@@ -939,7 +939,7 @@ export default function AIChatWidget() {
                       )}
                     </button>
                   </div>
-                  {((hasModification && index === messages.length - 1 && modificationPreview && versionMode === 'edit') || waitingForConfirmation) && (
+                  {((hasModification && index === messages.length - 1 && modificationPreview && versionMode === 'edit') || (waitingForConfirmation && versionMode !== null)) && (
                     <div className="mt-2 flex gap-2">
                       {waitingForConfirmation ? (
                         <>

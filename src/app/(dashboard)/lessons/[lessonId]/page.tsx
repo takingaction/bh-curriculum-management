@@ -138,7 +138,8 @@ export default function LessonContentPage({
   const [saveDialogMode, setSaveDialogMode] = useState<'new' | 'existing'>('new');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
-  const handleSaveVersionRef = useRef<((name: string, reason: string | null) => Promise<void>) | null>(null);
+  const handleSaveVersionRef = useRef<((name: string, reason: string | null, content?: Record<string, { html: string }>) => Promise<void>) | null>(null);
+  const pendingAutoCreateContentRef = useRef<Record<string, { html: string }> | null>(null);
 
   // Trigger for auto-create after handleSaveVersionRequest sets state
   const [autoCreateVersion, setAutoCreateVersion] = useState<{ name: string; preview: Record<string, unknown> } | null>(null);
@@ -242,6 +243,8 @@ export default function LessonContentPage({
       setShowBanner(false);
 
       if (suggestedVersionName) {
+        // Use a ref to store content temporarily so it's available when autoCreateVersion effect fires
+        pendingAutoCreateContentRef.current = contentToUse;
         setAutoCreateVersion({ name: suggestedVersionName, preview });
       }
     }
@@ -462,7 +465,9 @@ export default function LessonContentPage({
   // Handle auto-create version when triggered by handleSaveVersionRequest
   useEffect(() => {
     if (autoCreateVersion) {
-      handleSaveVersionRef.current?.(autoCreateVersion.name, null);
+      const content = pendingAutoCreateContentRef.current;
+      handleSaveVersionRef.current?.(autoCreateVersion.name, null, content || undefined);
+      pendingAutoCreateContentRef.current = null;
       setAutoCreateVersion(null);
     }
   }, [autoCreateVersion]);
@@ -589,12 +594,13 @@ export default function LessonContentPage({
     setShowBanner(false);
   };
 
-  const handleSaveVersion = async (name: string, reason: string | null) => {
-    if (!lesson || !currentContent) return;
+  const handleSaveVersion = async (name: string, reason: string | null, contentOverride?: Record<string, { html: string }> | null) => {
+    const contentToSave = contentOverride || currentContent;
+    if (!lesson || !contentToSave) return;
 
     try {
       if (saveDialogMode === 'existing' && editingVersionId) {
-        const mergedContent = { ...lastSavedContent, ...currentContent };
+        const mergedContent = { ...lastSavedContent, ...contentToSave };
         const res = await fetch(`/api/lessons/${lesson.id}/versions/${editingVersionId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -625,7 +631,7 @@ export default function LessonContentPage({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             version_name: name,
-            content: currentContent,
+            content: contentToSave,
             modification_reason: reason,
           }),
         });
