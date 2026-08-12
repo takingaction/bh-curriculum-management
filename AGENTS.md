@@ -905,6 +905,33 @@ The `extractFieldsFromTruncatedJson()` function handles:
 - AI responses wrapped in markdown code blocks
 - Truncated JSON (when AI hits token limits)
 - HTML content with nested braces (style attributes, entities like `&gt;`)
+- Escaped quotes in JSON (`\"`) - skips backslash-escaped characters when finding closing delimiter
+- Quotes inside HTML tag attributes - tracks `inHtmlTag` state to ignore quotes inside `<tag attr="value">`
+
+**Duration Modifications - Target Duration**:
+When user specifies a numeric duration (e.g., "create a 25 minute version"):
+- `extractTargetDuration()` parses the number from the message
+- `parseDuration()` parses the current lesson's `total_time` field
+- Direction ("shorter" or "longer") is determined by comparing target vs current duration
+- Target duration is passed to AI via system prompt: "Target duration: EXACTLY 25 minutes"
+- Target duration is included in version name: "Shorter Version (25 min) - Aug 12, 2026"
+
+**Duration Modifications - Fields Sent**:
+For duration modifications, only 9 modifiable fields are sent to AI (to reduce token usage):
+- lesson_outline, welcome_opening, actual_class_expectations, warm_up, lesson_hook, main_activity, instrument_expectations, reflection, closing_ceremony
+
+Skipped (static fields - not sent to AI):
+- learning_objectives, vocabulary, materials, vapa_text_block, ncas_text_block, assessment
+
+**Duplicate Version Name Handling**:
+When creating a version, if the suggested name already exists:
+- Appends (2), (3), etc. to the name
+- e.g., "Shorter Version - Aug 12, 2026 (2)"
+
+**Duration Detection Patterns**:
+Generic numeric duration patterns are detected via regex fallback:
+- Any message containing "X minute" or "X min" is recognized as a duration modification request
+- No longer relies on hardcoded specific numbers
 
 **Key files**:
 - `src/lib/version-utils.ts` - Version utilities, constants, types, `convertModifiedFields()` function

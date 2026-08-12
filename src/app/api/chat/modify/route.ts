@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
 const MODEL = "claude-haiku-4-5";
 const MODIFICATION_MODEL = "claude-sonnet-4-5";
-const MAX_TOKENS = 8192;
+const MAX_TOKENS = 12000; // TEMPORARILY INCREASED FOR TESTING - REVERT TO 8192 AFTER
 
 type ModificationType = "duration" | "translation" | "materials";
 
@@ -23,9 +23,8 @@ const MODIFICATION_PATTERNS: Record<ModificationType, string[]> = {
   duration: [
     "shorter", "longer", "reduce", "expand", "condense", "more time",
     "less time", "cut down", "scale down", "scale up", "brief", "concise",
-    "30 min", "45 min", "60 min", "20 minute", "30 minute", "40 minute",
-    "30 minutes", "45 minutes", "60 minutes", "20 minutes", "40 minutes",
-    "not enough time", "too long", "too short", "time constraint"
+    "not enough time", "too long", "too short", "time constraint",
+    "minute version", "min version", "hour version"
   ],
   translation: [
     "translate", "translation",
@@ -76,6 +75,50 @@ const MODIFICATION_PATTERNS: Record<ModificationType, string[]> = {
   ]
 };
 
+function parseDuration(durationStr: string | null): number | null {
+  if (!durationStr) return null;
+
+  const lower = durationStr.toLowerCase().trim();
+
+  const minuteMatch = lower.match(/(\d+(?:\.\d+)?)\s*(?:min|minute)/);
+  if (minuteMatch) {
+    return parseFloat(minuteMatch[1]);
+  }
+
+  const hourMatch = lower.match(/(\d+(?:\.\d+)?)\s*(?:hr|hour|hr\.)/);
+  if (hourMatch) {
+    return parseFloat(hourMatch[1]) * 60;
+  }
+
+  const justNumber = lower.match(/^(\d+(?:\.\d+)?)$/);
+  if (justNumber) {
+    return parseFloat(justNumber[1]);
+  }
+
+  return null;
+}
+
+function extractTargetDuration(message: string): number | null {
+  const lower = message.toLowerCase();
+
+  const minuteMatch = lower.match(/(\d+(?:\.\d+)?)\s*(?:min|minute|min\.|minute\-|min-)/);
+  if (minuteMatch) {
+    return parseFloat(minuteMatch[1]);
+  }
+
+  const hourMatch = lower.match(/(\d+(?:\.\d+)?)\s*(?:hour|hr|hr\.)/);
+  if (hourMatch) {
+    return parseFloat(hourMatch[1]) * 60;
+  }
+
+  const versionMatch = lower.match(/(?:make it |create a |to |for )?(\d+)\s*(?:min|minute)?\s*(?:version|please)?$/);
+  if (versionMatch) {
+    return parseFloat(versionMatch[1]);
+  }
+
+  return null;
+}
+
 const DIRECTION_PATTERNS = {
   shorter: ["shorter", "reduce", "cut down", "condense", "brief", "scale down", "less", "not enough time", "too long", "instead of", "decrease", "min version", "cut to"],
   longer: ["longer", "expand", "more time", "scale up", "more", "too short", "add more", "increase", "max version"]
@@ -98,6 +141,16 @@ function detectModificationRequest(message: string): ModificationDetection {
     if (matches > maxMatches) {
       maxMatches = matches;
       detectedType = type as ModificationType;
+    }
+  }
+
+  // Fallback: check for generic numeric duration patterns like "25 minute version"
+  // This catches cases like "create a 25 minute version" which aren't in the specific patterns
+  if (!detectedType) {
+    const numericDurationMatch = lower.match(/(\d+)\s*(?:min|minute|minutes|hr|hour|hours)/);
+    if (numericDurationMatch) {
+      detectedType = "duration";
+      maxMatches = 1;
     }
   }
 
@@ -158,7 +211,7 @@ function extractTargetLanguage(lower: string): string | null {
   return null;
 }
 
-function getModificationSystemPrompt(modType: "duration" | "translation", direction: "shorter" | "longer" | null, isEditing: boolean, targetLanguage?: string | null): string {
+function getModificationSystemPrompt(modType: "duration" | "translation", direction: "shorter" | "longer" | null, isEditing: boolean, targetLanguage?: string | null, targetDuration?: number | null): string {
   const basePrompt = `You are an AI assistant helping a teacher modify lesson content.
 
 The lesson content will be provided below. Analyze it and prepare modifications based on the teacher's request.
@@ -172,6 +225,10 @@ IMPORTANT: Your response must be a JSON object with this exact structure:
 }`;
 
   if (modType === "duration") {
+    const durationInstruction = targetDuration
+      ? ` Target duration: EXACTLY ${targetDuration} minutes. The lesson outline table MUST show activities totaling exactly ${targetDuration} minutes.`
+      : "";
+
     if (direction === "shorter") {
       return basePrompt + `
 
@@ -180,7 +237,8 @@ For a SHORTER version (condensed):
 - Shorter warm-ups and cool-downs
 - Focus on core learning objectives
 - Keep the most impactful parts
-- Reduce time on practice/repetition`;
+- Reduce time on practice/repetition
+- Do NOT modify these fields (return original content unchanged): learning_objectives, vocabulary, materials, vapa_text_block, ncas_text_block, assessment${durationInstruction}`;
     } else if (direction === "longer") {
       return basePrompt + `
 
@@ -189,14 +247,16 @@ For a LONGER version (expanded):
 - Include additional examples or activities
 - Extend reflection/discussion time
 - Add enrichment activities
-- More repetition for mastery`;
+- More repetition for mastery
+- Do NOT modify these fields (return original content unchanged): learning_objectives, vocabulary, materials, vapa_text_block, ncas_text_block, assessment${durationInstruction}`;
     } else {
       return basePrompt + `
 
 For a different duration version:
 - Adjust activities to fit target duration
 - Scale practice time appropriately
-- Maintain core learning objectives`;
+- Maintain core learning objectives
+- Do NOT modify these fields (return original content unchanged): learning_objectives, vocabulary, materials, vapa_text_block, ncas_text_block, assessment${durationInstruction}`;
     }
   }
 
@@ -291,8 +351,8 @@ function extractFieldsFromTruncatedJson(text: string): Record<string, unknown> |
     'learning_objectives': 'learning_objectives', 'objectives': 'learning_objectives',
     'vocabulary': 'vocabulary', 'vocab': 'vocabulary',
     'materials': 'materials',
-    'welcome_opening': 'welcome_opening', 'opening': 'welcome_opening', 'welcome': 'welcome_opening',
-    'actual_class_expectations': 'actual_class_expectations', 'expectations': 'actual_class_expectations',
+    'welcome_opening': 'welcome_opening', 'opening': 'welcome_opening', 'welcome': 'welcome_opening', 'welcome_and_opening': 'welcome_opening',
+    'actual_class_expectations': 'actual_class_expectations', 'expectations': 'actual_class_expectations', 'actual_class_and_expectations': 'actual_class_expectations',
     'warm_up': 'warm_up', 'warmup': 'warm_up',
     'lesson_hook': 'lesson_hook', 'hook': 'lesson_hook',
     'main_activity': 'main_activity', 'activity': 'main_activity',
@@ -318,9 +378,11 @@ function extractFieldsFromTruncatedJson(text: string): Record<string, unknown> |
     const quoteChar = contentStartMatch[1];
     const contentStart = startPos + contentStartMatch[0].length;
 
-    // Find the closing quote (not inside HTML entities or escaped quotes)
+    // Find the closing quote (not inside HTML entities or HTML tag attributes)
+    // We need to track when we're inside an HTML tag (<tag ...>) and ignore quotes inside attribute values
     let contentEnd = contentStart;
     let inEntity = false;
+    let inHtmlTag = false;
     let i = contentStart;
     while (i < text.length) {
       const char = text[i];
@@ -328,7 +390,14 @@ function extractFieldsFromTruncatedJson(text: string): Record<string, unknown> |
         inEntity = true;
       } else if (char === ';') {
         inEntity = false;
-      } else if (char === quoteChar && !inEntity) {
+      } else if (char === '<') {
+        inHtmlTag = true;
+      } else if (char === '>') {
+        inHtmlTag = false;
+      } else if (char === '\\') {
+        // Skip escaped character (e.g., \" in JSON)
+        i++;
+      } else if (char === quoteChar && !inEntity && !inHtmlTag) {
         contentEnd = i;
         break;
       }
@@ -336,7 +405,38 @@ function extractFieldsFromTruncatedJson(text: string): Record<string, unknown> |
     }
 
     const htmlContent = text.slice(contentStart, contentEnd);
+    console.log(`[EXTRACT] Field ${fieldName} raw (${htmlContent.length} chars): "${htmlContent.substring(0, 150)}..."`);
     if (!htmlContent) continue;
+
+    // Validate: extracted content should start with < (HTML tag) or be a short valid string
+    const isValidHtml = htmlContent.trim().startsWith('<');
+
+    // Additional check for truncated HTML: if it starts with < but is suspiciously short for HTML
+    // Real HTML content for a lesson field should be at least 50 chars
+    const isSuspiciouslyShort = isValidHtml && htmlContent.length < 50;
+
+    // Check if HTML is likely incomplete (opens tags but doesn't close them properly)
+    let appearsComplete = true;
+    if (isValidHtml && htmlContent.length >= 50) {
+      // Count angle brackets - if more opening than closing, likely truncated
+      const openTags = (htmlContent.match(/<[a-zA-Z][^>]*>/g) || []).length;
+      const closeTags = (htmlContent.match(/<\/[a-zA-Z][^>]*>/g) || []).length;
+      const selfClosing = (htmlContent.match(/<[a-zA-Z][^>]*\/>/g) || []).length;
+      // Allow some imbalance but not gross (e.g., 5 opens vs 0 closes is bad)
+      if (openTags > 3 && closeTags === 0 && !selfClosing) {
+        appearsComplete = false;
+        console.log(`[EXTRACT] WARNING: Field ${fieldName} appears incomplete (${openTags} open tags, ${closeTags} close tags, ${selfClosing} self-closing)`);
+      }
+    }
+
+    if (!isValidHtml || isSuspiciouslyShort || !appearsComplete) {
+      if (isSuspiciouslyShort || !appearsComplete) {
+        console.log(`[EXTRACT] WARNING: Field ${fieldName} content appears truncated (${htmlContent.length} chars, starts: ${htmlContent.substring(0, 80)}...), skipping`);
+      } else {
+        console.log(`[EXTRACT] WARNING: Field ${fieldName} content appears truncated (no HTML, ${htmlContent.length} chars), skipping`);
+      }
+      continue;
+    }
 
     // Normalize field name to snake_case
     let normalizedName = fieldName.replace(/([A-Z])/g, '_$1').toLowerCase();
@@ -362,7 +462,7 @@ function extractFieldsFromTruncatedJson(text: string): Record<string, unknown> |
 
 export async function POST(request: Request) {
   const body = await request.json();
-  const { message, lessonId, courseId, conversationHistory, editingVersionId, waitingForConfirmation, userSaidProceed, detectedLanguage, originalTargetLanguage, confirmationModificationType } = body;
+  const { message, lessonId, courseId, conversationHistory, editingVersionId, waitingForConfirmation, userSaidProceed, detectedLanguage, originalTargetLanguage, confirmationModificationType, confirmationModDirection, confirmationTargetDuration } = body;
 
   if (!message) {
     return NextResponse.json({ error: "Message is required" }, { status: 400 });
@@ -388,7 +488,7 @@ export async function POST(request: Request) {
 
   const { data: fullLesson } = await supabase
     .from("lessons")
-    .select("id, title, lesson_number, course_id, courses(id, title, grade), lesson_outline, learning_objectives, vocabulary, materials, vapa_text_block, ncas_text_block, welcome_opening, actual_class_expectations, warm_up, lesson_hook, main_activity, instrument_expectations, reflection, closing_ceremony, assessment")
+    .select("id, title, lesson_number, course_id, total_time, courses(id, title, grade), lesson_outline, learning_objectives, vocabulary, materials, vapa_text_block, ncas_text_block, welcome_opening, actual_class_expectations, warm_up, lesson_hook, main_activity, instrument_expectations, reflection, closing_ceremony, assessment")
     .eq("id", lessonId)
     .single();
 
@@ -436,12 +536,35 @@ export async function POST(request: Request) {
   const modType = userSaidProceed && confirmationModificationType
     ? confirmationModificationType
     : modificationDetection.type;
-  const modDirection = userSaidProceed && confirmationModificationType
-    ? null
+  let modDirection = userSaidProceed && confirmationModificationType
+    ? (confirmationModDirection || modificationDetection.direction)
     : modificationDetection.direction;
   const targetLanguage = userSaidProceed && originalTargetLanguage
     ? originalTargetLanguage
     : (modificationDetection.targetLanguage || detectedLanguage);
+
+  // Extract target duration for duration modifications (used in AI prompt and version name)
+  let modTargetDuration: number | null = null;
+  if (modType === "duration") {
+    // Use confirmationTargetDuration if available (from Proceed click), otherwise extract from message
+    modTargetDuration = userSaidProceed ? (confirmationTargetDuration || extractTargetDuration(message)) : extractTargetDuration(message);
+    console.log("[MODIFY API] modTargetDuration:", modTargetDuration, "(userSaidProceed:", userSaidProceed, ")");
+  }
+
+  // If direction still null but this is a duration modification, try to determine from numeric comparison
+  if (!modDirection && modType === "duration") {
+    const currentDuration = parseDuration(fullLesson.total_time);
+    console.log("[MODIFY API] Duration comparison: current=", currentDuration, "target=", modTargetDuration);
+    if (currentDuration && modTargetDuration) {
+      if (modTargetDuration < currentDuration) {
+        modDirection = "shorter";
+        console.log("[MODIFY API] Set direction to 'shorter' based on duration comparison");
+      } else if (modTargetDuration > currentDuration) {
+        modDirection = "longer";
+        console.log("[MODIFY API] Set direction to 'longer' based on duration comparison");
+      }
+    }
+  }
 
   console.log("[MODIFY API] After logic assignment:");
   console.log("[MODIFY API]   modType:", modType);
@@ -457,61 +580,73 @@ export async function POST(request: Request) {
     const courseTitle = course?.title || "Unknown";
     const courseGrade = course?.grade || "Unknown";
 
-    const modificationLessonContent = `FULL CONTENT OF THIS LESSON:
+    // Helper to get field content from editingVersionContent or fullLesson
+    const getFieldContent = (fieldName: string): string => {
+      const versionField = editingVersionContent as Record<string, { html?: string }> | null;
+      return versionField?.[fieldName]?.html || (fullLesson as Record<string, unknown>)[fieldName] as string || "(empty)";
+    };
+
+    // For duration: only include fields that can be modified (skip static fields like standards, vocab, etc.)
+    // For translation: include all 15 fields
+    const isDurationMod = effectiveModType === "duration";
+
+    let modificationLessonContent = `FULL CONTENT OF THIS LESSON:
 
 Lesson: ${lessonTitle}
 Course: ${courseTitle}
 Grade: ${courseGrade}
 Lesson Number: ${lessonNumber}
+${isDurationMod ? "(Note: Only modify the fields below. Do not change: learning_objectives, vocabulary, materials, vapa_text_block, ncas_text_block, assessment)" : ""}
 
 --- LESSON OUTLINE ---
-${editingVersionContent?.lesson_outline?.html || fullLesson.lesson_outline || "(empty)"}
+${getFieldContent('lesson_outline')}
 
---- LEARNING OBJECTIVES ---
-${editingVersionContent?.learning_objectives?.html || fullLesson.learning_objectives || "(empty)"}
+${isDurationMod ? "" : `--- LEARNING OBJECTIVES ---
+${getFieldContent('learning_objectives')}
 
 --- VOCABULARY ---
-${editingVersionContent?.vocabulary?.html || fullLesson.vocabulary || "(empty)"}
+${getFieldContent('vocabulary')}
 
 --- MATERIALS ---
-${editingVersionContent?.materials?.html || fullLesson.materials || "(empty)"}
-
+${getFieldContent('materials')}
+`}
 --- WELCOME AND OPENING CHECK-IN ---
-${editingVersionContent?.welcome_opening?.html || fullLesson.welcome_opening || "(empty)"}
+${getFieldContent('welcome_opening')}
 
 --- CLASS EXPECTATIONS AND PROCEDURES ---
-${editingVersionContent?.actual_class_expectations?.html || fullLesson.actual_class_expectations || "(empty)"}
+${getFieldContent('actual_class_expectations')}
 
---- WARM UP ---
-${editingVersionContent?.warm_up?.html || fullLesson.warm_up || "(empty)"}
+--- WELCOME UP ---
+${getFieldContent('warm_up')}
 
 --- LESSON HOOK ---
-${editingVersionContent?.lesson_hook?.html || fullLesson.lesson_hook || "(empty)"}
+${getFieldContent('lesson_hook')}
 
 --- MAIN ACTIVITY ---
-${editingVersionContent?.main_activity?.html || fullLesson.main_activity || "(empty)"}
+${getFieldContent('main_activity')}
 
 --- INSTRUMENT EXPECTATIONS ---
-${editingVersionContent?.instrument_expectations?.html || fullLesson.instrument_expectations || "(empty)"}
+${getFieldContent('instrument_expectations')}
 
 --- REFLECTION ---
-${editingVersionContent?.reflection?.html || fullLesson.reflection || "(empty)"}
+${getFieldContent('reflection')}
 
 --- CLOSING CEREMONY ---
-${editingVersionContent?.closing_ceremony?.html || fullLesson.closing_ceremony || "(empty)"}
+${getFieldContent('closing_ceremony')}
+${isDurationMod ? "" : `
 
 --- ASSESSMENT ---
-${editingVersionContent?.assessment?.html || fullLesson.assessment || "(empty)"}
+${getFieldContent('assessment')}
 
 --- VAPA STANDARDS ---
-${editingVersionContent?.vapa_text_block?.html || fullLesson.vapa_text_block || "(empty)"}
+${getFieldContent('vapa_text_block')}
 
 --- NCAS STANDARDS ---
-${editingVersionContent?.ncas_text_block?.html || fullLesson.ncas_text_block || "(empty)"}
+${getFieldContent('ncas_text_block')}`}
 `;
 
     if (waitingForConfirmation && userSaidProceed) {
-      const systemPrompt = getModificationSystemPrompt(effectiveModType, modDirection, !!editingVersionId, targetLanguage);
+      const systemPrompt = getModificationSystemPrompt(effectiveModType, modDirection, !!editingVersionId, targetLanguage, modTargetDuration);
 
       const lessonContextMessage = {
         role: "user" as const,
@@ -625,7 +760,36 @@ ${editingVersionContent?.ncas_text_block?.html || fullLesson.ncas_text_block || 
           console.log("[MODIFY API] Field content lengths:");
           for (const [key, val] of Object.entries(fields)) {
             const fieldVal = val as { html?: string };
-            console.log(`[MODIFY API]   ${key}: ${fieldVal?.html?.length || 0} chars`);
+            const html = fieldVal?.html || "";
+            console.log(`[MODIFY API]   ${key}: ${html.length} chars`);
+            // Validate: if content has significant length but no HTML tags, it might be narrative text
+            if (html.length > 100 && !html.includes('<') && !html.includes('>')) {
+              console.log(`[MODIFY API]   WARNING: Field ${key} appears to contain narrative text (no HTML tags), content preview: ${html.substring(0, 100)}...`);
+            }
+          }
+
+          // Validate we have meaningful content for duration modifications
+          if (effectiveModType === "duration") {
+            const fieldCount = Object.keys(fields).length;
+            const totalChars = Object.values(fields).reduce((sum: number, val: unknown) => sum + ((val as { html?: string })?.html?.length || 0), 0);
+            console.log(`[MODIFY API] Duration mod validation: ${fieldCount} fields, ${totalChars} total chars`);
+
+            // For duration, expect meaningful content - at least 500 total chars (rough indicator of valid HTML)
+            // Also check that non-empty fields have at least 50 chars (empty fields are OK - they'll use original content)
+            const fieldLengths = Object.values(fields).map((val: unknown) => ((val as { html?: string })?.html?.length || 0)).filter(len => len > 0);
+            const minFieldLength = fieldLengths.length > 0 ? Math.min(...fieldLengths) : 0;
+            console.log(`[MODIFY API] Duration mod: ${fieldCount} fields, ${totalChars} total chars, smallest non-empty field: ${minFieldLength} chars`);
+
+            if (fieldCount < 1 || totalChars < 500 || (fieldLengths.length > 0 && minFieldLength < 50)) {
+              console.log("[MODIFY API] Duration modification appears incomplete, returning error");
+              return NextResponse.json({
+                response: "I ran out of tokens to complete this job correctly. Please try again.",
+                links: [],
+                results: [],
+                isModificationRequest: true,
+                needsConfirmation: false,
+              });
+            }
           }
         }
       } catch (err) {
@@ -637,13 +801,37 @@ ${editingVersionContent?.ncas_text_block?.html || fullLesson.ncas_text_block || 
         modificationPreview = parsedPreview;
         
         const timestamp = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-        
+
         if (effectiveModType === "translation" && targetLanguage) {
           suggestedVersionName = `${targetLanguage.charAt(0).toUpperCase() + targetLanguage.slice(1)} Translation - ${timestamp}`;
         } else if (effectiveModType === "duration") {
-          suggestedVersionName = `${modDirection === "shorter" ? "Shorter" : "Longer"} Version - ${timestamp}`;
+          const durationSuffix = modTargetDuration ? ` (${modTargetDuration} min)` : "";
+          suggestedVersionName = `${modDirection === "shorter" ? "Shorter" : "Longer"} Version${durationSuffix} - ${timestamp}`;
         } else {
           suggestedVersionName = `Modified Version - ${timestamp}`;
+        }
+
+        // Check for duplicate version names and append (2), (3), etc. if needed
+        const { data: existingVersions } = await supabase
+          .from("lesson_versions")
+          .select("version_name")
+          .eq("lesson_id", lessonId)
+          .is("deleted_at", null);
+
+        if (existingVersions) {
+          const existingNames = existingVersions.map(v => v.version_name);
+          let finalName = suggestedVersionName;
+          let counter = 2;
+
+          while (existingNames.includes(finalName)) {
+            finalName = `${suggestedVersionName} (${counter})`;
+            counter++;
+          }
+
+          if (finalName !== suggestedVersionName) {
+            console.log(`[MODIFY API] Duplicate version name detected, renamed to: ${finalName}`);
+            suggestedVersionName = finalName;
+          }
         }
 
         return NextResponse.json({
@@ -661,7 +849,7 @@ ${editingVersionContent?.ncas_text_block?.html || fullLesson.ncas_text_block || 
         const fieldKeys = parsedPreview?.modifiedFields ? Object.keys(parsedPreview.modifiedFields).join(',') : 'none';
         const debugInfo = `parsed fields: ${fieldKeys}`;
         return NextResponse.json({
-          response: `I had trouble creating that version. ${debugInfo}`,
+          response: `I ran out of tokens to complete this job correctly. Please try again.`,
           links: [],
           results: [],
           isModificationRequest: true,
@@ -725,6 +913,7 @@ ${editingVersionContent?.ncas_text_block?.html || fullLesson.ncas_text_block || 
         needsConfirmation: true,
         modificationType: modType,
         modificationDirection: modDirection,
+        modificationTargetDuration: modTargetDuration,
         modificationPreview: null,
         suggestedVersionName,
       });
@@ -789,6 +978,8 @@ ${editingVersionContent?.ncas_text_block?.html || fullLesson.ncas_text_block || 
         isModificationRequest: true,
         needsConfirmation: true,
         modificationType: confirmationModificationType,
+        modificationDirection: confirmationModDirection || modificationDetection.direction,
+        modificationTargetDuration: confirmationTargetDuration,
         modificationPreview: null,
         suggestedVersionName: "",
     });

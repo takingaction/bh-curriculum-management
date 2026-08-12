@@ -19,6 +19,8 @@ export function VersionsChatWidget() {
   const [isLoading, setIsLoading] = useState(false);
   const [waitingForConfirmation, setWaitingForConfirmation] = useState(false);
   const [confirmationModificationType, setConfirmationModificationType] = useState<string | null>(null);
+  const [confirmationModDirection, setConfirmationModDirection] = useState<string | null>(null);
+  const [confirmationTargetDuration, setConfirmationTargetDuration] = useState<number | null>(null);
   const [hasModification, setHasModification] = useState(false);
   const [modificationPreview, setModificationPreview] = useState<Record<string, unknown> | null>(null);
   const [previewEditingVersionId, setPreviewEditingVersionId] = useState<string | null>(null);
@@ -38,10 +40,20 @@ export function VersionsChatWidget() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  useEffect(() => {
+    console.log("[VersionsChat] versionMode changed to:", versionMode);
+  }, [versionMode]);
+
+  useEffect(() => {
+    console.log("[VersionsChat] waitingForConfirmation changed to:", waitingForConfirmation);
+  }, [waitingForConfirmation]);
+
   const clearChat = () => {
     setMessages([]);
     setWaitingForConfirmation(false);
     setConfirmationModificationType(null);
+    setConfirmationModDirection(null);
+    setConfirmationTargetDuration(null);
     setHasModification(false);
     setModificationPreview(null);
     setWaitingForConfirmation(false);
@@ -129,6 +141,8 @@ export function VersionsChatWidget() {
           originalTargetLanguage,
           waitingForConfirmation,
           confirmationModificationType: confirmationModificationType,
+          confirmationModDirection,
+          confirmationTargetDuration,
         }),
       });
 
@@ -139,6 +153,12 @@ export function VersionsChatWidget() {
         setWaitingForConfirmation(true);
         if (data.modificationType) {
           setConfirmationModificationType(data.modificationType);
+        }
+        if (data.modificationDirection) {
+          setConfirmationModDirection(data.modificationDirection);
+        }
+        if (data.modificationTargetDuration) {
+          setConfirmationTargetDuration(data.modificationTargetDuration);
         }
       }
       
@@ -158,11 +178,16 @@ export function VersionsChatWidget() {
   };
 
   const handleProceed = async () => {
-    if (!modificationPreview && !waitingForConfirmation) return;
+    console.log("[VersionsChat] handleProceed called", { modificationPreview, waitingForConfirmation, isLoading });
+    if (!modificationPreview && !waitingForConfirmation) {
+      console.log("[VersionsChat] Early return - both modificationPreview and waitingForConfirmation are falsy");
+      return;
+    }
 
     setIsLoading(true);
 
     try {
+      console.log("[VersionsChat] Sending API request to /api/chat/modify");
       const response = await fetch("/api/chat/modify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -178,8 +203,11 @@ export function VersionsChatWidget() {
           waitingForConfirmation: true,
           userSaidProceed: true,
           confirmationModificationType,
+          confirmationModDirection,
+          confirmationTargetDuration,
         }),
       });
+      console.log("[VersionsChat] API response received", response.status);
 
       const data = await response.json();
       

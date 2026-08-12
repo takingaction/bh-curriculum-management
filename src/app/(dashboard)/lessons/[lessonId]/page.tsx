@@ -232,10 +232,42 @@ export default function LessonContentPage({
     } else {
       setSaveDialogMode('new');
 
+      // Check if this is a duration modification - for duration, we need to use original lesson content as base
+      const isDurationModification = previewData?.modificationType === 'duration';
+
       let contentToUse: Record<string, { html: string }> = {};
       if (modifiedFields && Object.keys(modifiedFields).length > 0) {
-        // Use centralized conversion
-        contentToUse = convertModifiedFields(modifiedFields);
+        if (isDurationModification) {
+          // For duration modifications, build content from original lesson and overlay modified fields
+          const originalFields: Record<string, string> = {};
+          for (const field of TEXT_FIELDS_LIST) {
+            originalFields[field] = getOriginalContent(field);
+          }
+          // convertModifiedFields will use originalFields as base for unmodified fields
+          const converted = convertModifiedFields(modifiedFields, originalFields);
+          // Only use AI-modified fields; for unmodified fields, we need to use original content
+          // (convertModifiedFields only populates fields from modifiedFields, leaving others empty)
+          // So we need to manually build the content with original values for unmodified fields
+          contentToUse = {};
+          for (const field of TEXT_FIELDS_LIST) {
+            const modifiedField = converted[field];
+            if (modifiedField?.html) {
+              // This field was modified by AI
+              contentToUse[field] = modifiedField;
+            } else {
+              // Use original lesson content for unmodified fields
+              contentToUse[field] = { html: originalFields[field] || "" };
+            }
+          }
+        } else {
+          // For translation and other modifications, use converted fields (may have empty unmodified fields)
+          contentToUse = convertModifiedFields(modifiedFields);
+        }
+      } else if (isDurationModification) {
+        // No modified fields but it's a duration mod - use all original content
+        for (const field of TEXT_FIELDS_LIST) {
+          contentToUse[field] = { html: getOriginalContent(field) };
+        }
       }
 
       setCurrentContent(contentToUse);
