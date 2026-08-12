@@ -282,6 +282,7 @@ interface LessonBasic {
 
 // Helper function to extract complete field objects from potentially truncated JSON
 function extractFieldsFromTruncatedJson(text: string): Record<string, unknown> | null {
+  console.log("[EXTRACT] Starting field extraction, text length:", text.length);
   const result: Record<string, unknown> = {};
 
   // Map common aliases for all field variants
@@ -348,8 +349,14 @@ function extractFieldsFromTruncatedJson(text: string): Record<string, unknown> |
   }
 
   if (Object.keys(result).length > 0) {
+    console.log("[EXTRACT] Successfully extracted", Object.keys(result).length, "fields:", Object.keys(result).join(', '));
+    for (const [key, val] of Object.entries(result)) {
+      const fieldVal = val as { html?: string };
+      console.log(`[EXTRACT]   ${key}: ${fieldVal?.html?.length || 0} chars, content: ${fieldVal?.html?.substring(0, 100)}...`);
+    }
     return { modifiedFields: result };
   }
+  console.log("[EXTRACT] No fields extracted");
   return null;
 }
 
@@ -414,6 +421,13 @@ export async function POST(request: Request) {
   const modificationDetection = detectModificationRequest(message);
   const userMessage = modificationDetection.isModification ? message : "";
 
+  console.log("[MODIFY API] Initial modificationDetection:");
+  console.log("[MODIFY API]   isModification:", modificationDetection.isModification);
+  console.log("[MODIFY API]   type:", modificationDetection.type);
+  console.log("[MODIFY API]   direction:", modificationDetection.direction);
+  console.log("[MODIFY API]   targetLanguage:", modificationDetection.targetLanguage);
+  console.log("[MODIFY API]   message:", message.substring(0, 200));
+
   const isVersionMode = true;
   let modificationPreview: Record<string, unknown> | null = null;
   let needsConfirmation = false;
@@ -428,6 +442,12 @@ export async function POST(request: Request) {
   const targetLanguage = userSaidProceed && originalTargetLanguage
     ? originalTargetLanguage
     : (modificationDetection.targetLanguage || detectedLanguage);
+
+  console.log("[MODIFY API] After logic assignment:");
+  console.log("[MODIFY API]   modType:", modType);
+  console.log("[MODIFY API]   modDirection:", modDirection);
+  console.log("[MODIFY API]   targetLanguage:", targetLanguage);
+  console.log("[MODIFY API]   userSaidProceed:", userSaidProceed);
 
   if ((modificationDetection.isModification || userSaidProceed) && modType) {
     const effectiveModType = modType as "duration" | "translation";
@@ -555,8 +575,16 @@ ${editingVersionContent?.ncas_text_block?.html || fullLesson.ncas_text_block || 
       const result = await response.json();
       const aiResponse = result.content?.[0]?.text || "";
 
-      // Log for debugging
-      console.log("[MODIFY API] AI response length:", aiResponse.length, "has modifiedFields:", aiResponse.includes('modifiedFields'));
+      // Comprehensive logging for debugging
+      console.log("[MODIFY API] ========== DEBUG START ==========");
+      console.log("[MODIFY API] modDirection value:", modDirection);
+      console.log("[MODIFY API] userSaidProceed:", userSaidProceed);
+      console.log("[MODIFY API] confirmationModificationType:", confirmationModificationType);
+      console.log("[MODIFY API] originalTargetLanguage:", originalTargetLanguage);
+      console.log("[MODIFY API] AI response length:", aiResponse.length);
+      console.log("[MODIFY API] AI response first 500 chars:", aiResponse.substring(0, 500));
+      console.log("[MODIFY API] AI response last 500 chars:", aiResponse.substring(aiResponse.length - 500));
+      console.log("[MODIFY API] ========== DEBUG END ==========");
 
       let parsedPreview = null;
       try {
@@ -594,6 +622,11 @@ ${editingVersionContent?.ncas_text_block?.html || fullLesson.ncas_text_block || 
           const fields = parsedPreview.modifiedFields || parsedPreview.modified_fields || {};
           parsedPreview.modifiedFields = fields;
           console.log("[MODIFY API] Parsed fields:", Object.keys(fields).join(', '));
+          console.log("[MODIFY API] Field content lengths:");
+          for (const [key, val] of Object.entries(fields)) {
+            const fieldVal = val as { html?: string };
+            console.log(`[MODIFY API]   ${key}: ${fieldVal?.html?.length || 0} chars`);
+          }
         }
       } catch (err) {
         console.log("[MODIFY API] JSON extraction error:", err);
