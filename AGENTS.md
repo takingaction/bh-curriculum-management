@@ -732,7 +732,7 @@ Feature for exploring lesson content and answering questions about music/dance/t
 **Architecture**: Three separate API endpoints and components for Ask, Search, and Versions modes.
 
 **API Routes**:
-- `POST /api/chat/ask` - Ask tab API with prefix detection (`curriculum:`, `course:`, `lesson:`)
+- `POST /api/chat/ask` - Ask tab API with explicit scope (`curriculum`, `course`, `lesson`)
 - `POST /api/chat/modify` - Versions tab API with modification flow
 - `POST /api/search` - Search tab API with direct DB query
 
@@ -742,8 +742,8 @@ Feature for exploring lesson content and answering questions about music/dance/t
 - `src/components/search-chat-widget.tsx` - Search tab with scope selector (Lesson/Course/Global)
 - `src/components/versions-chat-widget.tsx` - Versions tab with Create/Edit/Reset/Proceed buttons
 
-**Ask Mode - Tool Use (Claude Haiku)**:
-Claude Haiku uses tool use to search the curriculum intelligently. Available tools:
+**Ask Mode - Tool Use (Claude Sonnet)**:
+Claude Sonnet uses tool use to search the curriculum intelligently. Available tools:
 
 1. **search_lessons**: Search for lessons matching a query
    - Parameters: `query` (required), `grade`, `course_id`, `discipline`, `max_results`
@@ -756,18 +756,20 @@ Claude Haiku uses tool use to search the curriculum intelligently. Available too
 
 3. **list_my_courses**: List all courses user has access to
    - No parameters
-    - Returns courses grouped by discipline/grade
+   - Returns courses grouped by discipline/grade (only available when no scope selected)
 
-**Ask Mode - Scope Prefixes**:
-Use prefixes to explicitly control search scope (Ask mode only). All prefixes use Claude Haiku tool use:
-- `curriculum:` - Search all enrolled courses using `search_lessons` tool (e.g., `curriculum: voice lessons`)
-- `course:` - Search within current course context using `search_lessons` tool with `courseId` filter
-- `lesson:` - Get current lesson details using `get_lesson_details` tool
+**Ask Mode - Scope Buttons**:
+Three toggle buttons control search scope (radio behavior - only one active at a time):
+- **Curriculum**: Search all enrolled courses (always available)
+- **Course**: Search within current course (requires being on a course/lesson page)
+- **Lesson**: Search within current lesson (requires being on a lesson page)
 
-Examples:
-- `curriculum: 4th grade notation` - Searches all courses for grade 4 lessons about notation
-- `course: what's covered` - Searches within the current course context
-- `lesson: what standards` - Retrieves full details of the current lesson
+When scope is set to "course" or "lesson", the `list_my_courses` tool is removed from the available tools to force the AI to use the correct search scope.
+
+**Scope Persistence**:
+- Chat history persists across page refreshes and syncs across browser tabs
+- Active scope selection also persists
+- Uses localStorage with `aiChatHistory_ask` and `aiChatScope_ask` keys
 
 **Search Content tab**:
 - Uses `findMatchesInContent()` from `html-utils.ts` (same as Find & Replace)

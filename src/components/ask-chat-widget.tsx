@@ -5,6 +5,8 @@ import { useChatContext } from "./chat-context";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
+type ScopeType = 'curriculum' | 'course' | 'lesson';
+
 interface Message {
   role: "user" | "assistant";
   content: string;
@@ -28,28 +30,51 @@ interface SearchResult {
 }
 
 const CHAT_STORAGE_KEY = 'aiChatHistory_ask';
+const SCOPE_STORAGE_KEY = 'aiChatScope_ask';
 const MAX_STORED_MESSAGES = 50;
+
+function loadMessages(): Message[] {
+  if (typeof window === 'undefined') return [];
+  const stored = localStorage.getItem(CHAT_STORAGE_KEY);
+  if (stored) {
+    try {
+      return JSON.parse(stored);
+    } catch {
+      localStorage.removeItem(CHAT_STORAGE_KEY);
+    }
+  }
+  return [];
+}
+
+function loadScope(): ScopeType | null {
+  if (typeof window === 'undefined') return null;
+  const stored = localStorage.getItem(SCOPE_STORAGE_KEY);
+  if (stored === 'curriculum' || stored === 'course' || stored === 'lesson') {
+    return stored;
+  }
+  return null;
+}
 
 export function AskChatWidget() {
   const { lessonId, courseId } = useChatContext();
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<Message[]>(loadMessages);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [links, setLinks] = useState<Link[]>([]);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [activeScope, setActiveScope] = useState<ScopeType | null>(loadScope);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  useEffect(() => {
-    const stored = localStorage.getItem(CHAT_STORAGE_KEY);
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        setMessages(parsed);
-      } catch (e) {
-        localStorage.removeItem(CHAT_STORAGE_KEY);
-      }
+  const handleScopeToggle = (scope: ScopeType) => {
+    if (activeScope === scope) {
+      setActiveScope(null);
+    } else {
+      setActiveScope(scope);
     }
+  };
+
+  useEffect(() => {
     inputRef.current?.focus();
   }, []);
 
@@ -61,6 +86,29 @@ export function AskChatWidget() {
       localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(trimmed));
     }
   }, [messages]);
+
+  useEffect(() => {
+    localStorage.setItem(SCOPE_STORAGE_KEY, activeScope || '');
+  }, [activeScope]);
+
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === CHAT_STORAGE_KEY) {
+        if (e.newValue) {
+          try {
+            setMessages(JSON.parse(e.newValue));
+          } catch {
+            setMessages([]);
+          }
+        } else {
+          setMessages([]);
+        }
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -83,6 +131,7 @@ export function AskChatWidget() {
           message: userMessage,
           lessonId,
           courseId,
+          scope: activeScope,
           conversationHistory: messages.slice(-20),
         }),
       });
@@ -116,15 +165,53 @@ export function AskChatWidget() {
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between p-3 border-b border-gray-200">
-        <span className="text-sm font-medium text-gray-700">Ask</span>
-        {messages.length > 0 && (
+        <div className="flex items-center gap-1">
+          <span className="text-sm font-medium text-gray-700 mr-2">Ask</span>
           <button
-            onClick={clearChat}
-            className="text-xs text-gray-500 hover:text-gray-700"
+            onClick={() => handleScopeToggle('curriculum')}
+            className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
+              activeScope === 'curriculum'
+                ? 'bg-[#0d7377] text-white'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
           >
-            Clear
+            Curriculum
           </button>
-        )}
+          <button
+            onClick={() => handleScopeToggle('course')}
+            disabled={!courseId}
+            title={!courseId ? 'Navigate to a course to enable' : undefined}
+            className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
+              activeScope === 'course'
+                ? 'bg-[#0d7377] text-white'
+                : !courseId
+                  ? 'bg-gray-50 text-gray-300 cursor-not-allowed'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            Course
+          </button>
+          <button
+            onClick={() => handleScopeToggle('lesson')}
+            disabled={!lessonId}
+            title={!lessonId ? 'Navigate to a lesson to enable' : undefined}
+            className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
+              activeScope === 'lesson'
+                ? 'bg-[#0d7377] text-white'
+                : !lessonId
+                  ? 'bg-gray-50 text-gray-300 cursor-not-allowed'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            Lesson
+          </button>
+        </div>
+        <button
+          onClick={clearChat}
+          className="text-xs text-gray-500 hover:text-gray-700 ml-2"
+        >
+          Clear
+        </button>
       </div>
 
       <div className="flex-1 overflow-y-auto p-3 space-y-4">
@@ -132,7 +219,7 @@ export function AskChatWidget() {
           <div className="text-center text-gray-500 py-8 text-sm">
             Ask me anything about your curriculum!<br /><br />
             <span className="text-xs text-gray-400">
-              Use prefixes: curriculum:, course:, lesson:
+              Select a scope above to search specific content
             </span>
           </div>
         )}
