@@ -776,6 +776,10 @@ When scope is set to "course" or "lesson", the `list_my_courses` tool is removed
 - Searches all 15 lesson content fields
 - Case-insensitive substring matching across HTML content
 - Results capped at 10 per page with pagination
+- Search state persists across page refreshes and syncs across browser tabs
+- Uses localStorage with `aiSearchHistory` key
+- Persists: query, results, totalResults, hasMore, hasSearched, activeScope
+- Clears when user clicks Clear button (or clears localStorage)
 
 **Versions Tab - Modification Flow**:
 1. User says "Translate into Spanish" or "Make 30 min version"

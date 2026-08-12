@@ -19,16 +19,30 @@ type SearchScope = "lesson" | "course" | "global";
 
 const SEARCH_STORAGE_KEY = 'aiSearchHistory';
 
+function loadSearchState() {
+  if (typeof window === 'undefined') return null;
+  const stored = localStorage.getItem(SEARCH_STORAGE_KEY);
+  if (stored) {
+    try {
+      return JSON.parse(stored);
+    } catch {
+      localStorage.removeItem(SEARCH_STORAGE_KEY);
+    }
+  }
+  return null;
+}
+
 export function SearchChatWidget() {
   const { lessonId, courseId } = useChatContext();
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState<SearchResult[]>([]);
+  const storedState = loadSearchState();
+  const [query, setQuery] = useState(storedState?.query || "");
+  const [results, setResults] = useState<SearchResult[]>(storedState?.results || []);
   const [isLoading, setIsLoading] = useState(false);
-  const [totalResults, setTotalResults] = useState(0);
-  const [hasMore, setHasMore] = useState(false);
+  const [totalResults, setTotalResults] = useState(storedState?.totalResults || 0);
+  const [hasMore, setHasMore] = useState(storedState?.hasMore || false);
   const [page, setPage] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const [hasSearched, setHasSearched] = useState(false);
+  const [hasSearched, setHasSearched] = useState(storedState?.hasSearched || false);
   const [activeScope, setActiveScope] = useState<SearchScope>(() => {
     if (lessonId) return "lesson";
     if (courseId) return "course";
@@ -48,6 +62,38 @@ export function SearchChatWidget() {
 
   useEffect(() => {
     searchInputRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
+    const state = {
+      query,
+      results,
+      totalResults,
+      hasMore,
+      hasSearched,
+      activeScope,
+    };
+    localStorage.setItem(SEARCH_STORAGE_KEY, JSON.stringify(state));
+  }, [query, results, totalResults, hasMore, hasSearched, activeScope]);
+
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === SEARCH_STORAGE_KEY && e.newValue) {
+        try {
+          const state = JSON.parse(e.newValue);
+          setQuery(state.query || "");
+          setResults(state.results || []);
+          setTotalResults(state.totalResults || 0);
+          setHasMore(state.hasMore || false);
+          setHasSearched(state.hasSearched || false);
+        } catch {
+          // ignore parse errors
+        }
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
   const handleSearch = async (pageNum: number = 0) => {
@@ -222,6 +268,9 @@ export function SearchChatWidget() {
                   setResults([]);
                   setHasSearched(false);
                   setTotalResults(0);
+                  setHasMore(false);
+                  setPage(0);
+                  localStorage.removeItem(SEARCH_STORAGE_KEY);
                 }}
                 className="text-xs text-gray-500 hover:text-[#0d7377]"
               >
