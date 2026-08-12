@@ -8,12 +8,12 @@ export async function GET() {
   try {
     const supabase = await createClient();
 
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const userId = session.user.id;
+    const userId = user.id;
     const weekStart = getWeekStart();
     const weekStartStr = formatWeekStart(weekStart);
 

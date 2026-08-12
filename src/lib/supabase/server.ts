@@ -39,8 +39,8 @@ export async function createClient() {
 
 export async function getSession() {
   const supabase = await createClient();
-  const { data: { session } } = await supabase.auth.getSession();
-  return { data: { session } };
+  const { data: { user } } = await supabase.auth.getUser();
+  return { data: { session: user ? { user } : null } };
 }
 
 export async function createServiceClient() {

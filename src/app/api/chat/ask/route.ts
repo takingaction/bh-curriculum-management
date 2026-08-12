@@ -103,13 +103,13 @@ export async function POST(request: Request) {
   }
 
   const supabase = await createClient();
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { user } } = await supabase.auth.getUser();
 
-  if (!session) {
+  if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const userId = session.user.id;
+  const userId = user.id;
   const { data: profile } = await supabase
     .from("profiles")
     .select("enrollments")

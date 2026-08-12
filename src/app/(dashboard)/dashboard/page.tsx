@@ -3,13 +3,13 @@ import DashboardClient from "@/components/dashboard-client";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { user } } = await supabase.auth.getUser();
 
-  if (!session) {
+  if (!user) {
     return <div>Loading...</div>;
   }
 
-  const userId = session.user.id;
+  const userId = user.id;
 
   let { data: profile } = await supabase
     .from("profiles")

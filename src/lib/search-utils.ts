@@ -117,8 +117,8 @@ export async function searchLessons(params: SearchLessonsParams): Promise<Search
 
   const supabase = await createClient();
 
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
     throw new Error("Unauthorized");
   }
 
@@ -254,8 +254,8 @@ export async function getLessonDetails(params: GetLessonDetailsParams): Promise<
 
   const supabase = await createClient();
 
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
     throw new Error("Unauthorized");
   }
 
@@ -299,8 +299,8 @@ export async function getLessonDetails(params: GetLessonDetailsParams): Promise<
 export async function listMyCourses(userId: string): Promise<ListMyCoursesResult> {
   const supabase = await createClient();
 
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
     throw new Error("Unauthorized");
   }
 

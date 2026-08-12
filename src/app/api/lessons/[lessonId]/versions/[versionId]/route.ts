@@ -10,8 +10,8 @@ export async function GET(
     const supabase = await createClient();
     const { lessonId, versionId } = await params;
 
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -41,12 +41,12 @@ export async function PATCH(
     const supabase = await createClient();
     const { lessonId, versionId } = await params;
 
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const userId = session.user.id;
+    const userId = user.id;
     const body = await request.json();
 
     const { data: existingVersion, error: fetchError } = await supabase
@@ -114,12 +114,12 @@ export async function DELETE(
     const supabase = await createClient();
     const { lessonId, versionId } = await params;
 
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const userId = session.user.id;
+    const userId = user.id;
 
     const { data: existingVersion, error: fetchError } = await supabase
       .from("lesson_versions")

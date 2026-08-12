@@ -3,32 +3,32 @@ import { redirect } from "next/navigation";
 
 export async function requireAuth() {
   const supabase = await createClient();
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { user } } = await supabase.auth.getUser();
   
-  if (!session) {
+  if (!user) {
     redirect("/login");
   }
   
-  return { id: session.user.id };
+  return { id: user.id };
 }
 
 export async function requireAdmin() {
   const supabase = await createClient();
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { user } } = await supabase.auth.getUser();
   
-  if (!session) {
+  if (!user) {
     redirect("/login");
   }
   
   const { data: profile } = await supabase
     .from("profiles")
     .select("role")
-    .eq("id", session.user.id)
+    .eq("id", user.id)
     .single();
     
   if (profile?.role !== "admin") {
     redirect("/dashboard");
   }
   
-  return { id: session.user.id };
+  return { id: user.id };
 }

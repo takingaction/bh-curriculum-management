@@ -17,8 +17,8 @@ export async function GET(
     const supabase = await createClient();
     const { lessonId } = await params;
 
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -48,12 +48,12 @@ export async function POST(
     const supabase = await createClient();
     const { lessonId } = await params;
 
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const userId = session.user.id;
+    const userId = user.id;
     const body = await request.json();
     const { version_name, content, modification_reason, copyFromVersionId } = body as {
       version_name?: string;
