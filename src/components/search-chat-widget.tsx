@@ -28,6 +28,7 @@ export function SearchChatWidget() {
   const [hasMore, setHasMore] = useState(false);
   const [page, setPage] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [hasSearched, setHasSearched] = useState(false);
   const [activeScope, setActiveScope] = useState<SearchScope>(() => {
     if (lessonId) return "lesson";
     if (courseId) return "course";
@@ -54,6 +55,7 @@ export function SearchChatWidget() {
 
     setIsLoading(true);
     setError(null);
+    setHasSearched(true);
 
     try {
       const params = new URLSearchParams({
@@ -202,7 +204,7 @@ export function SearchChatWidget() {
           </div>
         )}
 
-        {results.length === 0 && !isLoading && query.length >= 2 && (
+        {hasSearched && results.length === 0 && !isLoading && query.length >= 2 && (
           <div className="text-center text-gray-500 py-8">
             No results found for "{query}"
           </div>
@@ -210,8 +212,21 @@ export function SearchChatWidget() {
 
         {results.length > 0 && (
           <div className="space-y-4">
-            <div className="text-sm text-gray-600 mb-2">
-              Found {totalResults} result{totalResults !== 1 ? "s" : ""}
+            <div className="text-sm text-gray-600 mb-2 flex items-center justify-between">
+              <span>
+                Found {totalResults} result{totalResults !== 1 ? "s" : ""}
+              </span>
+              <button
+                onClick={() => {
+                  setQuery("");
+                  setResults([]);
+                  setHasSearched(false);
+                  setTotalResults(0);
+                }}
+                className="text-xs text-gray-500 hover:text-[#0d7377]"
+              >
+                Clear
+              </button>
             </div>
 
             {results.map((result, index) => {
