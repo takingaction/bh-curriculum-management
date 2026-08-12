@@ -214,37 +214,46 @@ export function SearchChatWidget() {
               Found {totalResults} result{totalResults !== 1 ? "s" : ""}
             </div>
 
-            {results.map((result, index) => (
-              <div key={`${result.lesson_id}-${result.field_name}-${index}`} className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm">
-                <div className="flex items-start justify-between mb-2">
-                  <div>
-                    <span className="text-xs font-medium text-[#0d7377]">
-                      {result.course_title}
-                    </span>
-                    <span className="text-xs text-gray-400 mx-2">•</span>
+            {results.map((result, index) => {
+              const linkHref = `/lessons/${result.lesson_id}#${result.field_name}`;
+              
+              return (
+                <a
+                  key={`${result.lesson_id}-${result.field_name}-${index}`}
+                  href={linkHref}
+                  {...(activeScope !== "lesson" ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+                  className="block bg-white border border-gray-200 rounded-lg p-3 shadow-sm hover:border-[#0d7377] hover:shadow transition-all"
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <div>
+                      <span className="text-xs font-medium text-[#0d7377]">
+                        {result.course_title}
+                      </span>
+                      <span className="text-xs text-gray-400 mx-2">•</span>
+                      <span className="text-xs text-gray-500">
+                        Grade {result.grade}
+                      </span>
+                    </div>
                     <span className="text-xs text-gray-500">
-                      Grade {result.grade}
+                      Lesson {result.lesson_number}
                     </span>
                   </div>
-                  <span className="text-xs text-gray-500">
-                    Lesson {result.lesson_number}
-                  </span>
-                </div>
 
-                <h4 className="font-medium text-gray-900 mb-1 text-sm">
-                  {result.lesson_title}
-                </h4>
+                  <h4 className="font-medium text-gray-900 mb-1 text-sm">
+                    {result.lesson_title}
+                  </h4>
 
-                <div className="text-xs text-gray-500 mb-2">
-                  {getFieldLabel(result.field_name)}
-                </div>
+                  <div className="text-xs text-gray-500 mb-2">
+                    {getFieldLabel(result.field_name)}
+                  </div>
 
-                <div 
-                  className="text-sm text-gray-700 line-clamp-3"
-                  dangerouslySetInnerHTML={{ __html: result.chunk_text }}
-                />
-              </div>
-            ))}
+                  <div
+                    className="text-sm text-gray-700 line-clamp-3"
+                    dangerouslySetInnerHTML={{ __html: result.chunk_text }}
+                  />
+                </a>
+              );
+            })}
 
             {hasMore && (
               <button
