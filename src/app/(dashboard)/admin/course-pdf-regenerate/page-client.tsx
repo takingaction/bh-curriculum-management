@@ -334,6 +334,7 @@ export default function BatchCoursePdfRegeneratePage() {
 
       console.log("[Resume] Processing complete");
       processingRef.current = false;
+      setIsRunning(false);
       resumeModeRef.current = false;
       await fetchCurrentJob();
       await fetchResults(1, statusFilter);
@@ -418,6 +419,7 @@ export default function BatchCoursePdfRegeneratePage() {
 
       console.log("[Batch] Processing complete");
       processingRef.current = false;
+      setIsRunning(false);
       await fetchCurrentJob();
       await fetchResults(1, statusFilter);
 
