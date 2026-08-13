@@ -103,6 +103,15 @@ export default function CourseClient({
                 View Course Materials
               </button>
             )}
+            <a
+              href={`/api/courses/${courseId}/pdf?download=false&t=${Date.now()}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 text-xs text-[#0d7377] hover:underline mt-2"
+            >
+              <FileText className="w-3 h-3" />
+              Course Lessons PDF
+            </a>
           </div>
         </div>
       </div>

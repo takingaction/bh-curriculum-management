@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CourseImageUpload } from "@/components/course-image-upload";
 import { CoursePdfImageUpload } from "@/components/course-pdf-image-upload";
+import { CoursePdfCard } from "@/components/course-pdf-card";
 import { ManageImagesButton } from "@/components/manage-images-button";
 import { DeleteCourseButton } from "@/components/delete-course-button";
 import { CourseSpotifySection } from "@/components/course-spotify-section";
@@ -76,6 +77,8 @@ export default async function CourseDetailPage({
           <CoursePdfImageUpload courseId={course.id} currentImageUrl={course.pdf_image_url} />
         </CardContent>
       </Card>
+
+      <CoursePdfCard courseId={course.id} courseName={course.title} />
 
       <Card className="mb-8">
         <CardContent className="pt-6">
