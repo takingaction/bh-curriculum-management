@@ -50,18 +50,7 @@ export async function GET(
     // Build query for results
     let resultsQuery = supabaseAdmin
       .from("batch_course_pdf_results")
-      .select(`
-        *,
-        courses!course_id (
-          id,
-          title,
-          discipline,
-          grade
-        ),
-        course_pdfs (
-          file_size
-        )
-      `)
+      .select("*")
       .eq("job_id", jobId)
       .order("processed_at", { ascending: false });
 
@@ -86,23 +75,46 @@ export async function GET(
       return NextResponse.json({ error: "Failed to fetch results" }, { status: 500 });
     }
 
+    // Get unique course IDs
+    const courseIds = [...new Set((results || []).map(r => r.course_id).filter(Boolean))];
+
+    // Fetch course data
+    let coursesMap: Record<string, any> = {};
+    if (courseIds.length > 0) {
+      const { data: courses } = await supabaseAdmin
+        .from("courses")
+        .select("id, title, discipline, grade")
+        .in("id", courseIds);
+
+      if (courses) {
+        coursesMap = Object.fromEntries(courses.map(c => [c.id, c]));
+      }
+    }
+
+    // Fetch file sizes from course_pdfs
+    let fileSizesMap: Record<string, number | null> = {};
+    if (courseIds.length > 0) {
+      const { data: pdfData } = await supabaseAdmin
+        .from("course_pdfs")
+        .select("course_id, file_size")
+        .in("course_id", courseIds);
+
+      if (pdfData) {
+        fileSizesMap = Object.fromEntries(pdfData.map(p => [p.course_id, p.file_size]));
+      }
+    }
+
     // Combine data
     const resultsWithCourse = (results || []).map(r => ({
       ...r,
-      course: r.courses ? {
-        id: r.courses.id,
-        title: r.courses.title,
-        discipline: r.courses.discipline,
-        grade: r.courses.grade,
-        file_size: r.course_pdfs?.file_size || null,
+      course: r.course_id ? {
+        id: r.course_id,
+        title: coursesMap[r.course_id]?.title || null,
+        discipline: coursesMap[r.course_id]?.discipline || null,
+        grade: coursesMap[r.course_id]?.grade || null,
+        file_size: fileSizesMap[r.course_id] || null,
       } : null,
     }));
-
-    // Remove the nested keys since we flattened it
-    resultsWithCourse.forEach(r => {
-      delete r.courses;
-      delete r.course_pdfs;
-    });
 
     return NextResponse.json({
       job,
