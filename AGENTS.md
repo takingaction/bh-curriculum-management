@@ -520,6 +520,33 @@ Admin tool for regenerating all lesson PDFs at `/admin/pdf-regenerate`.
 
 **Note**: On Render Starter plan, PDFs process sequentially (~20 sec each, ~4 hours for 720 lessons)
 
+#### Discipline Scope & Sequence PDF
+Third PDF template showing all courses within a discipline (Music, Dance, or Theatre) on a single page.
+
+**PDF Layout**:
+- Header: Logo (left) + "SCOPE & SEQUENCE" badge (right, coral background, white text)
+- Discipline title bar: full-width coral, white text, all caps (e.g., "MUSIC" or "DANCE AND CULTURE")
+- Course list: bold title + summary per course, sorted by grade (PK, K, 1-6)
+- Footer: `[DISCIPLINE] | GRADES TK-6 | SCOPE + SEQUENCE`
+
+**Database table**:
+- `discipline_pdfs` - Stores discipline PDF metadata (discipline, storage_path, file_size, generated_at, generated_by)
+
+**Storage bucket**: `discipline-pdfs`
+
+**PDF Service endpoint**:
+- `POST /discipline-pdf` - Accepts `{ courses: array, discipline: string }` → returns `application/pdf`
+
+**API endpoints** (Next.js):
+- `GET /api/disciplines/[discipline]/pdf/info` - Get PDF metadata
+- `GET /api/disciplines/[discipline]/pdf` - View or download PDF (via ?download=true/false)
+- `POST /api/disciplines/[discipline]/pdf/generate` - Generate PDF, upload to Supabase Storage
+
+**Admin UI**:
+- PDF buttons appear below each discipline's course cards on `/admin/courses` page
+- Buttons: Generate PDF, View PDF, Download PDF
+- Component: `src/components/discipline-pdf-buttons.tsx`
+
 ### Environment Variables Required
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
