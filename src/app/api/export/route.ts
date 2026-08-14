@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { Document, Packer, Paragraph, TextRun, HeadingLevel } from "docx";
+import { Document, Packer, Paragraph, TextRun } from "docx";
 
 export async function POST(request: Request) {
   try {

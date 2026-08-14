@@ -798,6 +798,13 @@ When scope is set to "course" or "lesson", the `list_my_courses` tool is removed
 - Active scope selection also persists
 - Uses localStorage with `aiChatHistory_ask` and `aiChatScope_ask` keys
 
+**Ask Mode - Copy and Export**:
+- Each AI response has copy and export buttons in the top-right corner
+- **Copy**: Copies message text to clipboard (shows "Copied!" on success)
+- **Export**: Downloads AI response as a Word document (.docx) (shows "Done!" on success)
+- Export API at `POST /api/export` uses `docx` package to generate documents
+- Export parses markdown: headers (# ## ###), bold (**text**), italic (*text*), code (`text`), and links are preserved
+
 **Search Content tab**:
 - Uses `findMatchesInContent()` from `html-utils.ts` (same as Find & Replace)
 - Searches all 15 lesson content fields
