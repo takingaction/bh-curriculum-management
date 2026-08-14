@@ -110,7 +110,7 @@ export default function CourseClient({
               className="flex items-center gap-1.5 text-xs text-[#0d7377] hover:underline mt-2"
             >
               <FileText className="w-3 h-3" />
-              Course Lessons PDF
+              Course Scope & Sequence
             </a>
           </div>
         </div>
