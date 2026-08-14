@@ -481,6 +481,21 @@ Single source of truth: `profile.enrollments` array controls course access for a
   - `GET /api/lessons/[lessonId]/pdf/diagnostics` - Diagnostic endpoint for debugging PDF issues
 - **PDF error handling**: Generate endpoint returns detailed diagnostics on failure including PDF service URL, response status, HTML vs JSON detection, and extracted error messages
 
+**PDF Service Queue System:**
+- In-memory queue (`requestQueue`) prevents RAM exhaustion on single-instance Render
+- `pendingResults` Map tracks status per request: queued, processing, completed, failed
+- `cleanupStaleResults()` runs every 2 minutes and on each status/health check
+- Entries older than 10 minutes are cleaned up automatically
+- Entries without timestamps (pre-fix) are also cleaned up
+- Health endpoint shows `pending_results` count and `pending_details` array
+
+**Version PDF Polling:**
+- Version PDF route polls `/lesson-pdf-status` endpoint until PDF is ready
+- Polling interval: 2 seconds, max 60 attempts (2 minute timeout)
+- Status endpoint returns `Content-Type: application/json` for queued/processing
+- When completed, status endpoint returns `Content-Type: application/pdf` (binary)
+- Polling code checks `Content-Type` header before parsing JSON to handle binary response
+
 #### Batch PDF Regeneration Tool
 Admin tool for regenerating all lesson PDFs at `/admin/pdf-regenerate`.
 
