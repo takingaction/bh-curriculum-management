@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { SupabaseClient } from "@supabase/supabase-js";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
@@ -42,6 +43,109 @@ function addTargetBlankAndArrowsToLinks(obj: any): any {
     return result;
   }
   return obj;
+}
+
+interface UploadResult {
+  error?: string;
+  details?: any;
+  storagePath?: string;
+  fileSize?: number;
+}
+
+async function uploadPdfToStorage(
+  supabaseAdmin: SupabaseClient,
+  lessonId: string,
+  filename: string,
+  pdfBuffer: ArrayBuffer,
+  userId: string,
+  fileSize: number,
+  storagePath: string
+): Promise<UploadResult> {
+  console.log("Uploading PDF to storage:", storagePath, "Size:", fileSize);
+
+  const { error: removeError } = await supabaseAdmin.storage
+    .from("lesson-pdfs")
+    .remove([storagePath]);
+
+  if (removeError) {
+    console.log("Remove error (may not exist):", removeError.message);
+  }
+
+  const { error: uploadError } = await supabaseAdmin.storage
+    .from("lesson-pdfs")
+    .upload(storagePath, pdfBuffer, {
+      contentType: "application/pdf",
+      upsert: true,
+    });
+
+  if (uploadError) {
+    console.error("Storage upload error:", uploadError);
+    return {
+      error: "Failed to upload PDF to storage",
+      details: uploadError.message,
+      storagePath,
+      fileSize
+    };
+  }
+
+  const { error: upsertError } = await supabaseAdmin
+    .from("lesson_pdfs")
+    .upsert({
+      lesson_id: lessonId,
+      storage_path: storagePath,
+      file_size: fileSize,
+      generated_at: new Date().toISOString(),
+      generated_by: userId,
+    }, {
+      onConflict: "lesson_id",
+    });
+
+  if (upsertError) {
+    console.error("Database upsert error:", upsertError);
+    return { error: "Failed to save PDF metadata" };
+  }
+
+  return {};
+}
+
+async function updateBatchResultOnSuccess(
+  supabaseAdmin: SupabaseClient,
+  lessonId: string
+): Promise<void> {
+  const { data: failedEntries } = await supabaseAdmin
+    .from("batch_pdf_results")
+    .select("id, job_id")
+    .eq("lesson_id", lessonId)
+    .eq("status", "failed");
+
+  if (failedEntries && failedEntries.length > 0) {
+    for (const entry of failedEntries) {
+      await supabaseAdmin
+        .from("batch_pdf_results")
+        .update({
+          status: "success",
+          error_message: null,
+          processed_at: new Date().toISOString(),
+        })
+        .eq("id", entry.id);
+
+      const { data: job } = await supabaseAdmin
+        .from("batch_pdf_jobs")
+        .select("failure_count, success_count")
+        .eq("id", entry.job_id)
+        .single();
+
+      if (job) {
+        await supabaseAdmin
+          .from("batch_pdf_jobs")
+          .update({
+            failure_count: Math.max(0, job.failure_count - 1),
+            success_count: job.success_count + 1,
+          })
+          .eq("id", entry.job_id);
+      }
+    }
+  }
 }
 
 export async function POST(
@@ -117,9 +221,31 @@ export async function POST(
     const renderResponse = await fetch(`${pdfServiceUrl}/lesson-pdf`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ lesson: addTargetBlankAndArrowsToLinks(lesson), course }),
+      body: JSON.stringify({
+        lesson: addTargetBlankAndArrowsToLinks(lesson),
+        course,
+        lessonId // Pass lessonId so PDF service can track queue position
+      }),
       signal: AbortSignal.timeout(120000), // 2 minute timeout
     });
+
+    // Handle queue response - return queue info to client, let them poll
+    if (renderResponse.status === 202) {
+      const queueData = await renderResponse.json().catch(() => ({}));
+
+      if (queueData.status === 'queued') {
+        console.log(`[PDF] Service busy, queued at position ${queueData.position}. Returning to client.`);
+
+        // Return 202 with queue info so client can poll and show position
+        return NextResponse.json({
+          queued: true,
+          position: queueData.position,
+          queue_length: queueData.queue_length,
+          requestId: queueData.requestId || lessonId,
+          message: `PDF generation in progress. Your request is #${queueData.position} in queue.`
+        }, { status: 202 });
+      }
+    }
 
     if (!renderResponse.ok) {
       const errorText = await renderResponse.text();

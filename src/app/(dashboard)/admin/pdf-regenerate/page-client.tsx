@@ -199,7 +199,47 @@ export default function BatchPdfRegeneratePage() {
         return { success: true };
       }
 
-      // Retry once
+      // Check if queued - wait for completion
+      if (res.status === 202 && data.queued) {
+        console.log(`[Batch] Lesson ${lessonId} queued at position ${data.position}. Waiting for completion...`);
+        const requestId = data.requestId || lessonId;
+        const maxPolls = 60; // 60 polls x 3 seconds = 3 minutes max
+        let pollCount = 0;
+
+        while (pollCount < maxPolls) {
+          await new Promise(resolve => setTimeout(resolve, 3000));
+          pollCount++;
+
+          try {
+            const pdfRes = await fetch(`/api/lessons/${lessonId}/pdf`, {
+              signal: AbortSignal.timeout(10000)
+            });
+
+            if (pdfRes.ok) {
+              console.log(`[Batch] Lesson ${lessonId} completed after ${pollCount} queue polls`);
+              return { success: true };
+            }
+
+            // Check if still queued by calling generate again
+            const statusRes = await fetch(`/api/lessons/${lessonId}/pdf/generate`, { method: "POST" });
+            const statusData = await statusRes.json();
+
+            if (statusRes.ok && statusData.success) {
+              return { success: true };
+            }
+            if (statusRes.status === 202 && statusData.queued) {
+              console.log(`[Batch] Lesson ${lessonId} still queued at position ${statusData.position}`);
+              continue;
+            }
+          } catch (pollError) {
+            console.error(`[Batch] Poll error for lesson ${lessonId}:`, pollError);
+          }
+        }
+
+        return { success: false, error: "Timed out waiting in queue" };
+      }
+
+      // Retry once (only if not queued)
       const retryRes = await fetch(`/api/lessons/${lessonId}/pdf/generate`, { method: "POST" });
       const retryData = await retryRes.json();
 
