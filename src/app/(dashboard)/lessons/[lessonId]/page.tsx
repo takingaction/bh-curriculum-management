@@ -122,7 +122,7 @@ export default function LessonContentPage({
   const [pdfExists, setPdfExists] = useState(false);
   const [sectionPickerOpen, setSectionPickerOpen] = useState(false);
 
-  const canUseAI = profile?.email === "ron@myherocreative.com" || profile?.email === "emili@betterhumanseducation.com";
+  const canUseAI = profile?.email === "ron@myherocreative.com" || profile?.email === "emili@betterhumanseducation.com" || profile?.email === "tavis.danz@sanjuan.edu";
 
   const [versions, setVersions] = useState<LessonVersion[]>([]);
   const [activeVersionId, setActiveVersionId] = useState<string | null>(null);
@@ -149,6 +149,8 @@ export default function LessonContentPage({
   const [pdfVersion, setPdfVersion] = useState<LessonVersion | null>(null);
   const [versionsModalOpen, setVersionsModalOpen] = useState(false);
   const [copyingVersionId, setCopyingVersionId] = useState<string | null>(null);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [errorDetails, setErrorDetails] = useState("");
 
   const { clearModificationCallback, setVersionCount } = useChatContext();
 
@@ -680,12 +682,14 @@ export default function LessonContentPage({
           loadVersion(newVersion);
         } else {
           const error = await res.json();
-          alert(error.error || "Failed to save version");
+          setErrorDetails(error.error || "Failed to save version");
+          setShowErrorModal(true);
         }
       }
     } catch (err) {
       console.error("Failed to save version:", err);
-      alert("Failed to save version");
+      setErrorDetails(err instanceof Error ? err.message : "Unknown error occurred");
+      setShowErrorModal(true);
     }
   };
 
@@ -1386,6 +1390,32 @@ export default function LessonContentPage({
           </DialogHeader>
           <DialogFooter>
             <Button onClick={() => setShowSuccessModal(false)}>OK</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showErrorModal} onOpenChange={setShowErrorModal}>
+        <DialogContent className="w-[90%] md:w-[50%] md:max-w-[50%]">
+          <DialogHeader>
+            <DialogTitle>Failed to Save Version</DialogTitle>
+            <DialogDescription>
+              The lesson content was modified but the version couldn&apos;t be saved.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-4 p-3 bg-muted rounded-md text-sm">
+            <p className="font-medium text-destructive mb-1">Error Details:</p>
+            <p className="text-muted-foreground whitespace-pre-wrap">{errorDetails}</p>
+          </div>
+          <DialogFooter className="flex-row gap-2 sm:gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                navigator.clipboard.writeText(errorDetails);
+              }}
+            >
+              Copy Error Details
+            </Button>
+            <Button onClick={() => setShowErrorModal(false)}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

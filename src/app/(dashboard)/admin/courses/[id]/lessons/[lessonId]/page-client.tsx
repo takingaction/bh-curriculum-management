@@ -551,7 +551,7 @@ export default function EditLessonPage({
 
           {/* Right Content - Based on activePanel */}
           <div className="flex-1">
-            {(userEmail === "ron@myherocreative.com" || userEmail === "emili@betterhumanseducation.com") && versions.length > 0 && (
+            {(userEmail === "ron@myherocreative.com" || userEmail === "emili@betterhumanseducation.com" || userEmail === "tavis.danz@sanjuan.edu") && versions.length > 0 && (
               <div className="mb-4 pb-4 border-b border-[#e5e5e0]">
                 <VersionTabs
                   lessonId={lesson.id}

@@ -755,6 +755,7 @@ Feature for exploring lesson content and answering questions about music/dance/t
 **Widget Access**: Restricted to specific users only:
 - `ron@myherocreative.com`
 - `emili@betterhumanseducation.com`
+- `tavis.danz@sanjuan.edu`
 
 **Architecture**: Three separate API endpoints and components for Ask, Search, and Versions modes.
 
@@ -862,7 +863,7 @@ The `convertModifiedFields()` function in `version-utils.ts` handles:
 #### Lesson Version Control (AI-Powered)
 Feature allowing teachers to create/modify lessons via AI chat and save versions.
 
-**Access**: Restricted to admin users only (`ron@myherocreative.com`, `emili@betterhumanseducation.com`)
+**Access**: Restricted to admin users only (`ron@myherocreative.com`, `emili@betterhumanseducation.com`, `tavis.danz@sanjuan.edu`)
 
 **Database tables**:
 - `lesson_versions` - Stores AI-modified lesson content with version metadata
