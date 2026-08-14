@@ -240,13 +240,15 @@ export async function POST(
             continue;
           }
 
-          const statusData = await statusResponse.json();
+          const contentType = statusResponse.headers.get('content-type');
 
-          if (statusData.status === 'completed') {
+          if (contentType && contentType.includes('application/pdf')) {
             pdfBuffer = await statusResponse.arrayBuffer();
             console.log(`[Version PDF] PDF retrieved after ${i + 1} polls`);
             break;
           }
+
+          const statusData = await statusResponse.json();
 
           if (statusData.status === 'failed') {
             return NextResponse.json(
