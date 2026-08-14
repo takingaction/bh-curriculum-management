@@ -214,11 +214,57 @@ export async function POST(
     const renderResponse = await fetch(`${pdfServiceUrl}/lesson-pdf`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ lesson: lessonForPdf, course, isVersionPdf: true }),
+      body: JSON.stringify({ lesson: lessonForPdf, course, isVersionPdf: true, lessonId }),
       signal: AbortSignal.timeout(120000),
     });
 
-    if (!renderResponse.ok) {
+    let pdfBuffer: ArrayBuffer | null = null;
+
+    if (renderResponse.status === 202) {
+      const queueData = await renderResponse.json().catch(() => ({}));
+
+      if (queueData.status === 'queued' || queueData.status === 'processing') {
+        const requestId = queueData.requestId || lessonId;
+        console.log(`[Version PDF] Service busy, polling for PDF (position: ${queueData.position})`);
+
+        const maxPollAttempts = 60;
+        const pollIntervalMs = 2000;
+
+        for (let i = 0; i < maxPollAttempts; i++) {
+          await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
+
+          const statusResponse = await fetch(`${pdfServiceUrl}/lesson-pdf-status?lessonId=${requestId}`);
+
+          if (!statusResponse.ok) {
+            console.error("Status poll error:", statusResponse.status);
+            continue;
+          }
+
+          const statusData = await statusResponse.json();
+
+          if (statusData.status === 'completed') {
+            pdfBuffer = await statusResponse.arrayBuffer();
+            console.log(`[Version PDF] PDF retrieved after ${i + 1} polls`);
+            break;
+          }
+
+          if (statusData.status === 'failed') {
+            return NextResponse.json(
+              { error: "PDF generation failed", message: statusData.error },
+              { status: 500 }
+            );
+          }
+
+          if (i === maxPollAttempts - 1) {
+            return NextResponse.json({ error: "PDF generation timed out waiting for queue" }, { status: 500 });
+          }
+        }
+      }
+
+      if (pdfBuffer === null) {
+        pdfBuffer = await renderResponse.arrayBuffer();
+      }
+    } else if (!renderResponse.ok) {
       const errorText = await renderResponse.text();
       console.error("Render PDF service error:", errorText);
 
@@ -233,9 +279,9 @@ export async function POST(
         },
         { status: 500 }
       );
+    } else {
+      pdfBuffer = await renderResponse.arrayBuffer();
     }
-
-    const pdfBuffer = await renderResponse.arrayBuffer();
     const fileSize = pdfBuffer.byteLength;
 
     if (fileSize > MAX_FILE_SIZE) {
