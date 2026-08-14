@@ -78,6 +78,21 @@ export default async function DashboardPage() {
     .select("id")
     .eq("teacher_id", userId);
 
+  // Fetch discipline PDF info for available disciplines
+  const disciplinePdfs: Record<string, { exists: boolean }> = {};
+  const disciplines = ["Music", "Theatre", "Dance"];
+  for (const discipline of disciplines) {
+    const hasCourses = courses.some(c => c.discipline === discipline);
+    if (hasCourses) {
+      const { data: pdfData } = await supabase
+        .from("discipline_pdfs")
+        .select("discipline")
+        .eq("discipline", discipline)
+        .maybeSingle();
+      disciplinePdfs[discipline] = { exists: !!pdfData };
+    }
+  }
+
   return (
     <DashboardClient
       profile={profile}
@@ -88,6 +103,7 @@ export default async function DashboardPage() {
       isInactive={isInactive}
       isTrial={isTrial}
       trialEndsAt={trialEndsAt}
+      disciplinePdfs={disciplinePdfs}
     />
   );
 }

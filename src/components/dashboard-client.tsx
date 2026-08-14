@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { CourseCard } from "@/components/course-card";
 import VideoDialog from "@/components/video-dialog";
+import { FileText } from "lucide-react";
 
 const DISCIPLINE_ORDER = ["Music", "Theatre", "Dance"];
 
@@ -24,6 +25,7 @@ interface DashboardClientProps {
   isInactive?: boolean;
   isTrial?: boolean;
   trialEndsAt?: string | null;
+  disciplinePdfs?: Record<string, { exists: boolean }>;
 }
 
 export default function DashboardClient({
@@ -35,6 +37,7 @@ export default function DashboardClient({
   isInactive = false,
   isTrial = false,
   trialEndsAt = null,
+  disciplinePdfs = {},
 }: DashboardClientProps) {
   const [activeTab, setActiveTab] = useState<string>(
     DISCIPLINE_ORDER.find((d) => courses.some((c) => c.discipline === d)) || "Music"
@@ -136,18 +139,29 @@ export default function DashboardClient({
                 </div>
               </div>
 
-              <div key={activeTab} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                {activeCourses.map((course) => (
-                  <CourseCard
-                    key={course.id}
-                    id={course.id}
-                    title={course.title}
-                    discipline={course.discipline}
-                    grade={course.grade}
-                    imageUrl={course.image_url}
-                    lessonCount={lessonCounts[course.id] || 0}
-                  />
-                ))}
+              <div key={activeTab}>
+                <a
+                  href={`/api/disciplines/${activeTab}/pdf`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[#0d7377] hover:underline flex items-center gap-2 text-sm mb-4"
+                >
+                  <FileText className="w-4 h-4" />
+                  Courses Scope & Sequence
+                </a>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                  {activeCourses.map((course) => (
+                    <CourseCard
+                      key={course.id}
+                      id={course.id}
+                      title={course.title}
+                      discipline={course.discipline}
+                      grade={course.grade}
+                      imageUrl={course.image_url}
+                      lessonCount={lessonCounts[course.id] || 0}
+                    />
+                  ))}
+                </div>
               </div>
             </>
           ) : (
