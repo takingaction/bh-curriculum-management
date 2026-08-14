@@ -799,9 +799,9 @@ When scope is set to "course" or "lesson", the `list_my_courses` tool is removed
 - Uses localStorage with `aiChatHistory_ask` and `aiChatScope_ask` keys
 
 **Ask Mode - Copy and Export**:
-- Each AI response has copy and export buttons in the top-right corner
-- **Copy**: Copies message text to clipboard (shows "Copied!" on success)
-- **Export**: Downloads AI response as a Word document (.docx) (shows "Done!" on success)
+- Each AI response has copy and export buttons at the bottom of the message
+- **Copy**: Copies message text to clipboard (shows green checkmark briefly on success)
+- **Export**: Downloads AI response as a Word document (.docx) (shows green checkmark briefly on success)
 - Export API at `POST /api/export` uses `docx` package to generate documents
 - Export parses markdown: headers (# ## ###), bold (**text**), italic (*text*), code (`text`), and links are preserved
 
