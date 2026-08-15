@@ -224,83 +224,11 @@ export async function POST(
       body: JSON.stringify({
         lesson: addTargetBlankAndArrowsToLinks(lesson),
         course,
-        lessonId // Pass lessonId so PDF service can track queue position
       }),
       signal: AbortSignal.timeout(120000), // 2 minute timeout
     });
 
-    // Handle queue response - poll until PDF is ready
     let pdfBuffer: ArrayBuffer | null = null;
-
-    if (renderResponse.status === 202) {
-      const queueData = await renderResponse.json().catch(() => ({}));
-
-      if (queueData.status === 'queued' || queueData.status === 'processing') {
-        const requestId = queueData.requestId || lessonId;
-        console.log(`[PDF] Service busy, polling for PDF (position: ${queueData.position})`);
-
-        const maxPollAttempts = 60;
-        const pollIntervalMs = 2000;
-
-        for (let i = 0; i < maxPollAttempts; i++) {
-          await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
-
-          const statusResponse = await fetch(`${pdfServiceUrl}/lesson-pdf-status?lessonId=${requestId}`);
-
-          if (!statusResponse.ok) {
-            console.error(`[PDF] Status poll error: ${statusResponse.status}`);
-            continue;
-          }
-
-          const contentType = statusResponse.headers.get('content-type');
-          console.log(`[PDF] Poll ${i + 1}: Content-Type=${contentType}`);
-
-          // Check if response is PDF binary (completed)
-          if (contentType && contentType.includes('application/pdf')) {
-            pdfBuffer = await statusResponse.arrayBuffer();
-            console.log(`[PDF] PDF retrieved after ${i + 1} polls`);
-            break;
-          }
-
-          // Try to parse as JSON
-          let statusData;
-          try {
-            statusData = await statusResponse.json();
-          } catch (jsonError) {
-            // If JSON parsing fails, response might be PDF binary anyway
-            console.log(`[PDF] JSON parse failed, trying text fallback`);
-            const text = await statusResponse.text();
-            if (text.length > 100 && !text.startsWith('{')) {
-              // Likely PDF binary
-              pdfBuffer = new TextEncoder().encode(text).buffer;
-              console.log(`[PDF] PDF retrieved via text fallback after ${i + 1} polls`);
-              break;
-            }
-            console.error(`[PDF] Failed to parse status response`);
-            continue;
-          }
-
-          if (statusData.status === 'failed') {
-            return NextResponse.json(
-              { error: "PDF generation failed", message: statusData.error },
-              { status: 500 }
-            );
-          }
-
-          if (i === maxPollAttempts - 1) {
-            return NextResponse.json({ error: "PDF generation timed out waiting for queue" }, { status: 500 });
-          }
-        }
-
-        // If we still don't have PDF buffer, try the renderResponse
-        if (pdfBuffer === null) {
-          const renderContentType = renderResponse.headers.get('content-type');
-          if (renderContentType && renderContentType.includes('application/pdf')) {
-            pdfBuffer = await renderResponse.arrayBuffer();
-          }
-        }
-      }
-    }
 
     if (!renderResponse.ok) {
       const errorText = await renderResponse.text();
@@ -341,12 +269,9 @@ export async function POST(
       );
     }
 
-    // If PDF wasn't retrieved via polling, get it from renderResponse
-    if (pdfBuffer === null) {
-      const contentType = renderResponse.headers.get("content-type");
-      if (contentType && contentType.includes("application/pdf")) {
-        pdfBuffer = await renderResponse.arrayBuffer();
-      }
+    const contentType = renderResponse.headers.get("content-type");
+    if (contentType && contentType.includes("application/pdf")) {
+      pdfBuffer = await renderResponse.arrayBuffer();
     }
 
     if (pdfBuffer === null) {

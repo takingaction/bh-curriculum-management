@@ -214,69 +214,13 @@ export async function POST(
     const renderResponse = await fetch(`${pdfServiceUrl}/lesson-pdf`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ lesson: lessonForPdf, course, isVersionPdf: true, lessonId }),
+      body: JSON.stringify({ lesson: lessonForPdf, course, isVersionPdf: true }),
       signal: AbortSignal.timeout(120000),
     });
 
     let pdfBuffer: ArrayBuffer | null = null;
 
-    if (renderResponse.status === 202) {
-      const queueData = await renderResponse.json().catch(() => ({}));
-
-      if (queueData.status === 'queued' || queueData.status === 'processing') {
-        const requestId = queueData.requestId || lessonId;
-        console.log(`[Version PDF] Service busy, polling for PDF (position: ${queueData.position})`);
-
-        const maxPollAttempts = 60;
-        const pollIntervalMs = 2000;
-
-        for (let i = 0; i < maxPollAttempts; i++) {
-          await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
-
-          const statusResponse = await fetch(`${pdfServiceUrl}/lesson-pdf-status?lessonId=${requestId}`);
-
-          if (!statusResponse.ok) {
-            console.error("Status poll error:", statusResponse.status);
-            continue;
-          }
-
-          const contentType = statusResponse.headers.get('content-type');
-          console.log(`[Version PDF] Poll ${i + 1}: Content-Type=${contentType}`);
-
-          // Check if response is PDF binary (completed)
-          if (contentType && contentType.includes('application/pdf')) {
-            pdfBuffer = await statusResponse.arrayBuffer();
-            console.log(`[Version PDF] PDF retrieved after ${i + 1} polls`);
-            break;
-          }
-
-          // Parse JSON status response
-          let statusData;
-          try {
-            statusData = await statusResponse.json();
-          } catch (jsonError) {
-            // If JSON parsing fails, might be an error page or corrupted response
-            console.error(`[Version PDF] JSON parse failed: ${jsonError}`);
-            continue;
-          }
-
-          if (statusData.status === 'failed') {
-            return NextResponse.json(
-              { error: "PDF generation failed", message: statusData.error },
-              { status: 500 }
-            );
-          }
-
-          if (i === maxPollAttempts - 1) {
-            return NextResponse.json({ error: "PDF generation timed out waiting for queue" }, { status: 500 });
-          }
-        }
-      }
-
-      if (pdfBuffer === null) {
-        pdfBuffer = await renderResponse.arrayBuffer();
-      }
-    } else if (!renderResponse.ok) {
+    if (!renderResponse.ok) {
       const errorText = await renderResponse.text();
       console.error("Render PDF service error:", errorText);
 
@@ -291,9 +235,17 @@ export async function POST(
         },
         { status: 500 }
       );
-    } else {
+    }
+
+    const contentType = renderResponse.headers.get('content-type');
+    if (contentType && contentType.includes('application/pdf')) {
       pdfBuffer = await renderResponse.arrayBuffer();
     }
+
+    if (pdfBuffer === null) {
+      return NextResponse.json({ error: "Failed to get PDF from service" }, { status: 500 });
+    }
+
     const fileSize = pdfBuffer.byteLength;
 
     if (fileSize > MAX_FILE_SIZE) {
