@@ -279,7 +279,6 @@ export async function POST(
     }
 
     const fileSize = pdfBuffer.byteLength;
-    const contentType = renderResponse.headers.get("content-type") || "unknown";
     const contentLength = renderResponse.headers.get("content-length") || "not set";
 
     console.log("PDF received - Content-Type:", contentType);
