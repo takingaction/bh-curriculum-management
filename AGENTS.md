@@ -488,6 +488,14 @@ Single source of truth: `profile.enrollments` array controls course access for a
 - Entries older than 10 minutes are cleaned up automatically
 - Entries without timestamps (pre-fix) are also cleaned up
 - Health endpoint shows `pending_results` count and `pending_details` array
+- **Generation timeout**: 2 minutes per PDF (prevents stuck queue from blocking forever)
+- **Stuck detection**: Health endpoint shows `stuck_warning: true` when `isGenerating: true` but queue is empty
+
+**PDF Service Endpoints:**
+- `GET /health` - Health check with queue status, shows `stuck_warning` when queue may be stuck
+- `POST /clear-stuck` - Clear all queued items and reset `isGenerating` flag
+- `POST /skip-current` - Skip currently generating PDF and continue processing next in queue
+- `GET /lesson-pdf-status?lessonId=X` - Check status of a specific PDF generation request
 
 **Version PDF Polling:**
 - Version PDF route polls `/lesson-pdf-status` endpoint until PDF is ready
