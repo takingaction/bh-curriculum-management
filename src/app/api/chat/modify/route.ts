@@ -1,10 +1,60 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
+import { streamAnthropicResponse } from "@/lib/anthropic-stream";
 
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
 const MODEL = "claude-haiku-4-5";
 const MODIFICATION_MODEL = "claude-sonnet-4-5";
-const MAX_TOKENS = 12000; // TEMPORARILY INCREASED FOR TESTING - REVERT TO 8192 AFTER
+const MAX_TOKENS = 24000;
+const RETRY_MAX_TOKENS = 32000;
+
+// Field name alias mapping - maps alternate field names to canonical database names
+const FIELD_ALIAS_MAP: Record<string, string> = {
+  // Canonical names (map to themselves)
+  'lesson_outline': 'lesson_outline',
+  'learning_objectives': 'learning_objectives',
+  'vocabulary': 'vocabulary',
+  'materials': 'materials',
+  'welcome_opening': 'welcome_opening',
+  'actual_class_expectations': 'actual_class_expectations',
+  'warm_up': 'warm_up',
+  'lesson_hook': 'lesson_hook',
+  'main_activity': 'main_activity',
+  'instrument_expectations': 'instrument_expectations',
+  'reflection': 'reflection',
+  'closing_ceremony': 'closing_ceremony',
+  'assessment': 'assessment',
+  'vapa_text_block': 'vapa_text_block',
+  'ncas_text_block': 'ncas_text_block',
+  // Aliases
+  'outline': 'lesson_outline',
+  'objectives': 'learning_objectives',
+  'vocab': 'vocabulary',
+  'opening': 'welcome_opening',
+  'welcome': 'welcome_opening',
+  'welcome_and_opening': 'welcome_opening',
+  'expectations': 'actual_class_expectations',
+  'actual_class_and_expectations': 'actual_class_expectations',
+  'warmup': 'warm_up',
+  'hook': 'lesson_hook',
+  'activity': 'main_activity',
+  'instrument': 'instrument_expectations',
+  'closing': 'closing_ceremony',
+  'vapa_standards': 'vapa_text_block',
+  'vapa': 'vapa_text_block',
+  'ncas_standards': 'ncas_text_block',
+  'ncas': 'ncas_text_block',
+};
+
+// Normalize a field name: apply alias mapping, then convert camelCase to snake_case
+function normalizeFieldName(fieldName: string): string {
+  // First check alias map
+  const aliased = FIELD_ALIAS_MAP[fieldName];
+  if (aliased) return aliased;
+  // Then convert camelCase to snake_case
+  const snake = fieldName.replace(/([A-Z])/g, '_$1').toLowerCase();
+  return snake.startsWith('_') ? snake.substring(1) : snake;
+}
 
 type ModificationType = "duration" | "translation" | "materials";
 
@@ -268,10 +318,8 @@ For a TRANSLATION into ${targetLanguage || "the target language"}:
 - Maintain the structure and formatting
 - Keep HTML tags intact
 - Preserve all formatting (bold, italic, lists, etc.)
-- Do NOT translate:
-  - Song lyrics that don't translate well (mark as " [original] ")
-  - Tongue twisters (mark as " [English tongue twister] ")
-  - Cultural references that may not translate`;
+- CRITICAL - SONG LYRICS AND CHANTS: Do NOT translate songs, chants, or call-and-response lyrics. Keep them 100% in English. If a Japanese equivalent exists, you MAY add it in parentheses AFTER the English, but the English version must remain intact. Example: "Twinkle Twinkle Little Star (きらきら星)"
+- Do NOT translate tongue twisters (mark as " [English tongue twister] ")`;
   }
 
   return basePrompt;
@@ -340,29 +388,111 @@ interface LessonBasic {
   assessment?: string;
 }
 
+function unescapeJsonString(text: string): string {
+  return text
+    .replace(/\\"/g, '"')
+    .replace(/\\\\/g, '\\');
+}
+
+interface TruncationDetection {
+  isTruncated: boolean;
+  reason: string | null;
+  missingFields: string[];
+  needsRetry: boolean;
+}
+
+function detectTruncation(aiResponse: string, expectedFields: string[]): TruncationDetection {
+  const result: TruncationDetection = {
+    isTruncated: false,
+    reason: null,
+    missingFields: [],
+    needsRetry: false
+  };
+
+  // Check for literal ellipsis placeholder (AI output "..." to indicate skipped content)
+  if (/\.\.\.|…/.test(aiResponse)) {
+    const ellipsisMatches = aiResponse.match(/"(\.\.\.|…)"|(\.\.\.|…)(?=\s*[",}\]])/g);
+    if (ellipsisMatches) {
+      result.isTruncated = true;
+      result.reason = `AI used literal ellipsis placeholder: ${ellipsisMatches.join(', ')}`;
+      result.needsRetry = true;
+    }
+  }
+
+  // Check if JSON appears to be cut off mid-field (ends with opening quote but no closing)
+  const lastChunk = aiResponse.slice(-200);
+  if (lastChunk.includes('"html": "') && !lastChunk.match(/"[^"]*"\s*[,\}]/)) {
+    result.isTruncated = true;
+    result.reason = 'JSON appears cut off mid-field value';
+    result.needsRetry = true;
+  }
+
+  // Check for incomplete table structures in the response
+  const tableOpenCount = (aiResponse.match(/<table[^>]*>/g) || []).length;
+  const tableCloseCount = (aiResponse.match(/<\/table>/g) || []).length;
+  if (tableOpenCount > tableCloseCount && tableOpenCount > 0) {
+    result.isTruncated = true;
+    result.reason = `Table structure incomplete (${tableOpenCount} open, ${tableCloseCount} close)`;
+    result.needsRetry = true;
+  }
+
+  // Check for unclosed style attributes (style="...value" without proper ending)
+  const styleAttrMatches = aiResponse.match(/style=["'][^"']*$/g);
+  if (styleAttrMatches && styleAttrMatches.length > 0) {
+    result.isTruncated = true;
+    result.reason = `Unclosed style attribute: "${styleAttrMatches[styleAttrMatches.length - 1].slice(-50)}"`;
+    result.needsRetry = true;
+  }
+
+  // Check for expected fields that are missing from the response
+  const foundFields: string[] = [];
+  const fieldPattern = /"(\w+)":\s*\{\s*["']html["']/g;
+  let match;
+  while ((match = fieldPattern.exec(aiResponse)) !== null) {
+    foundFields.push(match[1]);
+  }
+
+  // Normalize field names using shared helper for comparison
+  const normalizedFound = foundFields.map(normalizeFieldName);
+  const normalizedExpected = expectedFields.map(normalizeFieldName);
+
+  for (const expected of normalizedExpected) {
+    if (!normalizedFound.includes(expected)) {
+      result.missingFields.push(expected);
+    }
+  }
+
+  // If more than 2 expected fields are missing, likely truncation
+  if (result.missingFields.length > 2 && !result.isTruncated) {
+    result.isTruncated = true;
+    result.reason = `Missing ${result.missingFields.length} expected fields: ${result.missingFields.join(', ')}`;
+    result.needsRetry = true;
+  }
+
+  // Check if response ends abruptly (no proper closing braces)
+  const trimmedResponse = aiResponse.trim();
+  if (trimmedResponse.endsWith('"') || trimmedResponse.endsWith(',')) {
+    const afterLastBrace = trimmedResponse.substring(trimmedResponse.lastIndexOf('}') + 1);
+    if (afterLastBrace.includes('"') && !afterLastBrace.includes('}')) {
+      result.isTruncated = true;
+      result.reason = 'Response ends abruptly without proper JSON closure';
+      result.needsRetry = true;
+    }
+  }
+
+  if (result.isTruncated) {
+    console.log(`[TRUNCATION DETECT] Detected truncation: ${result.reason}`);
+    console.log(`[TRUNCATION DETECT] Missing fields: ${result.missingFields.join(', ') || 'none'}`);
+    console.log(`[TRUNCATION DETECT] Needs retry: ${result.needsRetry}`);
+  }
+
+  return result;
+}
+
 // Helper function to extract complete field objects from potentially truncated JSON
 function extractFieldsFromTruncatedJson(text: string): Record<string, unknown> | null {
   console.log("[EXTRACT] Starting field extraction, text length:", text.length);
   const result: Record<string, unknown> = {};
-
-  // Map common aliases for all field variants
-  const fieldMap: Record<string, string> = {
-    'lesson_outline': 'lesson_outline', 'outline': 'lesson_outline',
-    'learning_objectives': 'learning_objectives', 'objectives': 'learning_objectives',
-    'vocabulary': 'vocabulary', 'vocab': 'vocabulary',
-    'materials': 'materials',
-    'welcome_opening': 'welcome_opening', 'opening': 'welcome_opening', 'welcome': 'welcome_opening', 'welcome_and_opening': 'welcome_opening',
-    'actual_class_expectations': 'actual_class_expectations', 'expectations': 'actual_class_expectations', 'actual_class_and_expectations': 'actual_class_expectations',
-    'warm_up': 'warm_up', 'warmup': 'warm_up',
-    'lesson_hook': 'lesson_hook', 'hook': 'lesson_hook',
-    'main_activity': 'main_activity', 'activity': 'main_activity',
-    'instrument_expectations': 'instrument_expectations', 'instrument': 'instrument_expectations',
-    'reflection': 'reflection',
-    'closing_ceremony': 'closing_ceremony', 'closing': 'closing_ceremony',
-    'assessment': 'assessment',
-    'vapa_text_block': 'vapa_text_block', 'vapa': 'vapa_text_block', 'vapa_standards': 'vapa_text_block',
-    'ncas_text_block': 'ncas_text_block', 'ncas': 'ncas_text_block', 'ncas_standards': 'ncas_text_block',
-  };
 
   // Find all "field_name": { patterns
   const fieldStartPattern = /(["'])(\w+)\1\s*:\s*\{\s*(["'])html\3\s*:/gi;
@@ -404,8 +534,9 @@ function extractFieldsFromTruncatedJson(text: string): Record<string, unknown> |
       i++;
     }
 
-    const htmlContent = text.slice(contentStart, contentEnd);
-    console.log(`[EXTRACT] Field ${fieldName} raw (${htmlContent.length} chars): "${htmlContent.substring(0, 150)}..."`);
+    const rawHtmlContent = text.slice(contentStart, contentEnd);
+    const htmlContent = unescapeJsonString(rawHtmlContent);
+    console.log(`[EXTRACT] Field ${fieldName} raw (${rawHtmlContent.length} chars): "${rawHtmlContent.substring(0, 150)}..."`);
     if (!htmlContent) continue;
 
     // Validate: extracted content should start with < (HTML tag) or be a short valid string
@@ -427,6 +558,40 @@ function extractFieldsFromTruncatedJson(text: string): Record<string, unknown> |
         appearsComplete = false;
         console.log(`[EXTRACT] WARNING: Field ${fieldName} appears incomplete (${openTags} open tags, ${closeTags} close tags, ${selfClosing} self-closing)`);
       }
+
+      // Enhanced table completeness check
+      if (appearsComplete && htmlContent.includes('<table')) {
+        if (!htmlContent.includes('</table>')) {
+          appearsComplete = false;
+          console.log(`[EXTRACT] WARNING: Field ${fieldName} has <table> but no </table>, marking as truncated`);
+        }
+        // Also check for incomplete row/cell structure in tables
+        const tableOpenCount = (htmlContent.match(/<table[^>]*>/g) || []).length;
+        const tableCloseCount = (htmlContent.match(/<\/table>/g) || []).length;
+        if (tableOpenCount > 0 && tableOpenCount !== tableCloseCount) {
+          appearsComplete = false;
+          console.log(`[EXTRACT] WARNING: Field ${fieldName} has unbalanced table tags (${tableOpenCount} open, ${tableCloseCount} close), marking as truncated`);
+        }
+      }
+
+      // Check for literal "..." or "…" placeholder (AI indicating skipped/omitted content)
+      const trimmedContent = htmlContent.trim();
+      if (trimmedContent === '...' || trimmedContent === '…' || trimmedContent === '"..."' || trimmedContent === '"…"') {
+        appearsComplete = false;
+        console.log(`[EXTRACT] WARNING: Field ${fieldName} contains literal placeholder (${trimmedContent}), marking as truncated`);
+      }
+
+      // Check for suspiciously truncated style attribute values
+      // Pattern: style="...value" where value ends mid-word (no semicolon, no closing quote properly)
+      const styleAttrMatch = htmlContent.match(/style=["']([^"']*)$/);
+      if (styleAttrMatch && styleAttrMatch[1].length > 0) {
+        const styleValue = styleAttrMatch[1];
+        // If it doesn't end with a proper terminator and is reasonably long, it's truncated
+        if (!styleValue.match(/[;"']\s*$/) && styleValue.length > 20) {
+          appearsComplete = false;
+          console.log(`[EXTRACT] WARNING: Field ${fieldName} has truncated style attribute (ends with: "${styleValue.slice(-30)}"), marking as truncated`);
+        }
+      }
     }
 
     if (!isValidHtml || isSuspiciouslyShort || !appearsComplete) {
@@ -438,11 +603,7 @@ function extractFieldsFromTruncatedJson(text: string): Record<string, unknown> |
       continue;
     }
 
-    // Normalize field name to snake_case
-    let normalizedName = fieldName.replace(/([A-Z])/g, '_$1').toLowerCase();
-    if (normalizedName.startsWith('_')) normalizedName = normalizedName.substring(1);
-
-    const finalName = fieldMap[normalizedName] || normalizedName;
+    const finalName = normalizeFieldName(fieldName);
     if (finalName && htmlContent && !finalName.includes('_html') && !finalName.includes('original')) {
       result[finalName] = { html: htmlContent, original_length: htmlContent.length };
     }
@@ -590,59 +751,55 @@ export async function POST(request: Request) {
     // For translation: include all 15 fields
     const isDurationMod = effectiveModType === "duration";
 
+    // The 9 modifiable fields for duration modifications
+    const DURATION_MODIFIABLE_FIELDS = [
+      'lesson_outline',
+      'welcome_opening',
+      'actual_class_expectations',
+      'warm_up',
+      'lesson_hook',
+      'main_activity',
+      'instrument_expectations',
+      'reflection',
+      'closing_ceremony'
+    ];
+
+    // All 15 fields for translation
+    const ALL_FIELDS = [
+      { key: 'lesson_outline', label: 'LESSON OUTLINE' },
+      { key: 'learning_objectives', label: 'LEARNING OBJECTIVES' },
+      { key: 'vocabulary', label: 'VOCABULARY' },
+      { key: 'materials', label: 'MATERIALS' },
+      { key: 'welcome_opening', label: 'WELCOME AND OPENING CHECK-IN' },
+      { key: 'actual_class_expectations', label: 'CLASS EXPECTATIONS AND PROCEDURES' },
+      { key: 'warm_up', label: 'WARM UP' },
+      { key: 'lesson_hook', label: 'LESSON HOOK' },
+      { key: 'main_activity', label: 'MAIN ACTIVITY' },
+      { key: 'instrument_expectations', label: 'INSTRUMENT EXPECTATIONS' },
+      { key: 'reflection', label: 'REFLECTION' },
+      { key: 'closing_ceremony', label: 'CLOSING CEREMONY' },
+      { key: 'assessment', label: 'ASSESSMENT' },
+      { key: 'vapa_text_block', label: 'VAPA STANDARDS' },
+      { key: 'ncas_text_block', label: 'NCAS STANDARDS' },
+    ];
+
+    const fieldsToInclude = isDurationMod
+      ? ALL_FIELDS.filter(f => DURATION_MODIFIABLE_FIELDS.includes(f.key))
+      : ALL_FIELDS;
+
+    const fieldsContent = fieldsToInclude
+      .map(f => `--- ${f.label} ---\n${getFieldContent(f.key)}`)
+      .join('\n\n');
+
     let modificationLessonContent = `FULL CONTENT OF THIS LESSON:
 
 Lesson: ${lessonTitle}
 Course: ${courseTitle}
 Grade: ${courseGrade}
 Lesson Number: ${lessonNumber}
-${isDurationMod ? "(Note: Only modify the fields below. Do not change: learning_objectives, vocabulary, materials, vapa_text_block, ncas_text_block, assessment)" : ""}
+${isDurationMod ? "(Note: Only modify the fields below. Do not change any other fields.)" : ""}
 
---- LESSON OUTLINE ---
-${getFieldContent('lesson_outline')}
-
-${isDurationMod ? "" : `--- LEARNING OBJECTIVES ---
-${getFieldContent('learning_objectives')}
-
---- VOCABULARY ---
-${getFieldContent('vocabulary')}
-
---- MATERIALS ---
-${getFieldContent('materials')}
-`}
---- WELCOME AND OPENING CHECK-IN ---
-${getFieldContent('welcome_opening')}
-
---- CLASS EXPECTATIONS AND PROCEDURES ---
-${getFieldContent('actual_class_expectations')}
-
---- WELCOME UP ---
-${getFieldContent('warm_up')}
-
---- LESSON HOOK ---
-${getFieldContent('lesson_hook')}
-
---- MAIN ACTIVITY ---
-${getFieldContent('main_activity')}
-
---- INSTRUMENT EXPECTATIONS ---
-${getFieldContent('instrument_expectations')}
-
---- REFLECTION ---
-${getFieldContent('reflection')}
-
---- CLOSING CEREMONY ---
-${getFieldContent('closing_ceremony')}
-${isDurationMod ? "" : `
-
---- ASSESSMENT ---
-${getFieldContent('assessment')}
-
---- VAPA STANDARDS ---
-${getFieldContent('vapa_text_block')}
-
---- NCAS STANDARDS ---
-${getFieldContent('ncas_text_block')}`}
+${fieldsContent}
 `;
 
     if (waitingForConfirmation && userSaidProceed) {
@@ -668,138 +825,259 @@ ${getFieldContent('ncas_text_block')}`}
         });
       }
 
-      let response;
-      try {
-        response = await fetch(ANTHROPIC_API_URL, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-api-key": apiKey,
-            "anthropic-version": "2023-06-01",
-          },
-          body: JSON.stringify({
-            model: MODIFICATION_MODEL,
-            max_tokens: MAX_TOKENS,
-            system: systemPrompt,
-            messages: messages.map((m: { role: string; content: string }) => ({
-              role: m.role,
-              content: m.content,
-            })),
-          }),
+      let aiResponse = "";
+      let streamSuccess = false;
+      let attempts = 0;
+      let truncationRetryCount = 0;
+      const maxStreamAttempts = 2;
+      const maxTruncationRetries = 1;
+
+      // Expected fields for truncation detection
+      const expectedFields: string[] = isDurationMod ? DURATION_MODIFIABLE_FIELDS : ALL_FIELDS.map(f => f.key);
+
+      let parsedPreview: Record<string, unknown> | null = null;
+
+      while (truncationRetryCount <= maxTruncationRetries) {
+        const currentMaxTokens = truncationRetryCount === 0 ? MAX_TOKENS : RETRY_MAX_TOKENS;
+        console.log(`[MODIFY API] Stream attempt ${attempts + 1}, max_tokens: ${currentMaxTokens}`);
+
+        const requestBody = JSON.stringify({
+          model: MODIFICATION_MODEL,
+          max_tokens: currentMaxTokens,
+          stream: true,
+          system: systemPrompt,
+          messages: messages.map((m: { role: string; content: string }) => ({
+            role: m.role,
+            content: m.content,
+          })),
         });
-      } catch (err) {
-        return NextResponse.json({
-          response: "Network error. Please try again.",
-          links: [],
-          results: [],
-          isModificationRequest: true,
-        });
-      }
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Anthropic API error:", response.status, errorText);
-        return NextResponse.json({
-          response: `AI API error (${response.status}). Please try again.`,
-          links: [],
-          results: [],
-          isModificationRequest: true,
-        });
-      }
+        aiResponse = "";
+        streamSuccess = false;
+        attempts = 0;
 
-      const result = await response.json();
-      const aiResponse = result.content?.[0]?.text || "";
+        while (!streamSuccess && attempts < maxStreamAttempts) {
+          attempts++;
 
-      // Comprehensive logging for debugging
-      console.log("[MODIFY API] ========== DEBUG START ==========");
-      console.log("[MODIFY API] modDirection value:", modDirection);
-      console.log("[MODIFY API] userSaidProceed:", userSaidProceed);
-      console.log("[MODIFY API] confirmationModificationType:", confirmationModificationType);
-      console.log("[MODIFY API] originalTargetLanguage:", originalTargetLanguage);
-      console.log("[MODIFY API] AI response length:", aiResponse.length);
-      console.log("[MODIFY API] AI response first 500 chars:", aiResponse.substring(0, 500));
-      console.log("[MODIFY API] AI response last 500 chars:", aiResponse.substring(aiResponse.length - 500));
-      console.log("[MODIFY API] ========== DEBUG END ==========");
-
-      let parsedPreview = null;
-      try {
-        // Try multiple strategies to extract complete JSON
-        let jsonStr = "";
-
-        // Strategy 1: Extract from markdown code blocks
-        const codeBlockMatch = aiResponse.match(/```(?:json)?\s*([\s\S]*?)```/);
-        if (codeBlockMatch && codeBlockMatch[1]) {
-          jsonStr = codeBlockMatch[1].trim();
-        }
-
-        // Strategy 2: If no complete JSON from code block, find the largest complete object
-        if (!jsonStr || !jsonStr.includes('"modifiedFields"')) {
-          const firstBrace = aiResponse.indexOf('{');
-          const lastBrace = aiResponse.lastIndexOf('}');
-          if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-            jsonStr = aiResponse.substring(firstBrace, lastBrace + 1);
-          }
-        }
-
-        // Strategy 3: If JSON is truncated (incomplete), try to find complete field objects
-        if (jsonStr) {
+          let response;
           try {
-            parsedPreview = JSON.parse(jsonStr);
-          } catch (parseErr) {
-            // JSON is incomplete/truncated - try to extract individual complete fields
-            console.log("[MODIFY API] JSON parse failed, attempting field-by-field extraction");
-            parsedPreview = extractFieldsFromTruncatedJson(aiResponse);
+            response = await fetch(ANTHROPIC_API_URL, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "x-api-key": apiKey,
+                "anthropic-version": "2023-06-01",
+              },
+              body: requestBody,
+            });
+          } catch (err) {
+            return NextResponse.json({
+              response: "Network error. Please try again.",
+              links: [],
+              results: [],
+              isModificationRequest: true,
+            });
           }
-        }
 
-        // Normalize modifiedFields (handle both camelCase and snake_case)
-        if (parsedPreview) {
-          const fields = parsedPreview.modifiedFields || parsedPreview.modified_fields || {};
-          parsedPreview.modifiedFields = fields;
-          console.log("[MODIFY API] Parsed fields:", Object.keys(fields).join(', '));
-          console.log("[MODIFY API] Field content lengths:");
-          for (const [key, val] of Object.entries(fields)) {
-            const fieldVal = val as { html?: string };
-            const html = fieldVal?.html || "";
-            console.log(`[MODIFY API]   ${key}: ${html.length} chars`);
-            // Validate: if content has significant length but no HTML tags, it might be narrative text
-            if (html.length > 100 && !html.includes('<') && !html.includes('>')) {
-              console.log(`[MODIFY API]   WARNING: Field ${key} appears to contain narrative text (no HTML tags), content preview: ${html.substring(0, 100)}...`);
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error("Anthropic API error:", response.status, errorText);
+            return NextResponse.json({
+              response: `AI API error (${response.status}). Please try again.`,
+              links: [],
+              results: [],
+              isModificationRequest: true,
+            });
+          }
+
+          try {
+            let charCount = 0;
+            for await (const chunk of streamAnthropicResponse(response)) {
+              aiResponse += chunk;
+              charCount += chunk.length;
+
+              if (charCount % 1000 === 0) {
+                await new Promise(resolve => setImmediate(resolve));
+              }
             }
-          }
-
-          // Validate we have meaningful content for duration modifications
-          if (effectiveModType === "duration") {
-            const fieldCount = Object.keys(fields).length;
-            const totalChars = Object.values(fields).reduce((sum: number, val: unknown) => sum + ((val as { html?: string })?.html?.length || 0), 0);
-            console.log(`[MODIFY API] Duration mod validation: ${fieldCount} fields, ${totalChars} total chars`);
-
-            // For duration, expect meaningful content - at least 500 total chars (rough indicator of valid HTML)
-            // Also check that non-empty fields have at least 50 chars (empty fields are OK - they'll use original content)
-            const fieldLengths = Object.values(fields).map((val: unknown) => ((val as { html?: string })?.html?.length || 0)).filter(len => len > 0);
-            const minFieldLength = fieldLengths.length > 0 ? Math.min(...fieldLengths) : 0;
-            console.log(`[MODIFY API] Duration mod: ${fieldCount} fields, ${totalChars} total chars, smallest non-empty field: ${minFieldLength} chars`);
-
-            if (fieldCount < 1 || totalChars < 500 || (fieldLengths.length > 0 && minFieldLength < 50)) {
-              console.log("[MODIFY API] Duration modification appears incomplete, returning error");
+            streamSuccess = true;
+          } catch (streamErr) {
+            console.error(`[MODIFY API] Stream attempt ${attempts} failed:`, streamErr);
+            if (attempts >= maxStreamAttempts) {
               return NextResponse.json({
-                response: "I ran out of tokens to complete this job correctly. Please try again.",
+                response: "Failed to process AI response. Please try again.",
                 links: [],
                 results: [],
                 isModificationRequest: true,
-                needsConfirmation: false,
               });
             }
+            await new Promise(resolve => setTimeout(resolve, 1000));
           }
         }
-      } catch (err) {
-        console.log("[MODIFY API] JSON extraction error:", err);
-        // Failed to parse
+
+        console.log(`[MODIFY API] Stream completed: ${aiResponse.length} chars, ${attempts} attempt(s)`);
+
+        // Comprehensive logging for debugging
+        console.log("[MODIFY API] ========== DEBUG START ==========");
+        console.log("[MODIFY API] modDirection value:", modDirection);
+        console.log("[MODIFY API] userSaidProceed:", userSaidProceed);
+        console.log("[MODIFY API] confirmationModificationType:", confirmationModificationType);
+        console.log("[MODIFY API] originalTargetLanguage:", originalTargetLanguage);
+        console.log("[MODIFY API] AI response length:", aiResponse.length);
+        console.log("[MODIFY API] AI response first 500 chars:", aiResponse.substring(0, 500));
+        console.log("[MODIFY API] AI response last 500 chars:", aiResponse.substring(aiResponse.length - 500));
+        console.log("[MODIFY API] ========== DEBUG END ==========");
+
+        // Run truncation detection BEFORE attempting extraction
+        const truncationDetection = detectTruncation(aiResponse, expectedFields);
+
+        parsedPreview = null;
+        try {
+          // Try multiple strategies to extract complete JSON
+          let jsonStr = "";
+
+          // Strategy 1: Extract from markdown code blocks
+          const codeBlockMatch = aiResponse.match(/```(?:json)?\s*([\s\S]*?)```/);
+          if (codeBlockMatch && codeBlockMatch[1]) {
+            jsonStr = codeBlockMatch[1].trim();
+          }
+
+          // Strategy 2: If no complete JSON from code block, find the largest complete object
+          if (!jsonStr || !jsonStr.includes('"modifiedFields"')) {
+            const firstBrace = aiResponse.indexOf('{');
+            const lastBrace = aiResponse.lastIndexOf('}');
+            if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+              jsonStr = aiResponse.substring(firstBrace, lastBrace + 1);
+            }
+          }
+
+          // Strategy 3: If JSON is truncated (incomplete), try to find complete field objects
+          if (jsonStr) {
+            try {
+              parsedPreview = JSON.parse(jsonStr);
+            } catch (parseErr) {
+              // JSON is incomplete/truncated - try to extract individual complete fields
+              console.log("[MODIFY API] JSON parse failed, attempting field-by-field extraction");
+              parsedPreview = extractFieldsFromTruncatedJson(aiResponse);
+            }
+          }
+
+          // Normalize modifiedFields (handle both camelCase, snake_case, and field aliases)
+          if (parsedPreview) {
+            const rawFields = parsedPreview.modifiedFields || parsedPreview.modified_fields || {};
+
+            // Normalize all field keys to canonical database names
+            const normalizedFields: Record<string, { html?: string; original_length?: number }> = {};
+            for (const [key, value] of Object.entries(rawFields)) {
+              const canonicalKey = normalizeFieldName(key);
+              if (!normalizedFields[canonicalKey]) {
+                normalizedFields[canonicalKey] = value;
+              }
+            }
+            parsedPreview.modifiedFields = normalizedFields;
+            const fields = normalizedFields;
+
+            console.log("[MODIFY API] Parsed fields:", Object.keys(fields).join(', '));
+            console.log("[MODIFY API] Field content lengths:");
+            const fieldEntries = Object.entries(fields);
+            for (let i = 0; i < fieldEntries.length; i++) {
+              const [key, val] = fieldEntries[i];
+              const fieldVal = val as { html?: string };
+              const html = fieldVal?.html || "";
+              console.log(`[MODIFY API]   ${key}: ${html.length} chars`);
+              if (html.length > 100 && !html.includes('<') && !html.includes('>')) {
+                console.log(`[MODIFY API]   WARNING: Field ${key} appears to contain narrative text (no HTML tags), content preview: ${html.substring(0, 100)}...`);
+              }
+              if (i % 5 === 0) {
+                await new Promise(resolve => setImmediate(resolve));
+              }
+            }
+
+            // Validate we have meaningful content for duration modifications
+            if (effectiveModType === "duration") {
+              const fieldCount = Object.keys(fields).length;
+              const totalChars = Object.values(fields).reduce((sum: number, val: unknown) => sum + ((val as { html?: string })?.html?.length || 0), 0);
+              console.log(`[MODIFY API] Duration mod validation: ${fieldCount} fields, ${totalChars} total chars`);
+
+              // For duration, expect meaningful content - at least 500 total chars (rough indicator of valid HTML)
+              // Also check that non-empty fields have at least 50 chars (empty fields are OK - they'll use original content)
+              const fieldLengths = Object.values(fields).map((val: unknown) => ((val as { html?: string })?.html?.length || 0)).filter(len => len > 0);
+              const minFieldLength = fieldLengths.length > 0 ? Math.min(...fieldLengths) : 0;
+              console.log(`[MODIFY API] Duration mod: ${fieldCount} fields, ${totalChars} total chars, smallest non-empty field: ${minFieldLength} chars`);
+
+              // Check if we should retry due to truncation
+              const needsRetry = truncationRetryCount < maxTruncationRetries &&
+                (truncationDetection.isTruncated || fieldCount < expectedFields.length - 2 || totalChars < 1000);
+
+              if (needsRetry) {
+                console.log(`[MODIFY API] Truncation detected (${truncationDetection.reason || 'insufficient content'}), retrying with higher max_tokens...`);
+                truncationRetryCount++;
+                continue; // Retry the while loop
+              }
+
+              if (fieldCount < 1 || totalChars < 500 || (fieldLengths.length > 0 && minFieldLength < 50)) {
+                console.log("[MODIFY API] Duration modification appears incomplete, returning error");
+                return NextResponse.json({
+                  response: "I ran out of tokens to complete this job correctly. Please try again.",
+                  links: [],
+                  results: [],
+                  isModificationRequest: true,
+                  needsConfirmation: false,
+                });
+              }
+            }
+          }
+
+          // If we got here with valid parsedPreview, break out of the retry loop
+          if (parsedPreview) {
+            break;
+          }
+        } catch (err) {
+          console.log("[MODIFY API] JSON extraction error:", err);
+        }
+
+        // If no valid parsedPreview but we haven't exhausted retries, try again
+        if (truncationRetryCount < maxTruncationRetries) {
+          console.log("[MODIFY API] No valid preview extracted, retrying with higher max_tokens...");
+          truncationRetryCount++;
+          continue;
+        }
+
+        // We've exhausted retries
+        break;
       }
 
       if (parsedPreview && parsedPreview.modifiedFields) {
         modificationPreview = parsedPreview;
-        
+
+        // Validate all 15 fields are present; fill missing fields with original content
+        const allFieldKeys = [
+          'lesson_outline', 'learning_objectives', 'vocabulary', 'materials',
+          'vapa_text_block', 'ncas_text_block', 'welcome_opening', 'actual_class_expectations',
+          'warm_up', 'lesson_hook', 'main_activity', 'instrument_expectations',
+          'reflection', 'closing_ceremony', 'assessment'
+        ];
+
+        const modifiedFields = modificationPreview.modifiedFields as Record<string, { html?: string; original_length?: number }>;
+        const missingFields: string[] = [];
+
+        for (const fieldKey of allFieldKeys) {
+          if (!modifiedFields[fieldKey] || !modifiedFields[fieldKey].html) {
+            missingFields.push(fieldKey);
+            // Get original content from fullLesson
+            const fullLessonAny = fullLesson as unknown as Record<string, string>;
+            const originalHtml = fullLessonAny[fieldKey] || "";
+            if (originalHtml) {
+              modifiedFields[fieldKey] = { html: originalHtml, original_length: originalHtml.length };
+              console.log(`[MODIFY API] Filled missing field '${fieldKey}' with original content (${originalHtml.length} chars)`);
+            }
+          }
+        }
+
+        if (missingFields.length > 0) {
+          console.log(`[MODIFY API] Missing fields filled from original: ${missingFields.join(', ')}`);
+        }
+
         const timestamp = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
         if (effectiveModType === "translation" && targetLanguage) {

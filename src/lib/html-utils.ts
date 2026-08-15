@@ -577,6 +577,134 @@ function countMatchesInHTML(html: string, search: string): number {
   return count;
 }
 
+export function htmlToPlainText(html: string): string {
+  if (!html) return "";
+
+  const handler = new DomHandler(undefined, { withStartIndices: true, withEndIndices: true });
+  const parser = new Parser(handler);
+  parser.parseComplete(html);
+
+  const BLOCK_TAGS = new Set(["p", "div", "h1", "h2", "h3", "h4", "h5", "h6", "li", "tr", "table", "ul", "ol", "br", "hr"]);
+  const INLINE_TAGS = new Set(["strong", "b", "em", "i", "a", "img", "span", "td", "th"]);
+
+  let result = "";
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const walk = (nodes: any[], inBlockContext: boolean = false) => {
+    for (let i = 0; i < nodes.length; i++) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const node: any = nodes[i];
+      const isLastNode = i === nodes.length - 1;
+
+      if (node instanceof Text) {
+        result += node.data || "";
+      } else if (node.name) {
+        const tagName = node.name.toLowerCase();
+
+        if (tagName === "br") {
+          result += "\n";
+        } else if (tagName === "p" || tagName === "div") {
+          if (!inBlockContext) {
+            result += "\n\n";
+          }
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          walk(node.children || [], true);
+          if (!isLastNode && !inBlockContext) {
+            result += "\n\n";
+          }
+        } else if (/^h[1-6]$/.test(tagName)) {
+          if (!inBlockContext && result.length > 0 && !result.endsWith("\n\n")) {
+            result += "\n\n";
+          }
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          walk(node.children || []);
+          if (!isLastNode) {
+            result += "\n\n";
+          }
+        } else if (tagName === "strong" || tagName === "b") {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const textContent = getTextContent(node.children || []);
+          if (textContent) {
+            result += "**" + textContent + "**";
+          }
+        } else if (tagName === "em" || tagName === "i") {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const textContent = getTextContent(node.children || []);
+          if (textContent) {
+            result += "*" + textContent + "*";
+          }
+        } else if (tagName === "a") {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          walk(node.children || []);
+        } else if (tagName === "img") {
+          result += "[image]";
+        } else if (tagName === "li") {
+          result += "- ";
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          walk(node.children || []);
+          result += "\n";
+        } else if (tagName === "td" || tagName === "th") {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          walk(node.children || []);
+          if (!isLastNode) {
+            result += " | ";
+          }
+        } else if (tagName === "tr") {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          walk(node.children || []);
+          result += "\n";
+        } else if (tagName === "ul" || tagName === "ol") {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          walk(node.children || []);
+          if (!isLastNode) {
+            result += "\n";
+          }
+        } else if (tagName === "table") {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          walk(node.children || []);
+          if (!isLastNode) {
+            result += "\n\n";
+          }
+        } else if (tagName === "hr") {
+          result += "\n---\n";
+        } else if (INLINE_TAGS.has(tagName)) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          walk(node.children || []);
+        } else {
+          // For unknown tags (including span), just walk children
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          walk(node.children || [], inBlockContext);
+        }
+      }
+    }
+  };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  walk(handler.root.children);
+
+  // Collapse multiple newlines to max 2
+  result = result.replace(/\n{3,}/g, "\n\n");
+
+  // Remove trailing newlines from each line and clean up spacing
+  const lines = result.split("\n");
+  const cleanedLines = lines.map(line => line.trim()).filter(line => line !== "" || lines.length === 1);
+
+  return cleanedLines.join("\n").trim();
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getTextContent(nodes: any[]): string {
+  let text = "";
+  for (const node of nodes) {
+    if (node instanceof Text) {
+      text += node.data || "";
+    } else if (node.children) {
+      text += getTextContent(node.children);
+    }
+  }
+  return text;
+}
+
 export const TEXT_FIELDS_LIST = [
   "lesson_outline",
   "learning_objectives",

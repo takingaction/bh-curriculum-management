@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
-import { searchLessons, getLessonDetails, listMyCourses } from "@/lib/search-utils";
+import { searchLessons, getLessonDetails, listMyCourses, GetLessonDetailsResult } from "@/lib/search-utils";
+import { htmlToPlainText } from "@/lib/html-utils";
 
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
 const MODEL = "claude-sonnet-4-5";
@@ -15,6 +16,7 @@ The search looks across all lesson content including: lesson outlines, learning 
 materials, VAPA standards, NCAS standards, welcome activities, warm-ups, main activities, reflections, assessments, and more.
 
 Returns a list of matching lessons with their titles, course information, grade levels, and relevant content snippets.
+ALWAYS check the "total_matches" field in the response - it shows the ACTUAL total count of all matching content, which may be larger than the number of lessons returned (capped by max_results).
 
 This tool accesses ONLY lessons the user has permission to view (based on their enrollment).`,
   input_schema: {
@@ -39,8 +41,8 @@ This tool accesses ONLY lessons the user has permission to view (based on their 
       },
       max_results: {
         type: "number",
-        description: "Maximum number of results to return (default: 10, max: 50)",
-        default: 10
+        description: "Maximum number of lessons to return (default: 25, max: 100). Note: The search also returns total_matches which shows the actual total count of matching content.",
+        default: 25
       }
     },
     required: ["query"]
@@ -252,10 +254,19 @@ IMPORTANT: This platform cannot receive files or images. Only ask for text-based
             continue;
           }
 
-          result = await getLessonDetails({
+          const lessonDetails = await getLessonDetails({
             lesson_id: finalLessonId!,
             sections: toolInput.sections,
           });
+
+          // Strip HTML from lesson content for ASK tab (only affects AI, not VERSIONS)
+          if (lessonDetails && lessonDetails.content) {
+            for (const field of Object.keys(lessonDetails.content)) {
+              lessonDetails.content[field] = htmlToPlainText(lessonDetails.content[field]);
+            }
+          }
+
+          result = lessonDetails;
         } else if (toolName === "list_my_courses") {
           result = await listMyCourses(userId);
         } else {

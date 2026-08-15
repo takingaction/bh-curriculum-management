@@ -32,7 +32,7 @@ CREATE INDEX IF NOT EXISTS idx_lesson_versions_created_by
 CREATE OR REPLACE FUNCTION check_version_limit()
 RETURNS TRIGGER AS $$
 BEGIN
-  IF (SELECT COUNT(*) FROM lesson_versions
+  IF (SELECT COUNT(*) FROM public.lesson_versions
       WHERE lesson_id = NEW.lesson_id AND deleted_at IS NULL) >= 3 THEN
     RAISE EXCEPTION 'Maximum of 3 active versions allowed per lesson';
   END IF;

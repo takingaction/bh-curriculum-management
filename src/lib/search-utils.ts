@@ -113,7 +113,7 @@ function getFieldLabel(fieldName: string): string {
 }
 
 export async function searchLessons(params: SearchLessonsParams): Promise<SearchLessonsResult> {
-  const { query, grade, courseId, discipline, maxResults = 10, userId } = params;
+  const { query, grade, courseId, discipline, maxResults = 25, userId } = params;
 
   const supabase = await createClient();
 

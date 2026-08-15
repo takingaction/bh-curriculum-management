@@ -41,7 +41,7 @@ RETURNS UUID AS $$
 DECLARE
   v_log_id UUID;
 BEGIN
-  INSERT INTO user_activity_log (user_id, action, resource_id)
+  INSERT INTO public.user_activity_log (user_id, action, resource_id)
   VALUES (p_user_id, p_action, p_resource_id)
   RETURNING id INTO v_log_id;
   RETURN v_log_id;
@@ -54,7 +54,7 @@ RETURNS SETOF DATE AS $$
 BEGIN
   RETURN QUERY
   SELECT DISTINCT DATE(created_at)::DATE
-  FROM user_activity_log
+  FROM public.user_activity_log
   WHERE user_id = p_user_id
     AND created_at >= p_start_date
     AND created_at < p_end_date

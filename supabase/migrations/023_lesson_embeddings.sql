@@ -48,7 +48,7 @@ CREATE POLICY "Admin full access to lesson_embeddings"
 CREATE OR REPLACE FUNCTION delete_lesson_embeddings(p_lesson_id UUID)
 RETURNS void AS $$
 BEGIN
-  DELETE FROM lesson_embeddings WHERE lesson_id = p_lesson_id;
+  DELETE FROM public.lesson_embeddings WHERE lesson_id = p_lesson_id;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
@@ -71,7 +71,7 @@ BEGIN
     le.field_name,
     le.chunk_text,
     1 - (le.embedding <=> query_embedding) AS similarity
-  FROM lesson_embeddings le
+  FROM public.lesson_embeddings le
   WHERE 1 - (le.embedding <=> query_embedding) > match_threshold
   ORDER BY le.embedding <=> query_embedding
   LIMIT match_count;
