@@ -250,32 +250,14 @@ export async function POST(
             break;
           }
 
-          // Try to parse as JSON
+          // Parse JSON status response
           let statusData;
           try {
             statusData = await statusResponse.json();
           } catch (jsonError) {
-            // If JSON parsing fails, response might be PDF binary anyway
-            console.log(`[Version PDF] JSON parse failed, trying arrayBuffer`);
-            const text = await statusResponse.text();
-            if (text.length > 100 && !text.startsWith('{')) {
-              // Likely PDF binary
-              pdfBuffer = new TextEncoder().encode(text).buffer;
-              console.log(`[Version PDF] PDF retrieved via text fallback after ${i + 1} polls`);
-              break;
-            }
-            console.error(`[Version PDF] Failed to parse status response: ${jsonError}`);
+            // If JSON parsing fails, might be an error page or corrupted response
+            console.error(`[Version PDF] JSON parse failed: ${jsonError}`);
             continue;
-          }
-
-          if (statusData.status === 'completed') {
-            // This shouldn't happen if Content-Type is correct, but handle it
-            const pdfResponse = await fetch(`${pdfServiceUrl}/lesson-pdf-status?lessonId=${requestId}`);
-            if (pdfResponse.headers.get('content-type')?.includes('application/pdf')) {
-              pdfBuffer = await pdfResponse.arrayBuffer();
-              console.log(`[Version PDF] PDF retrieved via re-fetch after ${i + 1} polls`);
-              break;
-            }
           }
 
           if (statusData.status === 'failed') {
