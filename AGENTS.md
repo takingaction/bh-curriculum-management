@@ -482,27 +482,24 @@ Single source of truth: `profile.enrollments` array controls course access for a
 - **PDF error handling**: Generate endpoint returns detailed diagnostics on failure including PDF service URL, response status, HTML vs JSON detection, and extracted error messages
 
 **PDF Service Queue System:**
-- In-memory queue (`requestQueue`) prevents RAM exhaustion on single-instance Render
-- `pendingResults` Map tracks status per request: queued, processing, completed, failed
-- `cleanupStaleResults()` runs every 2 minutes and on each status/health check
-- Entries older than 10 minutes are cleaned up automatically
-- Entries without timestamps (pre-fix) are also cleaned up
-- Health endpoint shows `pending_results` count and `pending_details` array
-- **Generation timeout**: 2 minutes per PDF (prevents stuck queue from blocking forever)
-- **Stuck detection**: Health endpoint shows `stuck_warning: true` when `isGenerating: true` but queue is empty
+- Queue system was REMOVED (August 2026) - caused more problems than it solved
+- Lesson and version PDFs now return directly (synchronous) like course/discipline PDFs
+- `/lesson-pdf` endpoint now awaits `generatePDF()` and returns PDF directly
+- Queue code still exists in `pdf-service/src/index.js` but is dormant (unused)
+- Health endpoint still shows queue status but queue is always empty now
 
 **PDF Service Endpoints:**
-- `GET /health` - Health check with queue status, shows `stuck_warning` when queue may be stuck
-- `POST /clear-stuck` - Clear all queued items and reset `isGenerating` flag
-- `POST /skip-current` - Skip currently generating PDF and continue processing next in queue
-- `GET /lesson-pdf-status?lessonId=X` - Check status of a specific PDF generation request
+- `GET /health` - Health check with queue status
+- `POST /clear-stuck` - Clear queue and reset state
+- `POST /skip-current` - Skip current PDF
+- `GET /lesson-pdf-status?lessonId=X` - Legacy endpoint (no longer used by client)
+- `GET /debug-network` - Debug endpoint to test external URL access from service
 
-**Version PDF Polling:**
-- Version PDF route polls `/lesson-pdf-status` endpoint until PDF is ready
-- Polling interval: 2 seconds, max 60 attempts (2 minute timeout)
-- Status endpoint returns `Content-Type: application/json` for queued/processing
-- When completed, status endpoint returns `Content-Type: application/pdf` (binary)
-- Polling code checks `Content-Type` header before parsing JSON to handle binary response
+**CJK Font Support (August 2026):**
+- Fonts loaded via Google Fonts CDN using `<link>` tags (not `@import`)
+- `document.fonts.ready` is awaited before PDF generation to ensure fonts load
+- Fonts: Noto Sans SC (Chinese), Noto Sans JP (Japanese), Noto Sans KR (Korean)
+- Preconnect hints added for fonts.googleapis.com and fonts.gstatic.com
 
 #### Batch PDF Regeneration Tool
 Admin tool for regenerating all lesson PDFs at `/admin/pdf-regenerate`.
