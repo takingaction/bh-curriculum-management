@@ -4,19 +4,19 @@ import { getPdfFileName, TEXT_FIELDS_LIST } from "@/lib/version-utils";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
-const inFlightJobs = new Map<string, { jobId: string; promise: Promise<any> }>();
+const inFlightJobs = new Map<string, Promise<string>>();
 
-function getOrCreateJob(lessonId: string, versionId: string, pdfServiceUrl: string, lessonForPdf: any, course: any) {
+async function getOrCreateJob(lessonId: string, versionId: string, pdfServiceUrl: string, lessonForPdf: any, course: any): Promise<string> {
   const key = `${lessonId}:${versionId}`;
   const existing = inFlightJobs.get(key);
   if (existing) {
-    console.log("[VersionPDF] Found existing in-flight job for", key, ":", existing.jobId);
+    console.log("[VersionPDF] Found existing in-flight job for", key, "- reusing");
     return existing;
   }
 
   console.log("[VersionPDF] Creating new job for", key);
 
-  const submitPromise = (async () => {
+  const submitJob = async (): Promise<string> => {
     const submitResponse = await fetch(`${pdfServiceUrl}/queue/submit`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -34,25 +34,21 @@ function getOrCreateJob(lessonId: string, versionId: string, pdfServiceUrl: stri
 
     const { jobId } = await submitResponse.json();
     return jobId;
-  })();
+  };
 
-  const entry = { promise: submitPromise, jobId: null as string | null };
-  submitPromise.then((jobId) => {
-    entry.jobId = jobId;
-  });
+  const jobPromise = submitJob();
+  inFlightJobs.set(key, jobPromise);
 
-  inFlightJobs.set(key, entry as any);
-
-  submitPromise.finally(() => {
+  jobPromise.finally(() => {
     setTimeout(() => {
       const current = inFlightJobs.get(key);
-      if (current && (current as any).jobId === entry.jobId) {
+      if (current === jobPromise) {
         inFlightJobs.delete(key);
       }
     }, 60000);
   });
 
-  return { jobId: null, promise: submitPromise };
+  return jobPromise;
 }
 
 function addTargetBlankAndArrowsToLinks(obj: any): any {
@@ -241,8 +237,7 @@ export async function POST(
     }
 
     console.log("[VersionPDF][", requestId, "] Submitting job to queue...");
-    const jobInfo = await getOrCreateJob(lessonId, versionId, pdfServiceUrl, lessonForPdf, course);
-    const jobId = await jobInfo.promise;
+    const jobId = await getOrCreateJob(lessonId, versionId, pdfServiceUrl, lessonForPdf, course);
     console.log("[VersionPDF][", requestId, "] Job submitted to queue:", jobId);
 
     // Poll for completion
