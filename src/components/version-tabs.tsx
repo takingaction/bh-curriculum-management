@@ -62,7 +62,7 @@ export function VersionTabs({
   const handleViewPdf = (version: LessonVersion, e: React.MouseEvent) => {
     e.stopPropagation();
     if (version.pdf_storage_path) {
-      const url = `/api/lessons/${lessonId}/versions/${version.id}/pdf`;
+      const url = `/api/lessons/${lessonId}/versions/${version.id}/pdf?cb=${Date.now()}`;
       window.open(url, "_blank");
     }
   };

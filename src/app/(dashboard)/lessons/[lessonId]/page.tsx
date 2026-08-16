@@ -120,6 +120,7 @@ export default function LessonContentPage({
   const [courseAssets, setCourseAssets] = useState<any[]>([]);
   const [activeSection, setActiveSection] = useState<string | null>(null);
   const [pdfExists, setPdfExists] = useState(false);
+  const [pdfCacheBust, setPdfCacheBust] = useState<string>("");
   const [sectionPickerOpen, setSectionPickerOpen] = useState(false);
 
   const canUseAI = profile?.email === "ron@myherocreative.com" || profile?.email === "emili@betterhumanseducation.com" || profile?.email === "tavis.danz@sanjuan.edu";
@@ -437,7 +438,10 @@ export default function LessonContentPage({
     if (lesson?.id) {
       fetch(`/api/lessons/${lesson.id}/pdf/info`)
         .then(res => res.json())
-        .then(data => setPdfExists(data.exists === true))
+        .then(data => {
+          setPdfExists(data.exists === true);
+          setPdfCacheBust(data.generated_at ? new Date(data.generated_at).getTime().toString() : "");
+        })
         .catch(() => setPdfExists(false));
     }
   }, [lesson]);
@@ -827,7 +831,7 @@ export default function LessonContentPage({
   };
 
   const handleViewPdf = (versionId: string) => {
-    window.open(`/api/lessons/${lesson?.id}/versions/${versionId}/pdf`, "_blank");
+    window.open(`/api/lessons/${lesson?.id}/versions/${versionId}/pdf?cb=${Date.now()}`, "_blank");
   };
 
   const handleSwitchVersion = (action: 'save' | 'discard' | 'cancel') => {
@@ -945,7 +949,7 @@ export default function LessonContentPage({
                     ) : (
                       <>
                         <a
-                          href={`/api/lessons/${lesson.id}/pdf?download=false`}
+                          href={`/api/lessons/${lesson.id}/pdf?download=false&t=${pdfCacheBust}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-[#0d7377] hover:underline"
@@ -955,7 +959,7 @@ export default function LessonContentPage({
                         </a>
                         {" | "}
                         <a
-                          href={`/api/lessons/${lesson.id}/pdf?download=true`}
+                          href={`/api/lessons/${lesson.id}/pdf?download=true&t=${pdfCacheBust}`}
                           download
                           className="text-[#0d7377] hover:underline"
                           onClick={(e) => handlePdfClick(e, true)}

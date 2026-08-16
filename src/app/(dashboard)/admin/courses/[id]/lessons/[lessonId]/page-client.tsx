@@ -117,6 +117,7 @@ export default function EditLessonPage({
   } | null>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [pdfError, setPdfError] = useState<{ message: string; diagnostics?: any } | null>(null);
+  const [pdfCacheBust, setPdfCacheBust] = useState<string>("");
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [fields, setFields] = useState<Fields>({
     lesson_number: "",
@@ -198,7 +199,10 @@ export default function EditLessonPage({
     if (lesson?.id) {
       fetch(`/api/lessons/${lesson.id}/pdf/info`)
         .then((res) => res.json())
-        .then((data) => setPdfInfo(data))
+        .then((data) => {
+          setPdfInfo(data);
+          setPdfCacheBust(data.generated_at ? new Date(data.generated_at).getTime().toString() : "");
+        })
         .catch(() => setPdfInfo({ exists: false }));
     }
   }, [lesson?.id]);
@@ -252,6 +256,7 @@ export default function EditLessonPage({
         file_size: data.file_size,
         filename: data.filename,
       });
+      setPdfCacheBust(Date.now().toString());
     } catch (err: any) {
       setPdfError({
         message: err.message,
@@ -679,7 +684,7 @@ export default function EditLessonPage({
                     </div>
                     <div className="flex gap-4">
                       <a
-                        href={`/api/lessons/${lesson.id}/pdf?download=false`}
+                        href={`/api/lessons/${lesson.id}/pdf?download=false&t=${pdfCacheBust}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="px-4 py-2 bg-white border border-[#0d7377] text-[#0d7377] rounded hover:bg-[#0d7377] hover:text-white transition-colors"
@@ -687,7 +692,7 @@ export default function EditLessonPage({
                         View PDF
                       </a>
                       <a
-                        href={`/api/lessons/${lesson.id}/pdf?download=true`}
+                        href={`/api/lessons/${lesson.id}/pdf?download=true&t=${pdfCacheBust}`}
                         className="px-4 py-2 bg-white border border-[#0d7377] text-[#0d7377] rounded hover:bg-[#0d7377] hover:text-white transition-colors"
                       >
                         Download PDF
