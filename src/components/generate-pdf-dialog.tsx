@@ -36,6 +36,7 @@ export function GeneratePdfDialog({
   const [isGenerating, setIsGenerating] = useState(false);
 
   const handleOpenChange = (newOpen: boolean) => {
+    console.log("[GeneratePdfDialog] handleOpenChange called, newOpen:", newOpen, "isGenerating:", isGenerating);
     if (!newOpen) {
       setIsGenerating(false);
     }
@@ -43,7 +44,9 @@ export function GeneratePdfDialog({
   };
 
   useEffect(() => {
+    console.log("[GeneratePdfDialog] useEffect running, open:", open, "isGenerating:", isGenerating);
     if (open && !isGenerating) {
+      console.log("[GeneratePdfDialog] Starting generation, setting isGenerating=true");
       setIsGenerating(true);
       setDialogState("generating");
       setError(null);
@@ -52,10 +55,12 @@ export function GeneratePdfDialog({
   }, [open]);
 
   const handleGenerate = async () => {
+    console.log("[GeneratePdfDialog] handleGenerate called, lessonId:", lessonId, "version.id:", version.id);
     setDialogState("generating");
     setError(null);
 
     try {
+      console.log("[GeneratePdfDialog] Fetching PDF API...");
       const res = await fetch(`/api/lessons/${lessonId}/versions/${version.id}/pdf`, {
         method: "POST",
       });

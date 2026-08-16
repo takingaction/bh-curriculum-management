@@ -4,6 +4,57 @@ import { getPdfFileName, TEXT_FIELDS_LIST } from "@/lib/version-utils";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
+const inFlightJobs = new Map<string, { jobId: string; promise: Promise<any> }>();
+
+function getOrCreateJob(lessonId: string, versionId: string, pdfServiceUrl: string, lessonForPdf: any, course: any) {
+  const key = `${lessonId}:${versionId}`;
+  const existing = inFlightJobs.get(key);
+  if (existing) {
+    console.log("[VersionPDF] Found existing in-flight job for", key, ":", existing.jobId);
+    return existing;
+  }
+
+  console.log("[VersionPDF] Creating new job for", key);
+
+  const submitPromise = (async () => {
+    const submitResponse = await fetch(`${pdfServiceUrl}/queue/submit`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        pdfType: "version",
+        payload: { lesson: lessonForPdf, course, isVersionPdf: true },
+      }),
+      signal: AbortSignal.timeout(10000),
+    });
+
+    if (!submitResponse.ok) {
+      const errorData = await submitResponse.json();
+      throw new Error(errorData.error || "Failed to submit job to queue");
+    }
+
+    const { jobId } = await submitResponse.json();
+    return jobId;
+  })();
+
+  const entry = { promise: submitPromise, jobId: null as string | null };
+  submitPromise.then((jobId) => {
+    entry.jobId = jobId;
+  });
+
+  inFlightJobs.set(key, entry as any);
+
+  submitPromise.finally(() => {
+    setTimeout(() => {
+      const current = inFlightJobs.get(key);
+      if (current && (current as any).jobId === entry.jobId) {
+        inFlightJobs.delete(key);
+      }
+    }, 60000);
+  });
+
+  return { jobId: null, promise: submitPromise };
+}
+
 function addTargetBlankAndArrowsToLinks(obj: any): any {
   if (typeof obj === "string") {
     let result = obj;
@@ -189,26 +240,9 @@ export async function POST(
       return NextResponse.json({ error: "PDF service not configured" }, { status: 500 });
     }
 
-    // Submit to queue for priority processing
-    const submitResponse = await fetch(`${pdfServiceUrl}/queue/submit`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        pdfType: "version",
-        payload: { lesson: lessonForPdf, course, isVersionPdf: true },
-      }),
-      signal: AbortSignal.timeout(10000),
-    });
-
-    if (!submitResponse.ok) {
-      const errorData = await submitResponse.json();
-      return NextResponse.json(
-        { error: errorData.error || "Failed to submit job to queue" },
-        { status: submitResponse.status }
-      );
-    }
-
-    const { jobId } = await submitResponse.json();
+    console.log("[VersionPDF][", requestId, "] Submitting job to queue...");
+    const jobInfo = await getOrCreateJob(lessonId, versionId, pdfServiceUrl, lessonForPdf, course);
+    const jobId = await jobInfo.promise;
     console.log("[VersionPDF][", requestId, "] Job submitted to queue:", jobId);
 
     // Poll for completion
