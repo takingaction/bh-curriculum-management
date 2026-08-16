@@ -20,11 +20,13 @@ export async function GET(
       );
     }
 
+    console.log("[QueueStatus] Checking status for jobId:", jobId);
     const response = await fetch(`${pdfServiceUrl}/queue/status/${jobId}`, {
       signal: AbortSignal.timeout(10000),
     });
 
     const data = await response.json();
+    console.log("[QueueStatus] Response for", jobId, ":", JSON.stringify(data));
 
     if (!response.ok) {
       return NextResponse.json(
