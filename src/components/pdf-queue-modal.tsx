@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Loader2, CheckCircle2, XCircle } from "lucide-react";
+import { Loader2, CheckCircle2, XCircle, HelpCircle } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -20,10 +20,11 @@ interface PdfQueueModalProps {
   onError?: (error: string) => void;
 }
 
-type ModalState = "queued" | "processing" | "completed" | "failed";
+type ModalState = "queued" | "processing" | "completed" | "failed" | "cancelled";
 
 const POLL_INTERVAL = 2000;
-const TIMEOUT_MS = 60000;
+const INITIAL_WAIT_MS = 5000;
+const TIMEOUT_MS = 120000;
 
 export function PdfQueueModal({
   open,
@@ -36,7 +37,8 @@ export function PdfQueueModal({
   const [modalState, setModalState] = useState<ModalState>("queued");
   const [position, setPosition] = useState<number>(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [startTime] = useState<number>(Date.now());
+  const lastSuccessfulContact = useRef<number>(Date.now());
+  const hasConnectedOnce = useRef<boolean>(false);
 
   const checkStatus = useCallback(async () => {
     if (!jobId) return;
@@ -44,10 +46,14 @@ export function PdfQueueModal({
     try {
       const res = await fetch(`/api/pdf/queue/status/${jobId}`);
 
+      lastSuccessfulContact.current = Date.now();
+
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.error || "Failed to get status");
       }
+
+      hasConnectedOnce.current = true;
 
       const data = await res.json();
 
@@ -64,6 +70,11 @@ export function PdfQueueModal({
         return;
       }
 
+      if (data.status === "cancelled") {
+        setModalState("cancelled");
+        return;
+      }
+
       if (data.status === "processing") {
         setModalState("processing");
         setPosition(0);
@@ -74,9 +85,12 @@ export function PdfQueueModal({
         setPosition(data.position || 0);
       }
     } catch (err: any) {
-      setModalState("failed");
-      setErrorMessage(err.message || "Failed to check status");
-      if (onError) onError(err.message);
+      const elapsed = Date.now() - lastSuccessfulContact.current;
+      if (elapsed > INITIAL_WAIT_MS && hasConnectedOnce.current) {
+        setModalState("failed");
+        setErrorMessage("Connection lost. Please try again.");
+        if (onError) onError("Connection lost");
+      }
     }
   }, [jobId, onSuccess, onError]);
 
@@ -95,13 +109,24 @@ export function PdfQueueModal({
   useEffect(() => {
     if (!open || !jobId) return;
 
+    hasConnectedOnce.current = false;
+    lastSuccessfulContact.current = Date.now();
+    setModalState("queued");
+    setErrorMessage(null);
+
     const pollInterval = setInterval(checkStatus, POLL_INTERVAL);
 
     const timeout = setTimeout(() => {
       clearInterval(pollInterval);
-      if (modalState !== "completed" && modalState !== "failed") {
+
+      const elapsed = Date.now() - lastSuccessfulContact.current;
+      if (modalState === "completed" || modalState === "failed" || modalState === "cancelled") {
+        return;
+      }
+
+      if (elapsed > TIMEOUT_MS) {
         setModalState("failed");
-        setErrorMessage("Request timed out. You can try again shortly.");
+        setErrorMessage("Request timed out. Please try again.");
         if (onError) onError("Request timed out");
       }
     }, TIMEOUT_MS);
@@ -112,7 +137,7 @@ export function PdfQueueModal({
       clearInterval(pollInterval);
       clearTimeout(timeout);
     };
-  }, [open, jobId, checkStatus, modalState, onError]);
+  }, [open, jobId]);
 
   useEffect(() => {
     if (!open) {
@@ -170,6 +195,15 @@ export function PdfQueueModal({
             </div>
           )}
 
+          {modalState === "cancelled" && (
+            <div className="flex flex-col items-center justify-center">
+              <XCircle className="w-8 h-8 text-gray-400" />
+              <p className="mt-4 text-gray-600 font-medium">
+                PDF Generation Cancelled
+              </p>
+            </div>
+          )}
+
           {modalState === "failed" && (
             <div className="flex flex-col items-center justify-center">
               <XCircle className="w-8 h-8 text-red-600" />
@@ -181,26 +215,12 @@ export function PdfQueueModal({
                   {errorMessage}
                 </p>
               )}
-              <p className="mt-2 text-sm text-gray-500">
-                You can try again shortly.
-              </p>
             </div>
           )}
         </div>
 
         <DialogFooter>
-          {modalState === "queued" && (
-            <>
-              <Button variant="outline" onClick={handleCancel}>
-                Cancel
-              </Button>
-              <Button variant="outline" onClick={() => onOpenChange(false)}>
-                Close
-              </Button>
-            </>
-          )}
-
-          {modalState === "processing" && (
+          {(modalState === "queued" || modalState === "processing") && (
             <>
               <Button variant="outline" onClick={handleCancel}>
                 Cancel
@@ -215,7 +235,7 @@ export function PdfQueueModal({
             <Button onClick={() => onOpenChange(false)}>Done</Button>
           )}
 
-          {modalState === "failed" && (
+          {(modalState === "cancelled" || modalState === "failed") && (
             <>
               <Button variant="outline" onClick={() => onOpenChange(false)}>
                 Close
