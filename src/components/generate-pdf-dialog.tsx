@@ -34,6 +34,11 @@ export function GeneratePdfDialog({
   const [dialogState, setDialogState] = useState<DialogState>("generating");
   const [error, setError] = useState<string | null>(null);
 
+  const handleOpenChange = (newOpen: boolean) => {
+    console.log("[GeneratePdfDialog] handleOpenChange called, newOpen:", newOpen);
+    onOpenChange(newOpen);
+  };
+
   useEffect(() => {
     console.log("[GeneratePdfDialog] useEffect running, open:", open);
     if (open) {
@@ -79,7 +84,7 @@ export function GeneratePdfDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="w-[90%] md:w-[50%] md:max-w-[50%]">
         <DialogHeader>
           <DialogTitle>Generate PDF</DialogTitle>
