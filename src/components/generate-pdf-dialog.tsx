@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Loader2, AlertCircle } from "lucide-react";
+import { Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -22,13 +22,7 @@ interface GeneratePdfDialogProps {
   onPdfGenerated?: (pdfPath: string) => void;
 }
 
-interface PdfUsageInfo {
-  pdf_count: number;
-  limit: number;
-  remaining: number;
-}
-
-type DialogState = "confirm" | "generating" | "done" | "error";
+type DialogState = "generating" | "done" | "error";
 
 export function GeneratePdfDialog({
   open,
@@ -37,31 +31,18 @@ export function GeneratePdfDialog({
   version,
   onPdfGenerated,
 }: GeneratePdfDialogProps) {
-  const [dialogState, setDialogState] = useState<DialogState>("confirm");
+  const [dialogState, setDialogState] = useState<DialogState>("generating");
   const [error, setError] = useState<string | null>(null);
-  const [usageInfo, setUsageInfo] = useState<PdfUsageInfo | null>(null);
 
   useEffect(() => {
     if (open) {
-      setDialogState("confirm");
+      setDialogState("generating");
       setError(null);
-      fetchUsageInfo();
+      handleGenerate();
     }
   }, [open]);
 
-  const fetchUsageInfo = async () => {
-    try {
-      const res = await fetch("/api/pdf-usage");
-      if (res.ok) {
-        const data = await res.json();
-        setUsageInfo(data);
-      }
-    } catch {
-      console.error("Failed to fetch PDF usage");
-    }
-  };
-
-  const handleConfirm = async () => {
+  const handleGenerate = async () => {
     setDialogState("generating");
     setError(null);
 
@@ -73,31 +54,15 @@ export function GeneratePdfDialog({
       const data = await res.json();
 
       if (!res.ok) {
-        if (res.status === 403 && data.error === "Weekly PDF limit reached") {
-          setError(`You have reached your weekly limit of ${data.limit} PDFs.`);
-          setDialogState("error");
-        } else {
-          setError(data.error || "Failed to generate PDF");
-          setDialogState("error");
-        }
+        setError(data.error || "Failed to generate PDF");
+        setDialogState("error");
         return;
       }
 
       if (data.success) {
-        setUsageInfo((prev) =>
-          prev
-            ? {
-                ...prev,
-                pdf_count: data.pdf_count,
-                remaining: data.remaining,
-              }
-            : null
-        );
-
         if (onPdfGenerated) {
           onPdfGenerated(data.filename);
         }
-
         setDialogState("done");
         setTimeout(() => {
           onOpenChange(false);
@@ -109,13 +74,6 @@ export function GeneratePdfDialog({
     }
   };
 
-  const handleRetry = () => {
-    setDialogState("confirm");
-    setError(null);
-  };
-
-  const hasLimitReached = usageInfo && usageInfo.remaining <= 0;
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[90%] md:w-[50%] md:max-w-[50%]">
@@ -124,34 +82,6 @@ export function GeneratePdfDialog({
         </DialogHeader>
 
         <div className="py-2">
-          {dialogState === "confirm" && (
-            <div className="space-y-3">
-              <p className="text-sm font-medium text-gray-800">
-                Version: {getVersionDisplayName(version)}
-              </p>
-
-              {version.modification_reason && (
-                <p className="text-sm text-gray-600">
-                  Reason: {version.modification_reason}
-                </p>
-              )}
-
-              {usageInfo && (
-                <p className="text-sm">
-                  This will be PDF <strong>{usageInfo.pdf_count + 1}</strong> of{" "}
-                  <strong>{usageInfo.limit}</strong> for the week. Continue?
-                </p>
-              )}
-
-              {error && (
-                <div className="flex items-start gap-2 text-red-600 bg-red-50 p-3 rounded-lg">
-                  <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                  <p className="text-sm">{error}</p>
-                </div>
-              )}
-            </div>
-          )}
-
           {dialogState === "generating" && (
             <div className="flex flex-col items-center justify-center py-8">
               <Loader2 className="w-8 h-8 animate-spin text-[#0d7377]" />
@@ -161,7 +91,8 @@ export function GeneratePdfDialog({
 
           {dialogState === "done" && (
             <div className="flex flex-col items-center justify-center py-8">
-              <p className="text-green-600 font-medium">PDF Generated Successfully!</p>
+              <CheckCircle2 className="w-8 h-8 text-green-600" />
+              <p className="mt-4 text-green-600 font-medium">PDF Generated Successfully!</p>
             </div>
           )}
 
@@ -176,17 +107,6 @@ export function GeneratePdfDialog({
         </div>
 
         <DialogFooter>
-          {dialogState === "confirm" && (
-            <>
-              <Button variant="outline" onClick={() => onOpenChange(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleConfirm} disabled={!!hasLimitReached || !usageInfo}>
-                Yes, Continue
-              </Button>
-            </>
-          )}
-
           {dialogState === "generating" && (
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
@@ -204,7 +124,7 @@ export function GeneratePdfDialog({
               <Button variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
-              <Button onClick={handleRetry}>
+              <Button onClick={handleGenerate}>
                 Try Again
               </Button>
             </>

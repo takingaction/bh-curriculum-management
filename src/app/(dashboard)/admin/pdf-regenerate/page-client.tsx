@@ -191,8 +191,12 @@ export default function BatchPdfRegeneratePage() {
   // Process a single lesson PDF
   const processLesson = async (lessonId: string, jobId: string): Promise<{ success: boolean; error?: string }> => {
     try {
-      // First attempt
-      const res = await fetch(`/api/lessons/${lessonId}/pdf/generate`, { method: "POST" });
+      // First attempt - batch priority (9) so single PDFs jump ahead
+      const res = await fetch(`/api/lessons/${lessonId}/pdf/generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ priority: 9 }),
+      });
       const data = await res.json();
 
       if (res.ok && data.success) {
@@ -220,8 +224,12 @@ export default function BatchPdfRegeneratePage() {
               return { success: true };
             }
 
-            // Check if still queued by calling generate again
-            const statusRes = await fetch(`/api/lessons/${lessonId}/pdf/generate`, { method: "POST" });
+            // Check if still queued by calling generate again - batch priority (9)
+            const statusRes = await fetch(`/api/lessons/${lessonId}/pdf/generate`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ priority: 9 }),
+            });
             const statusData = await statusRes.json();
 
             if (statusRes.ok && statusData.success) {
@@ -239,8 +247,12 @@ export default function BatchPdfRegeneratePage() {
         return { success: false, error: "Timed out waiting in queue" };
       }
 
-      // Retry once (only if not queued)
-      const retryRes = await fetch(`/api/lessons/${lessonId}/pdf/generate`, { method: "POST" });
+      // Retry once (only if not queued) - batch priority (9)
+      const retryRes = await fetch(`/api/lessons/${lessonId}/pdf/generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ priority: 9 }),
+      });
       const retryData = await retryRes.json();
 
       if (retryRes.ok && retryData.success) {

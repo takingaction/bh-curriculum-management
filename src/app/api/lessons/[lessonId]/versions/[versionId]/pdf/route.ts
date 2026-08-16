@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
-import { getPdfFileName, getWeekStart, formatWeekStart, TEXT_FIELDS_LIST } from "@/lib/version-utils";
+import { getPdfFileName, TEXT_FIELDS_LIST } from "@/lib/version-utils";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-const WEEKLY_PDF_LIMIT = 20;
 
 function addTargetBlankAndArrowsToLinks(obj: any): any {
   if (typeof obj === "string") {
@@ -122,30 +121,6 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const weekStart = getWeekStart();
-    const weekStartStr = formatWeekStart(weekStart);
-
-    const { data: pdfUsage, error: pdfUsageError } = await supabase
-      .from("lesson_version_pdf_usage")
-      .select("pdf_count")
-      .eq("user_id", user.id)
-      .eq("week_start", weekStartStr)
-      .single();
-
-    const currentCount = pdfUsage?.pdf_count || 0;
-
-    if (currentCount >= WEEKLY_PDF_LIMIT) {
-      return NextResponse.json(
-        {
-          error: "Weekly PDF limit reached",
-          pdf_count: currentCount,
-          limit: WEEKLY_PDF_LIMIT,
-          week_start: weekStartStr,
-        },
-        { status: 403 }
-      );
-    }
-
     const { data: version, error: versionError } = await supabase
       .from("lesson_versions")
       .select("*")
@@ -211,39 +186,65 @@ export async function POST(
       return NextResponse.json({ error: "PDF service not configured" }, { status: 500 });
     }
 
-    const renderResponse = await fetch(`${pdfServiceUrl}/lesson-pdf`, {
+    // Submit to queue for priority processing
+    const submitResponse = await fetch(`${pdfServiceUrl}/queue/submit`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ lesson: lessonForPdf, course, isVersionPdf: true }),
-      signal: AbortSignal.timeout(120000),
+      body: JSON.stringify({
+        pdfType: "version",
+        payload: { lesson: lessonForPdf, course, isVersionPdf: true },
+      }),
+      signal: AbortSignal.timeout(10000),
     });
 
-    let pdfBuffer: ArrayBuffer | null = null;
-
-    if (!renderResponse.ok) {
-      const errorText = await renderResponse.text();
-      console.error("Render PDF service error:", errorText);
-
+    if (!submitResponse.ok) {
+      const errorData = await submitResponse.json();
       return NextResponse.json(
-        {
-          error: "PDF generation failed at external service",
-          diagnostics: {
-            pdfServiceUrl,
-            status: renderResponse.status,
-            responsePreview: errorText.substring(0, 500),
-          },
-        },
-        { status: 500 }
+        { error: errorData.error || "Failed to submit job to queue" },
+        { status: submitResponse.status }
       );
     }
 
-    const contentType = renderResponse.headers.get('content-type');
-    if (contentType && contentType.includes('application/pdf')) {
-      pdfBuffer = await renderResponse.arrayBuffer();
+    const { jobId } = await submitResponse.json();
+
+    // Poll for completion
+    const maxWaitTime = 120000;
+    const pollInterval = 2000;
+    const startTime = Date.now();
+    let pdfBuffer: ArrayBuffer | null = null;
+
+    while (Date.now() - startTime < maxWaitTime) {
+      const statusRes = await fetch(`${pdfServiceUrl}/queue/status/${jobId}`, {
+        signal: AbortSignal.timeout(5000),
+      });
+
+      if (statusRes.ok) {
+        const statusData = await statusRes.json();
+
+        if (statusData.status === "completed") {
+          const resultRes = await fetch(`${pdfServiceUrl}/queue/result/${jobId}`, {
+            signal: AbortSignal.timeout(30000),
+          });
+
+          if (resultRes.headers.get("content-type")?.includes("application/pdf")) {
+            pdfBuffer = await resultRes.arrayBuffer();
+          }
+          break;
+        }
+
+        if (statusData.status === "failed") {
+          return NextResponse.json(
+            { error: statusData.error || "PDF generation failed" },
+            { status: 500 }
+          );
+        }
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, pollInterval));
     }
 
     if (pdfBuffer === null) {
-      return NextResponse.json({ error: "Failed to get PDF from service" }, { status: 500 });
+      return NextResponse.json({ error: "PDF generation timed out" }, { status: 500 });
     }
 
     const fileSize = pdfBuffer.byteLength;
@@ -287,29 +288,11 @@ export async function POST(
       console.error("Failed to update version with PDF path:", updateError);
     }
 
-    const { error: usageUpsertError } = await supabase
-      .from("lesson_version_pdf_usage")
-      .upsert(
-        {
-          user_id: user.id,
-          week_start: weekStartStr,
-          pdf_count: currentCount + 1,
-        },
-        { onConflict: "user_id,week_start" }
-      );
-
-    if (usageUpsertError) {
-      console.error("Failed to update PDF usage:", usageUpsertError);
-    }
-
     return NextResponse.json({
       success: true,
       filename,
       file_size: fileSize,
       generated_at: new Date().toISOString(),
-      pdf_count: currentCount + 1,
-      limit: WEEKLY_PDF_LIMIT,
-      remaining: WEEKLY_PDF_LIMIT - currentCount - 1,
     });
   } catch (error: any) {
     console.error("Version PDF generate error:", error);

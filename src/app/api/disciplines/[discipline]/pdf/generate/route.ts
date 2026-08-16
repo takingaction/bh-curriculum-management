@@ -66,7 +66,7 @@ export async function POST(
 
     const storagePath = `${discipline.toLowerCase()}/scope-and-sequence.pdf`;
 
-    // Call Render PDF service
+    // Call Render PDF service - submit to queue for priority processing
     const pdfServiceUrl = process.env.PDF_SERVICE_URL;
 
     if (!pdfServiceUrl) {
@@ -76,55 +76,72 @@ export async function POST(
     console.log("Generating discipline PDF for:", discipline);
     console.log("Number of courses:", sortedCourses.length);
 
-    const renderResponse = await fetch(`${pdfServiceUrl}/discipline-pdf`, {
+    // Submit to queue
+    const submitResponse = await fetch(`${pdfServiceUrl}/queue/submit`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ courses: sortedCourses, discipline }),
-      signal: AbortSignal.timeout(120000), // 2 minute timeout
+      body: JSON.stringify({
+        pdfType: "discipline",
+        payload: { courses: sortedCourses, discipline },
+      }),
+      signal: AbortSignal.timeout(10000),
     });
 
-    if (!renderResponse.ok) {
-      const errorText = await renderResponse.text();
-      console.error("Render PDF service error:", errorText);
+    if (!submitResponse.ok) {
+      const errorData = await submitResponse.json();
+      return NextResponse.json(
+        { error: errorData.error || "Failed to submit job to queue" },
+        { status: submitResponse.status }
+      );
+    }
 
-      const diagnostics: Record<string, unknown> = {
-        pdfServiceUrl: pdfServiceUrl,
-        pdfServiceResponded: true,
-        status: renderResponse.status,
-        statusText: renderResponse.statusText,
-        responseContentType: renderResponse.headers.get("content-type"),
-        responsePreview: errorText.substring(0, 1000),
-      };
+    const { jobId } = await submitResponse.json();
 
-      const isHtml = errorText.includes("<!DOCTYPE") || errorText.includes("<html");
-      const isJson = errorText.trim().startsWith("{");
-      diagnostics.isHtmlError = isHtml;
-      diagnostics.isJsonError = isJson;
+    // Poll for completion
+    const maxWaitTime = 120000; // 2 minutes
+    const pollInterval = 2000;
+    const startTime = Date.now();
+    let pdfBuffer: ArrayBuffer | null = null;
 
-      if (isHtml) {
-        const titleMatch = errorText.match(/<title>(.*?)<\/title>/i);
-        const preMatch = errorText.match(/<pre>([\s\S]*?)<\/pre>/i);
-        diagnostics.htmlError = {
-          title: titleMatch ? titleMatch[1] : null,
-          message: preMatch ? preMatch[1] : null,
-        };
+    while (Date.now() - startTime < maxWaitTime) {
+      const statusRes = await fetch(`${pdfServiceUrl}/queue/status/${jobId}`, {
+        signal: AbortSignal.timeout(5000),
+      });
+
+      if (statusRes.ok) {
+        const statusData = await statusRes.json();
+
+        if (statusData.status === "completed") {
+          const resultRes = await fetch(`${pdfServiceUrl}/queue/result/${jobId}`, {
+            signal: AbortSignal.timeout(30000),
+          });
+
+          if (resultRes.headers.get("content-type")?.includes("application/pdf")) {
+            pdfBuffer = await resultRes.arrayBuffer();
+          }
+          break;
+        }
+
+        if (statusData.status === "failed") {
+          return NextResponse.json(
+            { error: statusData.error || "PDF generation failed" },
+            { status: 500 }
+          );
+        }
       }
 
+      await new Promise((resolve) => setTimeout(resolve, pollInterval));
+    }
+
+    if (pdfBuffer === null) {
       return NextResponse.json(
-        {
-          error: "PDF generation failed at external service",
-          diagnostics,
-        },
+        { error: "PDF generation timed out" },
         { status: 500 }
       );
     }
 
-    const pdfBuffer = await renderResponse.arrayBuffer();
     const fileSize = pdfBuffer.byteLength;
-    const contentType = renderResponse.headers.get("content-type") || "unknown";
-
-    console.log("Discipline PDF received - Content-Type:", contentType);
-    console.log("Discipline PDF received - Actual byteLength:", fileSize);
+    console.log("Discipline PDF received - byteLength:", fileSize);
 
     // Check file size limit
     if (fileSize > MAX_FILE_SIZE) {

@@ -481,19 +481,32 @@ Single source of truth: `profile.enrollments` array controls course access for a
   - `GET /api/lessons/[lessonId]/pdf/diagnostics` - Diagnostic endpoint for debugging PDF issues
 - **PDF error handling**: Generate endpoint returns detailed diagnostics on failure including PDF service URL, response status, HTML vs JSON detection, and extracted error messages
 
-**PDF Service Queue System:**
-- Queue system was REMOVED (August 2026) - caused more problems than it solved
-- Lesson and version PDFs now return directly (synchronous) like course/discipline PDFs
-- `/lesson-pdf` endpoint now awaits `generatePDF()` and returns PDF directly
-- Queue code still exists in `pdf-service/src/index.js` but is dormant (unused)
-- Health endpoint still shows queue status but queue is always empty now
+**PDF Service Queue System (August 2026):**
+- Priority-based queue ensures only 1 PDF generates at a time to prevent RAM exhaustion on 512MB Render Starter
+- Queue is in-memory (not database-backed) - survives service restarts but lost if service restarts mid-job
+- Priority mapping: lesson=1, version=1, course=1, discipline=1, batch=9
+- Queue processes FIFO within priority - single PDFs (priority 1) always jump ahead of batch items (priority 9)
+- Batch lessons submitted with priority 9 so teacher's single PDFs complete first
 
-**PDF Service Endpoints:**
-- `GET /health` - Health check with queue status
-- `POST /clear-stuck` - Clear queue and reset state
-- `POST /skip-current` - Skip current PDF
-- `GET /lesson-pdf-status?lessonId=X` - Legacy endpoint (no longer used by client)
-- `GET /debug-network` - Debug endpoint to test external URL access from service
+**Queue Endpoints (pdf-service):**
+- `POST /queue/submit` - Submit job with pdfType and payload
+- `GET /queue/status/:jobId` - Get job status and queue position
+- `GET /queue/result/:jobId` - Get completed PDF or pending status
+- `DELETE /queue/cancel/:jobId` - Cancel pending job (fails if already processing)
+- `GET /queue/stats` - Queue depth and current job info
+- `GET /health` - Health check with queue stats
+
+**Next.js Queue API Routes:**
+- `POST /api/pdf/queue/submit` - Submit to queue
+- `GET /api/pdf/queue/status/[jobId]` - Poll for status
+- `GET /api/pdf/queue/result/[jobId]` - Get completed PDF
+- `DELETE /api/pdf/queue/cancel/[jobId]` - Cancel request
+
+**Queue Modal (PdfQueueModal):**
+- Shows queue position (# in queue) or "Generating your PDF"
+- 60 second timeout then error with retry option
+- Cancel button removes from queue if not yet processing
+- States: queued, processing, completed, failed
 
 **CJK Font Support (August 2026):**
 - Fonts loaded via Google Fonts CDN using `<link>` tags (not `@import`)
