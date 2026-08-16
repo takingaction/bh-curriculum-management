@@ -25,7 +25,6 @@ export async function POST(
       return NextResponse.json({ error: "Discipline required" }, { status: 400 });
     }
 
-    // Auth check - must be admin
     const supabase = await createClient();
     const supabaseAdmin = await createServiceClient();
 
@@ -45,7 +44,6 @@ export async function POST(
       return NextResponse.json({ error: "Admin access required" }, { status: 403 });
     }
 
-    // Fetch all courses for this discipline
     const { data: courses, error: coursesError } = await supabase
       .from("courses")
       .select("id, title, discipline, grade, summary")
@@ -61,12 +59,10 @@ export async function POST(
       return NextResponse.json({ error: "No courses found for this discipline" }, { status: 404 });
     }
 
-    // Sort by grade
     const sortedCourses = [...courses].sort(sortByGrade);
 
     const storagePath = `${discipline.toLowerCase()}/scope-and-sequence.pdf`;
 
-    // Call Render PDF service - submit to queue for priority processing
     const pdfServiceUrl = process.env.PDF_SERVICE_URL;
 
     if (!pdfServiceUrl) {
@@ -76,74 +72,52 @@ export async function POST(
     console.log("Generating discipline PDF for:", discipline);
     console.log("Number of courses:", sortedCourses.length);
 
-    // Submit to queue
-    const submitResponse = await fetch(`${pdfServiceUrl}/queue/submit`, {
+    const renderResponse = await fetch(`${pdfServiceUrl}/discipline-pdf`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        pdfType: "discipline",
-        payload: { courses: sortedCourses, discipline },
-      }),
-      signal: AbortSignal.timeout(10000),
+      body: JSON.stringify({ courses: sortedCourses, discipline }),
+      signal: AbortSignal.timeout(120000),
     });
 
-    if (!submitResponse.ok) {
-      const errorData = await submitResponse.json();
-      return NextResponse.json(
-        { error: errorData.error || "Failed to submit job to queue" },
-        { status: submitResponse.status }
-      );
-    }
+    if (!renderResponse.ok) {
+      const errorText = await renderResponse.text();
+      console.error("Render PDF service error:", errorText);
 
-    const { jobId } = await submitResponse.json();
+      const diagnostics: Record<string, unknown> = {
+        pdfServiceUrl: pdfServiceUrl,
+        pdfServiceResponded: true,
+        status: renderResponse.status,
+        statusText: renderResponse.statusText,
+        responseContentType: renderResponse.headers.get("content-type"),
+        responsePreview: errorText.substring(0, 1000),
+      };
 
-    // Poll for completion
-    const maxWaitTime = 120000; // 2 minutes
-    const pollInterval = 2000;
-    const startTime = Date.now();
-    let pdfBuffer: ArrayBuffer | null = null;
+      const isHtml = errorText.includes("<!DOCTYPE") || errorText.includes("<html");
+      const isJson = errorText.trim().startsWith("{");
+      diagnostics.isHtmlError = isHtml;
+      diagnostics.isJsonError = isJson;
 
-    while (Date.now() - startTime < maxWaitTime) {
-      const statusRes = await fetch(`${pdfServiceUrl}/queue/status/${jobId}`, {
-        signal: AbortSignal.timeout(5000),
-      });
-
-      if (statusRes.ok) {
-        const statusData = await statusRes.json();
-
-        if (statusData.status === "completed") {
-          const resultRes = await fetch(`${pdfServiceUrl}/queue/result/${jobId}`, {
-            signal: AbortSignal.timeout(30000),
-          });
-
-          if (resultRes.headers.get("content-type")?.includes("application/pdf")) {
-            pdfBuffer = await resultRes.arrayBuffer();
-          }
-          break;
-        }
-
-        if (statusData.status === "failed") {
-          return NextResponse.json(
-            { error: statusData.error || "PDF generation failed" },
-            { status: 500 }
-          );
-        }
+      if (isHtml) {
+        const titleMatch = errorText.match(/<title>(.*?)<\/title>/i);
+        const preMatch = errorText.match(/<pre>([\s\S]*?)<\/pre>/i);
+        diagnostics.htmlError = {
+          title: titleMatch ? titleMatch[1] : null,
+          message: preMatch ? preMatch[1] : null,
+        };
       }
 
-      await new Promise((resolve) => setTimeout(resolve, pollInterval));
-    }
-
-    if (pdfBuffer === null) {
       return NextResponse.json(
-        { error: "PDF generation timed out" },
+        {
+          error: "PDF generation failed at external service",
+          diagnostics,
+        },
         { status: 500 }
       );
     }
 
+    const pdfBuffer = await renderResponse.arrayBuffer();
     const fileSize = pdfBuffer.byteLength;
-    console.log("Discipline PDF received - byteLength:", fileSize);
 
-    // Check file size limit
     if (fileSize > MAX_FILE_SIZE) {
       return NextResponse.json(
         { error: `PDF file too large (max ${MAX_FILE_SIZE / 1024 / 1024}MB)`, actualSize: fileSize },
@@ -151,10 +125,8 @@ export async function POST(
       );
     }
 
-    // Upload to Supabase Storage
     console.log("Uploading Discipline PDF to storage:", storagePath, "Size:", fileSize);
 
-    // Delete existing file first, then upload fresh
     const { error: removeError } = await supabaseAdmin.storage
       .from("discipline-pdfs")
       .remove([storagePath]);
@@ -176,11 +148,10 @@ export async function POST(
         error: "Failed to upload PDF to storage",
         details: uploadError.message,
         storagePath,
-        fileSize
+        fileSize,
       }, { status: 500 });
     }
 
-    // Upsert record in discipline_pdfs table
     const { error: upsertError } = await supabaseAdmin
       .from("discipline_pdfs")
       .upsert({

@@ -4,53 +4,6 @@ import { getPdfFileName, TEXT_FIELDS_LIST } from "@/lib/version-utils";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
-const inFlightJobs = new Map<string, Promise<string>>();
-
-async function getOrCreateJob(lessonId: string, versionId: string, pdfServiceUrl: string, lessonForPdf: any, course: any): Promise<string> {
-  const key = `${lessonId}:${versionId}`;
-  const existing = inFlightJobs.get(key);
-  if (existing) {
-    console.log("[VersionPDF] Found existing in-flight job for", key, "- reusing");
-    return existing;
-  }
-
-  console.log("[VersionPDF] Creating new job for", key);
-
-  const submitJob = async (): Promise<string> => {
-    const submitResponse = await fetch(`${pdfServiceUrl}/queue/submit`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        pdfType: "version",
-        payload: { lesson: lessonForPdf, course, isVersionPdf: true },
-      }),
-      signal: AbortSignal.timeout(10000),
-    });
-
-    if (!submitResponse.ok) {
-      const errorData = await submitResponse.json();
-      throw new Error(errorData.error || "Failed to submit job to queue");
-    }
-
-    const { jobId } = await submitResponse.json();
-    return jobId;
-  };
-
-  const jobPromise = submitJob();
-  inFlightJobs.set(key, jobPromise);
-
-  jobPromise.finally(() => {
-    setTimeout(() => {
-      const current = inFlightJobs.get(key);
-      if (current === jobPromise) {
-        inFlightJobs.delete(key);
-      }
-    }, 60000);
-  });
-
-  return jobPromise;
-}
-
 function addTargetBlankAndArrowsToLinks(obj: any): any {
   if (typeof obj === "string") {
     let result = obj;
@@ -152,11 +105,8 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ lessonId: string; versionId: string }> }
 ) {
-  const requestId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
-  console.log("[VersionPDF] POST received, requestId:", requestId, "at", new Date().toISOString());
   try {
     const { lessonId, versionId } = await params;
-    console.log("[VersionPDF][", requestId, "] params - lessonId:", lessonId, "versionId:", versionId);
 
     if (!lessonId || !versionId) {
       return NextResponse.json({ error: "Lesson ID and Version ID required" }, { status: 400 });
@@ -236,65 +186,40 @@ export async function POST(
       return NextResponse.json({ error: "PDF service not configured" }, { status: 500 });
     }
 
-    console.log("[VersionPDF][", requestId, "] Submitting job to queue...");
-    const jobId = await getOrCreateJob(lessonId, versionId, pdfServiceUrl, lessonForPdf, course);
-    console.log("[VersionPDF][", requestId, "] Job submitted to queue:", jobId);
+    const renderResponse = await fetch(`${pdfServiceUrl}/lesson-pdf`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ lesson: lessonForPdf, course, isVersionPdf: true }),
+      signal: AbortSignal.timeout(120000),
+    });
 
-    // Poll for completion
-    const maxWaitTime = 120000;
-    const pollInterval = 2000;
-    const startTime = Date.now();
     let pdfBuffer: ArrayBuffer | null = null;
 
-    while (Date.now() - startTime < maxWaitTime) {
-      console.log("[VersionPDF][", requestId, "] Polling status for job:", jobId);
-      const statusRes = await fetch(`${pdfServiceUrl}/queue/status/${jobId}`, {
-        signal: AbortSignal.timeout(5000),
-      });
+    if (!renderResponse.ok) {
+      const errorText = await renderResponse.text();
+      console.error("Render PDF service error:", errorText);
 
-      if (statusRes.ok) {
-        const statusData = await statusRes.json();
-        console.log("[VersionPDF][", requestId, "] Status response:", JSON.stringify(statusData));
+      return NextResponse.json(
+        {
+          error: "PDF generation failed at external service",
+          diagnostics: {
+            pdfServiceUrl,
+            status: renderResponse.status,
+            responsePreview: errorText.substring(0, 500),
+          },
+        },
+        { status: 500 }
+      );
+    }
 
-        if (statusData.status === "completed") {
-          console.log("[VersionPDF][", requestId, "] Job completed, fetching result for job:", jobId);
-          const resultRes = await fetch(`${pdfServiceUrl}/queue/result/${jobId}`, {
-            signal: AbortSignal.timeout(30000),
-          });
-
-          console.log("[VersionPDF][", requestId, "] Result response status:", resultRes.status);
-          console.log("[VersionPDF][", requestId, "] Result content-type:", resultRes.headers.get("content-type"));
-
-          if (resultRes.headers.get("content-type")?.includes("application/pdf")) {
-            pdfBuffer = await resultRes.arrayBuffer();
-            console.log("[VersionPDF][", requestId, "] PDF buffer received, size:", pdfBuffer.byteLength);
-          } else {
-            const resultText = await resultRes.text();
-            console.log("[VersionPDF][", requestId, "] Result was NOT PDF, body:", resultText.substring(0, 500));
-          }
-          break;
-        }
-
-        if (statusData.status === "failed") {
-          console.log("[VersionPDF][", requestId, "] Job failed:", statusData.error);
-          return NextResponse.json(
-            { error: statusData.error || "PDF generation failed" },
-            { status: 500 }
-          );
-        }
-      } else {
-        console.log("[VersionPDF][", requestId, "] Status response not ok:", statusRes.status);
-      }
-
-      await new Promise((resolve) => setTimeout(resolve, pollInterval));
+    const contentType = renderResponse.headers.get("content-type");
+    if (contentType && contentType.includes("application/pdf")) {
+      pdfBuffer = await renderResponse.arrayBuffer();
     }
 
     if (pdfBuffer === null) {
-      console.log("[VersionPDF][", requestId, "] Timeout: pdfBuffer still null after polling");
-      return NextResponse.json({ error: "PDF generation timed out" }, { status: 500 });
+      return NextResponse.json({ error: "Failed to get PDF from service" }, { status: 500 });
     }
-
-    console.log("[VersionPDF][", requestId, "] PDF buffer ready, size:", pdfBuffer.byteLength);
 
     const fileSize = pdfBuffer.byteLength;
 
@@ -310,10 +235,9 @@ export async function POST(
       .remove([storagePath]);
 
     if (removeError) {
-      console.log("[VersionPDF][", requestId, "] Remove error (may not exist):", removeError.message);
+      console.log("Remove error (may not exist):", removeError.message);
     }
 
-    console.log("[VersionPDF][", requestId, "] Uploading to storage, path:", storagePath, "size:", fileSize);
     const { error: uploadError } = await supabaseAdmin.storage
       .from("lesson-version-pdfs")
       .upload(storagePath, pdfBuffer, {
@@ -322,11 +246,10 @@ export async function POST(
       });
 
     if (uploadError) {
-      console.error("[VersionPDF][", requestId, "] Storage upload error:", uploadError);
+      console.error("Storage upload error:", uploadError);
       return NextResponse.json({ error: "Failed to upload PDF to storage" }, { status: 500 });
     }
 
-    console.log("[VersionPDF][", requestId, "] Storage upload successful, updating database...");
     const { error: updateError } = await supabase
       .from("lesson_versions")
       .update({
@@ -336,10 +259,9 @@ export async function POST(
       .eq("id", versionId);
 
     if (updateError) {
-      console.error("[VersionPDF][", requestId, "] Failed to update version with PDF path:", updateError);
+      console.error("Failed to update version with PDF path:", updateError);
     }
 
-    console.log("[VersionPDF][", requestId, "] SUCCESS - PDF generated and uploaded");
     return NextResponse.json({
       success: true,
       filename,
@@ -347,8 +269,7 @@ export async function POST(
       generated_at: new Date().toISOString(),
     });
   } catch (error: any) {
-    console.error("[VersionPDF][", requestId, "] Catch block error:", error);
-    console.error("[VersionPDF][", requestId, "] Error stack:", error.stack);
+    console.error("Version PDF generate error:", error);
 
     if (error.name === "TimeoutError") {
       return NextResponse.json({ error: "PDF generation timed out" }, { status: 500 });

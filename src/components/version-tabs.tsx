@@ -54,7 +54,6 @@ export function VersionTabs({
   };
 
   const handleGeneratePdf = (version: LessonVersion, e: React.MouseEvent) => {
-    console.log("[VersionTabs] handleGeneratePdf called, version:", version.id);
     e.stopPropagation();
     setPdfVersion(version);
     setPdfDialogOpen(true);
@@ -223,7 +222,6 @@ export function VersionTabs({
         <GeneratePdfDialog
           open={pdfDialogOpen}
           onOpenChange={(open) => {
-            console.log("[VersionTabs] GeneratePdfDialog onOpenChange called, open:", open);
             setPdfDialogOpen(open);
             if (!open) setPdfVersion(null);
           }}
