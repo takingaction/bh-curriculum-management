@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
 import {
@@ -8,11 +8,9 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
 import type { LessonVersion } from "@/lib/version-utils";
-import { getVersionDisplayName } from "@/lib/version-utils";
 
 interface GeneratePdfDialogProps {
   open: boolean;
@@ -34,13 +32,7 @@ export function GeneratePdfDialog({
   const [dialogState, setDialogState] = useState<DialogState>("generating");
   const [error, setError] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
-
-  const handleOpenChange = (newOpen: boolean) => {
-    if (!newOpen) {
-      setIsGenerating(false);
-    }
-    onOpenChange(newOpen);
-  };
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     if (open && !isGenerating) {
@@ -51,19 +43,41 @@ export function GeneratePdfDialog({
     }
   }, [open]);
 
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
+
+  const handleCancel = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setIsGenerating(false);
+    onOpenChange(false);
+  };
+
   const handleGenerate = async () => {
+    abortControllerRef.current = new AbortController();
     setDialogState("generating");
     setError(null);
 
     try {
       const res = await fetch(`/api/lessons/${lessonId}/versions/${version.id}/pdf`, {
         method: "POST",
+        signal: abortControllerRef.current.signal,
       });
 
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error || "Failed to generate PDF");
+        const errorMessage = data.diagnostics
+          ? `Failed to generate PDF: ${data.error}\n\nDiagnostics: ${JSON.stringify(data.diagnostics, null, 2)}`
+          : data.error || "Failed to generate PDF";
+        setError(errorMessage);
         setDialogState("error");
         return;
       }
@@ -73,18 +87,36 @@ export function GeneratePdfDialog({
           onPdfGenerated(data.filename);
         }
         setDialogState("done");
-        setTimeout(() => {
-          onOpenChange(false);
-        }, 1500);
       }
-    } catch (err) {
-      setError("Failed to generate PDF. Please try again.");
+    } catch (err: any) {
+      if (err.name === "AbortError") {
+        setIsGenerating(false);
+        return;
+      }
+      setError("Failed to generate PDF. Please check your connection and try again.");
       setDialogState("error");
+    } finally {
+      abortControllerRef.current = null;
     }
   };
 
+  const handleClose = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setIsGenerating(false);
+    setDialogState("generating");
+    setError(null);
+    onOpenChange(false);
+  };
+
+  const handleTryAgain = () => {
+    handleGenerate();
+  };
+
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="w-[90%] md:w-[50%] md:max-w-[50%]">
         <DialogHeader>
           <DialogTitle>Generate PDF</DialogTitle>
@@ -101,7 +133,7 @@ export function GeneratePdfDialog({
           {dialogState === "done" && (
             <div className="flex flex-col items-center justify-center py-8">
               <CheckCircle2 className="w-8 h-8 text-green-600" />
-              <p className="mt-4 text-green-600 font-medium">PDF Generated Successfully!</p>
+              <p className="mt-4 text-green-600 font-medium">PDF Created Successfully!</p>
             </div>
           )}
 
@@ -109,7 +141,7 @@ export function GeneratePdfDialog({
             <div className="space-y-4">
               <div className="flex items-start gap-2 text-red-600 bg-red-50 p-3 rounded-lg">
                 <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                <p className="text-sm">{error}</p>
+                <p className="text-sm whitespace-pre-wrap">{error}</p>
               </div>
             </div>
           )}
@@ -117,23 +149,23 @@ export function GeneratePdfDialog({
 
         <DialogFooter>
           {dialogState === "generating" && (
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
+            <Button variant="outline" onClick={handleCancel}>
               Cancel
             </Button>
           )}
 
           {dialogState === "done" && (
-            <Button onClick={() => onOpenChange(false)}>
-              Done
+            <Button onClick={handleClose}>
+              Close
             </Button>
           )}
 
           {dialogState === "error" && (
             <>
-              <Button variant="outline" onClick={() => onOpenChange(false)}>
-                Cancel
+              <Button variant="outline" onClick={handleClose}>
+                Close
               </Button>
-              <Button onClick={handleGenerate}>
+              <Button onClick={handleTryAgain}>
                 Try Again
               </Button>
             </>

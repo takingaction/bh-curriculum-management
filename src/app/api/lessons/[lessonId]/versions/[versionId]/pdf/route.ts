@@ -186,27 +186,87 @@ export async function POST(
       return NextResponse.json({ error: "PDF service not configured" }, { status: 500 });
     }
 
-    const renderResponse = await fetch(`${pdfServiceUrl}/lesson-pdf`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ lesson: lessonForPdf, course, isVersionPdf: true }),
-      signal: AbortSignal.timeout(120000),
-    });
+    let renderResponse;
+    try {
+      renderResponse = await fetch(`${pdfServiceUrl}/lesson-pdf`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lesson: lessonForPdf, course, isVersionPdf: true }),
+        signal: AbortSignal.timeout(120000),
+      });
+    } catch (fetchError: any) {
+      console.error("VersionPDF: Fetch to PDF service failed:", fetchError.message);
+      const diagnostics: Record<string, any> = {
+        pdfServiceUrl,
+        errorType: fetchError.name || "FetchError",
+        errorMessage: fetchError.message,
+        code: fetchError.code,
+      };
+
+      if (fetchError.cause) {
+        diagnostics.cause = fetchError.cause.message || fetchError.cause;
+      }
+
+      if (fetchError.message?.includes("ECONNREFUSED")) {
+        diagnostics.hint = "PDF service is not running or unreachable";
+      } else if (fetchError.message?.includes("ETIMEDOUT")) {
+        diagnostics.hint = "Connection to PDF service timed out";
+      } else if (fetchError.name === "TimeoutError") {
+        diagnostics.hint = "PDF service request timed out after 120 seconds";
+      }
+
+      return NextResponse.json(
+        {
+          error: "Failed to connect to PDF service",
+          diagnostics,
+        },
+        { status: 500 }
+      );
+    }
 
     let pdfBuffer: ArrayBuffer | null = null;
 
     if (!renderResponse.ok) {
       const errorText = await renderResponse.text();
-      console.error("Render PDF service error:", errorText);
+      console.error("VersionPDF: Render service error:", errorText);
+      console.error("VersionPDF: Render service status:", renderResponse.status);
+
+      let errorData: any = {};
+      try {
+        errorData = JSON.parse(errorText);
+      } catch {
+        // Not JSON, use text
+      }
+
+      const diagnostics: Record<string, any> = {
+        pdfServiceUrl,
+        status: renderResponse.status,
+        statusText: renderResponse.statusText,
+        responseContentType: renderResponse.headers.get("content-type"),
+      };
+
+      if (errorData.error) {
+        diagnostics.serviceError = errorData.error;
+        diagnostics.serviceMessage = errorData.message;
+      }
+
+      diagnostics.responseBody = errorText.substring(0, 1000);
+
+      const isHtml = errorText.includes("<!DOCTYPE") || errorText.includes("<html");
+      if (isHtml) {
+        diagnostics.isHtmlError = true;
+        const titleMatch = errorText.match(/<title>(.*?)<\/title>/i);
+        const preMatch = errorText.match(/<pre>([\s\S]*?)<\/pre>/i);
+        diagnostics.htmlError = {
+          title: titleMatch ? titleMatch[1] : null,
+          message: preMatch ? preMatch[1] : null,
+        };
+      }
 
       return NextResponse.json(
         {
-          error: "PDF generation failed at external service",
-          diagnostics: {
-            pdfServiceUrl,
-            status: renderResponse.status,
-            responsePreview: errorText.substring(0, 500),
-          },
+          error: errorData.error || "PDF generation failed at external service",
+          diagnostics,
         },
         { status: 500 }
       );
@@ -218,7 +278,18 @@ export async function POST(
     }
 
     if (pdfBuffer === null) {
-      return NextResponse.json({ error: "Failed to get PDF from service" }, { status: 500 });
+      console.error("VersionPDF: Response was not PDF, content-type:", contentType);
+      return NextResponse.json(
+        {
+          error: "PDF service returned unexpected response",
+          diagnostics: {
+            pdfServiceUrl,
+            contentType: contentType || "not set",
+            expectedContentType: "application/pdf",
+          },
+        },
+        { status: 500 }
+      );
     }
 
     const fileSize = pdfBuffer.byteLength;
@@ -246,8 +317,19 @@ export async function POST(
       });
 
     if (uploadError) {
-      console.error("Storage upload error:", uploadError);
-      return NextResponse.json({ error: "Failed to upload PDF to storage" }, { status: 500 });
+      console.error("VersionPDF: Storage upload error:", uploadError);
+      return NextResponse.json(
+        {
+          error: "Failed to upload PDF to storage",
+          diagnostics: {
+            error: uploadError.message,
+            errorCode: uploadError.statusCode,
+            storagePath,
+            fileSize,
+          },
+        },
+        { status: 500 }
+      );
     }
 
     const { error: updateError } = await supabase
@@ -259,7 +341,7 @@ export async function POST(
       .eq("id", versionId);
 
     if (updateError) {
-      console.error("Failed to update version with PDF path:", updateError);
+      console.error("VersionPDF: Database update error:", updateError);
     }
 
     return NextResponse.json({
@@ -269,12 +351,28 @@ export async function POST(
       generated_at: new Date().toISOString(),
     });
   } catch (error: any) {
-    console.error("Version PDF generate error:", error);
+    console.error("VersionPDF: Unexpected error:", error.message || error);
+    console.error("VersionPDF: Error stack:", error.stack);
+
+    const diagnostics: Record<string, any> = {
+      errorType: error.name || "Error",
+      errorMessage: error.message || String(error),
+    };
 
     if (error.name === "TimeoutError") {
-      return NextResponse.json({ error: "PDF generation timed out" }, { status: 500 });
+      diagnostics.hint = "Request to PDF service timed out after 120 seconds";
     }
 
-    return NextResponse.json({ error: error.message || "Failed to generate PDF" }, { status: 500 });
+    if (error.cause) {
+      diagnostics.cause = error.cause.message || error.cause;
+    }
+
+    return NextResponse.json(
+      {
+        error: error.message || "Failed to generate PDF",
+        diagnostics,
+      },
+      { status: 500 }
+    );
   }
 }
