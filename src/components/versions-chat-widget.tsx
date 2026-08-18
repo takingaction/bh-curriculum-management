@@ -263,14 +263,11 @@ export function VersionsChatWidget() {
               Create New
             </button>
             <button
-              onClick={handleEditSelected}
-              className={`flex-1 px-3 py-2 text-sm font-medium rounded transition-colors ${
-                versionMode === 'edit'
-                  ? "bg-[#0d7377] text-white"
-                  : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-              }`}
+              onClick={() => {}}
+              disabled
+              className="flex-1 px-3 py-2 text-sm font-medium rounded transition-colors bg-gray-200 text-gray-700 cursor-not-allowed opacity-50"
             >
-              Edit Selected
+              Edit Selected (<span className="text-xs">Coming Soon</span>)
             </button>
           </div>
           {versionMode === 'edit' && !editingVersionId && (
