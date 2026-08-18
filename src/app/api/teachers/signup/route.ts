@@ -12,8 +12,16 @@ export async function POST(request: Request) {
       email,
       california,
       district_name,
-      primary_discipline
+      primary_discipline,
+      phone_number
     } = body;
+
+    if (phone_number) {
+      return NextResponse.json(
+        { error: "Invalid request" },
+        { status: 400 }
+      );
+    }
 
     if (!first_name || !last_name || !email) {
       return NextResponse.json(

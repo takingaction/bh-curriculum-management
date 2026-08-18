@@ -44,6 +44,12 @@ export default function SignupPage() {
     e.preventDefault();
     setError("");
 
+    const honeypot = (e.target as HTMLFormElement).querySelector<HTMLInputElement>('input[name="phone_number"]');
+    if (honeypot?.value) {
+      setSignupComplete(true);
+      return;
+    }
+
     if (!formData.first_name.trim() || !formData.last_name.trim()) {
       setError("First name and last name are required");
       return;
@@ -255,6 +261,16 @@ export default function SignupPage() {
                   I teach in California
                 </Label>
               </div>
+
+              <input
+                type="text"
+                name="phone_number"
+                id="phone_number"
+                tabIndex={-1}
+                autoComplete="off"
+                className="sr-only"
+                placeholder="Do not fill this in"
+              />
 
               <div className="pt-4">
                 <Button
