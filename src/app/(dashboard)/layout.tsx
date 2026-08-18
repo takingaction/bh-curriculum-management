@@ -27,7 +27,7 @@ export default async function DashboardLayout({
   const isAdmin = profile?.role === "admin";
 
   return (
-    <ChatProvider>
+    <ChatProvider userId={user.id}>
       <div className="min-h-screen bg-white">
         <header className="bg-white border-b border-[#e5e5e0]">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

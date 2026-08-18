@@ -29,8 +29,6 @@ interface SearchResult {
   grade?: string;
 }
 
-const CHAT_STORAGE_KEY = 'aiChatHistory_ask';
-const SCOPE_STORAGE_KEY = 'aiChatScope_ask';
 const MAX_STORED_MESSAGES = 50;
 
 interface AskChatWidgetProps {
@@ -38,22 +36,24 @@ interface AskChatWidgetProps {
   setIsLoading: (loading: boolean) => void;
 }
 
-function loadMessages(): Message[] {
-  if (typeof window === 'undefined') return [];
-  const stored = localStorage.getItem(CHAT_STORAGE_KEY);
+function loadMessagesForUser(userId: string | null): Message[] {
+  if (typeof window === 'undefined' || !userId) return [];
+  const chatKey = `aiChatHistory_ask_${userId}`;
+  const stored = localStorage.getItem(chatKey);
   if (stored) {
     try {
       return JSON.parse(stored);
     } catch {
-      localStorage.removeItem(CHAT_STORAGE_KEY);
+      return [];
     }
   }
   return [];
 }
 
-function loadScope(): ScopeType | null {
-  if (typeof window === 'undefined') return null;
-  const stored = localStorage.getItem(SCOPE_STORAGE_KEY);
+function loadScopeForUser(userId: string | null): ScopeType | null {
+  if (typeof window === 'undefined' || !userId) return null;
+  const scopeKey = `aiChatScope_ask_${userId}`;
+  const stored = localStorage.getItem(scopeKey);
   if (stored === 'curriculum' || stored === 'course' || stored === 'lesson') {
     return stored;
   }
@@ -61,12 +61,12 @@ function loadScope(): ScopeType | null {
 }
 
 export function AskChatWidget({ isLoading, setIsLoading }: AskChatWidgetProps) {
-  const { lessonId, courseId } = useChatContext();
-  const [messages, setMessages] = useState<Message[]>(loadMessages);
+  const { userId, lessonId, courseId } = useChatContext();
+  const [messages, setMessages] = useState<Message[]>(() => loadMessagesForUser(userId));
   const [input, setInput] = useState("");
   const [links, setLinks] = useState<Link[]>([]);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
-  const [activeScope, setActiveScope] = useState<ScopeType | null>(loadScope);
+  const [activeScope, setActiveScope] = useState<ScopeType | null>(() => loadScopeForUser(userId));
   const [copyFeedback, setCopyFeedback] = useState<number | null>(null);
   const [exportFeedback, setExportFeedback] = useState<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -85,36 +85,30 @@ export function AskChatWidget({ isLoading, setIsLoading }: AskChatWidgetProps) {
   }, []);
 
   useEffect(() => {
+    if (!userId) return;
+    const chatKey = `aiChatHistory_ask_${userId}`;
     if (messages.length <= MAX_STORED_MESSAGES) {
-      localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(messages));
+      localStorage.setItem(chatKey, JSON.stringify(messages));
     } else {
       const trimmed = messages.slice(-MAX_STORED_MESSAGES);
-      localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(trimmed));
+      localStorage.setItem(chatKey, JSON.stringify(trimmed));
     }
-  }, [messages]);
+  }, [messages, userId]);
 
   useEffect(() => {
-    localStorage.setItem(SCOPE_STORAGE_KEY, activeScope || '');
-  }, [activeScope]);
+    if (!userId) return;
+    const scopeKey = `aiChatScope_ask_${userId}`;
+    localStorage.setItem(scopeKey, activeScope || '');
+  }, [activeScope, userId]);
 
   useEffect(() => {
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === CHAT_STORAGE_KEY) {
-        if (e.newValue) {
-          try {
-            setMessages(JSON.parse(e.newValue));
-          } catch {
-            setMessages([]);
-          }
-        } else {
-          setMessages([]);
-        }
-      }
-    };
-
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, []);
+    if (!userId) return;
+    const scopeKey = `aiChatScope_ask_${userId}`;
+    const stored = localStorage.getItem(scopeKey);
+    if (stored === 'curriculum' || stored === 'course' || stored === 'lesson') {
+      setActiveScope(stored);
+    }
+  }, [userId]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -165,7 +159,9 @@ export function AskChatWidget({ isLoading, setIsLoading }: AskChatWidgetProps) {
 
   const clearChat = () => {
     setMessages([]);
-    localStorage.removeItem(CHAT_STORAGE_KEY);
+    if (userId) {
+      localStorage.removeItem(`aiChatHistory_ask_${userId}`);
+    }
   };
 
   const handleCopyMessage = async (content: string, index: number) => {

@@ -836,6 +836,8 @@ Feature for exploring lesson content and answering questions about music/dance/t
 
 **Tab Switch Warning**: When AI is processing a request (loading) and user clicks a different tab, a warning modal appears asking for confirmation. Switching tabs cancels the in-progress request.
 
+**User-Scoped Storage**: Chat history and search state are stored in localStorage with user-specific keys (e.g., `aiChatHistory_ask_${userId}`, `aiSearchHistory_${userId}`), ensuring each user has isolated chat history.
+
 **Architecture**: Three separate API endpoints and components for Ask, Search, and Versions modes.
 
 **API Routes**:
@@ -845,9 +847,10 @@ Feature for exploring lesson content and answering questions about music/dance/t
 
 **Widget Components**:
 - `src/components/ai-chat-container.tsx` - Tabbed container (Ask | Versions | Search), manages shared loading state
-- `src/components/ask-chat-widget.tsx` - Ask tab with localStorage chat history, receives isLoading props
+- `src/components/ask-chat-widget.tsx` - Ask tab with localStorage chat history (user-scoped), receives isLoading props
 - `src/components/search-chat-widget.tsx` - Search tab with scope selector (Lesson/Course/Global), receives isLoading props
 - `src/components/versions-chat-widget.tsx` - Versions tab with Create/Edit (disabled) / Reset / Proceed buttons, receives isLoading props
+- `src/components/chat-context.tsx` - React context providing userId, lessonId, courseId to widgets
 
 **Ask Mode - Tool Use (Claude Sonnet)**:
 Claude Sonnet uses tool use to search the curriculum intelligently. Available tools:

@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useRef, useCallback, ReactNode } from "react";
 
 interface ChatContextType {
+  userId: string | null;
   lessonId: string | null;
   courseId: string | null;
   editingVersionId: string | null;
@@ -21,6 +22,7 @@ interface ChatContextType {
 }
 
 const ChatContext = createContext<ChatContextType>({
+  userId: null,
   lessonId: null,
   courseId: null,
   editingVersionId: null,
@@ -44,9 +46,10 @@ export function useChatContext() {
 
 interface ChatProviderProps {
   children: ReactNode;
+  userId: string | null;
 }
 
-export function ChatProvider({ children }: ChatProviderProps) {
+export function ChatProvider({ children, userId }: ChatProviderProps) {
   const [lessonId, setLessonId] = useState<string | null>(null);
   const [courseId, setCourseId] = useState<string | null>(null);
   const [editingVersionId, setEditingVersionId] = useState<string | null>(null);
@@ -82,6 +85,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
   }, []);
 
   const value = {
+    userId,
     lessonId,
     courseId,
     editingVersionId,

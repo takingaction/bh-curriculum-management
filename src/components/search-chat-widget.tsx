@@ -17,36 +17,44 @@ interface SearchResult {
 
 type SearchScope = "lesson" | "course" | "global";
 
-const SEARCH_STORAGE_KEY = 'aiSearchHistory';
-
 interface SearchChatWidgetProps {
   isLoading: boolean;
   setIsLoading: (loading: boolean) => void;
 }
 
-function loadSearchState() {
-  if (typeof window === 'undefined') return null;
-  const stored = localStorage.getItem(SEARCH_STORAGE_KEY);
+function loadSearchStateForUser(userId: string | null) {
+  if (typeof window === 'undefined' || !userId) {
+    return { query: "", results: [], totalResults: 0, hasMore: false, hasSearched: false };
+  }
+  const searchKey = `aiSearchHistory_${userId}`;
+  const stored = localStorage.getItem(searchKey);
   if (stored) {
     try {
-      return JSON.parse(stored);
+      const state = JSON.parse(stored);
+      return {
+        query: state.query || "",
+        results: state.results || [],
+        totalResults: state.totalResults || 0,
+        hasMore: state.hasMore || false,
+        hasSearched: state.hasSearched || false,
+      };
     } catch {
-      localStorage.removeItem(SEARCH_STORAGE_KEY);
+      return { query: "", results: [], totalResults: 0, hasMore: false, hasSearched: false };
     }
   }
-  return null;
+  return { query: "", results: [], totalResults: 0, hasMore: false, hasSearched: false };
 }
 
 export function SearchChatWidget({ isLoading, setIsLoading }: SearchChatWidgetProps) {
-  const { lessonId, courseId } = useChatContext();
-  const storedState = loadSearchState();
-  const [query, setQuery] = useState(storedState?.query || "");
-  const [results, setResults] = useState<SearchResult[]>(storedState?.results || []);
-  const [totalResults, setTotalResults] = useState(storedState?.totalResults || 0);
-  const [hasMore, setHasMore] = useState(storedState?.hasMore || false);
+  const { userId, lessonId, courseId } = useChatContext();
+  const initialState = loadSearchStateForUser(userId);
+  const [query, setQuery] = useState(initialState.query);
+  const [results, setResults] = useState<SearchResult[]>(initialState.results);
+  const [totalResults, setTotalResults] = useState(initialState.totalResults);
+  const [hasMore, setHasMore] = useState(initialState.hasMore);
   const [page, setPage] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const [hasSearched, setHasSearched] = useState(storedState?.hasSearched || false);
+  const [hasSearched, setHasSearched] = useState(initialState.hasSearched);
   const [activeScope, setActiveScope] = useState<SearchScope>(() => {
     if (lessonId) return "lesson";
     if (courseId) return "course";
@@ -69,6 +77,8 @@ export function SearchChatWidget({ isLoading, setIsLoading }: SearchChatWidgetPr
   }, []);
 
   useEffect(() => {
+    if (!userId) return;
+    const searchKey = `aiSearchHistory_${userId}`;
     const state = {
       query,
       results,
@@ -77,28 +87,8 @@ export function SearchChatWidget({ isLoading, setIsLoading }: SearchChatWidgetPr
       hasSearched,
       activeScope,
     };
-    localStorage.setItem(SEARCH_STORAGE_KEY, JSON.stringify(state));
-  }, [query, results, totalResults, hasMore, hasSearched, activeScope]);
-
-  useEffect(() => {
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === SEARCH_STORAGE_KEY && e.newValue) {
-        try {
-          const state = JSON.parse(e.newValue);
-          setQuery(state.query || "");
-          setResults(state.results || []);
-          setTotalResults(state.totalResults || 0);
-          setHasMore(state.hasMore || false);
-          setHasSearched(state.hasSearched || false);
-        } catch {
-          // ignore parse errors
-        }
-      }
-    };
-
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, []);
+    localStorage.setItem(searchKey, JSON.stringify(state));
+  }, [query, results, totalResults, hasMore, hasSearched, activeScope, userId]);
 
   const handleSearch = async (pageNum: number = 0) => {
     if (!query || query.length < 2) return;
@@ -274,7 +264,9 @@ export function SearchChatWidget({ isLoading, setIsLoading }: SearchChatWidgetPr
                   setTotalResults(0);
                   setHasMore(false);
                   setPage(0);
-                  localStorage.removeItem(SEARCH_STORAGE_KEY);
+                  if (userId) {
+                    localStorage.removeItem(`aiSearchHistory_${userId}`);
+                  }
                 }}
                 className="text-xs text-gray-500 hover:text-[#0d7377]"
               >
