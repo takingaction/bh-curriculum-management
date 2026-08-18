@@ -782,6 +782,53 @@ Admin tool for tracking teacher engagement and site usage at `/admin/analytics`.
 - `src/app/(dashboard)/dashboard/courses/[courseId]/page.tsx` - Course view tracking
 - `src/components/user-menu.tsx` - Analytics link in admin dropdown
 
+#### Teacher Management (`/admin/teachers`)
+Admin page for managing teacher accounts with real-time search and bulk operations.
+
+**Features:**
+
+**Real-time Search:**
+- Search input filters teachers by name or email
+- Debounced filtering using `useMemo`
+- Clear button to reset search
+
+**Multi-Select:**
+- Checkbox column for selecting multiple teachers
+- Select-all checkbox in header (selects filtered results)
+- Selection count displayed in bulk action bar
+
+**Inline Status Editing:**
+- When teachers are selected, Status column shows dropdown instead of badge
+- Dropdowns highlight in yellow when status differs from original
+- Global status dropdown in bulk action bar to set all selected teachers at once
+- "Save Changes" button only enabled when changes pending
+- After save, selection clears and list refreshes
+
+**Bulk Actions:**
+- **Delete**: Opens confirmation modal with teacher names, then deletes via `DELETE /api/admin/teachers/bulk`
+- **Clear**: Deselects all teachers and discards pending changes
+
+**Table Layout:**
+- Fixed table layout with `table-layout: fixed; width: 100%`
+- Name, Email, Access columns have `max-width` and `word-wrap: break-word` for text wrapping
+- Prevents long names/emails from pushing other columns off screen
+
+**API Endpoints:**
+- `DELETE /api/admin/teachers/bulk` - Accepts `{ ids: string[] }`, deletes multiple teachers
+- `PATCH /api/admin/teachers/bulk` - Accepts `{ updates: Array<{ id, enrollment_status }> }`, updates multiple teachers
+
+**Trial Countdown (Teacher Edit Page `/admin/teachers/[id]`):**
+- Shows countdown when status is "trial" (e.g., "12 days remaining")
+- Editable trial end date via date picker
+- Trial section hidden when status is active/inactive
+- Changing status to "trial" resets to 14 days from today (unless custom date set)
+
+**Key files:**
+- `src/app/(dashboard)/admin/teachers/page-client.tsx` - Teacher list with search/multi-select/bulk
+- `src/app/(dashboard)/admin/teachers/[id]/page-client.tsx` - Individual teacher edit with trial management
+- `src/app/api/admin/teachers/bulk/route.ts` - Bulk delete/patch endpoints
+- `src/components/bulk-delete-modal.tsx` - Delete confirmation modal
+
 #### AI Chat Assistant
 Feature for exploring lesson content and answering questions about music/dance/theatre education.
 
@@ -857,6 +904,16 @@ When scope is set to "course" or "lesson", the `list_my_courses` tool is removed
 5. User clicks **Proceed**
 6. API executes modification, returns JSON with `modifiedFields`
 7. Frontend auto-saves version
+
+**Versions Tab - Two-Mode Workflow**:
+
+**Create Mode (new version from original)**:
+- User asks AI to modify (e.g., "Make a 30 min version")
+- AI asks questions first, waits for answers
+- AI asks "Click 'Proceed' when ready"
+- On Proceed, version is created with suggested name (e.g., "Shorter Version - 8/10/2026")
+
+**Edit Mode**: Currently disabled (button shows "Edit Selected (Coming Soon)").
 
 **Versions Tab - API Details** (`/api/chat/modify`):
 - Detects modification type from initial message (translation vs duration)
