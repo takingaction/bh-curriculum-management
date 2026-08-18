@@ -832,10 +832,9 @@ Admin page for managing teacher accounts with real-time search and bulk operatio
 #### AI Chat Assistant
 Feature for exploring lesson content and answering questions about music/dance/theatre education.
 
-**Widget Access**: Restricted to specific users only:
-- `ron@myherocreative.com`
-- `emili@betterhumanseducation.com`
-- `tavis.danz@sanjuan.edu`
+**Widget Access**: Available to all users with role `admin` or `teacher`.
+
+**Tab Switch Warning**: When AI is processing a request (loading) and user clicks a different tab, a warning modal appears asking for confirmation. Switching tabs cancels the in-progress request.
 
 **Architecture**: Three separate API endpoints and components for Ask, Search, and Versions modes.
 
@@ -845,10 +844,10 @@ Feature for exploring lesson content and answering questions about music/dance/t
 - `POST /api/search` - Search tab API with direct DB query
 
 **Widget Components**:
-- `src/components/ai-chat-container.tsx` - Tabbed container (Ask | Versions | Search)
-- `src/components/ask-chat-widget.tsx` - Ask tab with localStorage chat history
-- `src/components/search-chat-widget.tsx` - Search tab with scope selector (Lesson/Course/Global)
-- `src/components/versions-chat-widget.tsx` - Versions tab with Create/Edit/Reset/Proceed buttons
+- `src/components/ai-chat-container.tsx` - Tabbed container (Ask | Versions | Search), manages shared loading state
+- `src/components/ask-chat-widget.tsx` - Ask tab with localStorage chat history, receives isLoading props
+- `src/components/search-chat-widget.tsx` - Search tab with scope selector (Lesson/Course/Global), receives isLoading props
+- `src/components/versions-chat-widget.tsx` - Versions tab with Create/Edit (disabled) / Reset / Proceed buttons, receives isLoading props
 
 **Ask Mode - Tool Use (Claude Sonnet)**:
 Claude Sonnet uses tool use to search the curriculum intelligently. Available tools:

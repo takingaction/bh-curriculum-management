@@ -19,6 +19,11 @@ type SearchScope = "lesson" | "course" | "global";
 
 const SEARCH_STORAGE_KEY = 'aiSearchHistory';
 
+interface SearchChatWidgetProps {
+  isLoading: boolean;
+  setIsLoading: (loading: boolean) => void;
+}
+
 function loadSearchState() {
   if (typeof window === 'undefined') return null;
   const stored = localStorage.getItem(SEARCH_STORAGE_KEY);
@@ -32,12 +37,11 @@ function loadSearchState() {
   return null;
 }
 
-export function SearchChatWidget() {
+export function SearchChatWidget({ isLoading, setIsLoading }: SearchChatWidgetProps) {
   const { lessonId, courseId } = useChatContext();
   const storedState = loadSearchState();
   const [query, setQuery] = useState(storedState?.query || "");
   const [results, setResults] = useState<SearchResult[]>(storedState?.results || []);
-  const [isLoading, setIsLoading] = useState(false);
   const [totalResults, setTotalResults] = useState(storedState?.totalResults || 0);
   const [hasMore, setHasMore] = useState(storedState?.hasMore || false);
   const [page, setPage] = useState(0);

@@ -54,7 +54,7 @@ export default async function DashboardLayout({
         </header>
         <main className="py-2">{children}</main>
         <Footer />
-        {(user.email === "ron@myherocreative.com" || user.email === "emili@betterhumanseducation.com" || user.email === "tavis.danz@sanjuan.edu") && <AIChatContainer />}
+        {(profile?.role === "admin" || profile?.role === "teacher") && <AIChatContainer />}
       </div>
     </ChatProvider>
   );

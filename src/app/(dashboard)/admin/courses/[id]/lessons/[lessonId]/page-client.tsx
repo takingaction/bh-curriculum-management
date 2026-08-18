@@ -118,7 +118,6 @@ export default function EditLessonPage({
   const [pdfLoading, setPdfLoading] = useState(false);
   const [pdfError, setPdfError] = useState<{ message: string; diagnostics?: any } | null>(null);
   const [pdfCacheBust, setPdfCacheBust] = useState<string>("");
-  const [userEmail, setUserEmail] = useState<string | null>(null);
   const [fields, setFields] = useState<Fields>({
     lesson_number: "",
     title: "",
@@ -224,13 +223,6 @@ export default function EditLessonPage({
       console.error("Failed to fetch versions:", err);
     }
   };
-
-  useEffect(() => {
-    fetch("/api/debug-auth")
-      .then((res) => res.json())
-      .then((data) => setUserEmail(data.authUserEmail))
-      .catch(() => setUserEmail(null));
-  }, []);
 
   const handleGeneratePDF = async () => {
     if (!lesson) return;
@@ -556,7 +548,7 @@ export default function EditLessonPage({
 
           {/* Right Content - Based on activePanel */}
           <div className="flex-1">
-            {(userEmail === "ron@myherocreative.com" || userEmail === "emili@betterhumanseducation.com" || userEmail === "tavis.danz@sanjuan.edu") && versions.length > 0 && (
+            {versions.length > 0 && (
               <div className="mb-4 pb-4 border-b border-[#e5e5e0]">
                 <VersionTabs
                   lessonId={lesson.id}

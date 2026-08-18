@@ -33,6 +33,11 @@ const CHAT_STORAGE_KEY = 'aiChatHistory_ask';
 const SCOPE_STORAGE_KEY = 'aiChatScope_ask';
 const MAX_STORED_MESSAGES = 50;
 
+interface AskChatWidgetProps {
+  isLoading: boolean;
+  setIsLoading: (loading: boolean) => void;
+}
+
 function loadMessages(): Message[] {
   if (typeof window === 'undefined') return [];
   const stored = localStorage.getItem(CHAT_STORAGE_KEY);
@@ -55,11 +60,10 @@ function loadScope(): ScopeType | null {
   return null;
 }
 
-export function AskChatWidget() {
+export function AskChatWidget({ isLoading, setIsLoading }: AskChatWidgetProps) {
   const { lessonId, courseId } = useChatContext();
   const [messages, setMessages] = useState<Message[]>(loadMessages);
   const [input, setInput] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
   const [links, setLinks] = useState<Link[]>([]);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [activeScope, setActiveScope] = useState<ScopeType | null>(loadScope);

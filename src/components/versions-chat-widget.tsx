@@ -12,11 +12,15 @@ interface Message {
 
 const LANGUAGE_PATTERN = /\b(russian|spanish|french|german|portuguese|chinese|japanese|korean|arabic|hindi|italian|dutch|polish|vietnamese|greek|hebrew|thai|urdu|swahili|tagalog|creole)\b/i;
 
-export function VersionsChatWidget() {
+interface VersionsChatWidgetProps {
+  isLoading: boolean;
+  setIsLoading: (loading: boolean) => void;
+}
+
+export function VersionsChatWidget({ isLoading, setIsLoading }: VersionsChatWidgetProps) {
   const { lessonId, courseId, editingVersionId, onSaveVersionRequest, onSaveAsRequest } = useChatContext();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
   const [waitingForConfirmation, setWaitingForConfirmation] = useState(false);
   const [confirmationModificationType, setConfirmationModificationType] = useState<string | null>(null);
   const [confirmationModDirection, setConfirmationModDirection] = useState<string | null>(null);

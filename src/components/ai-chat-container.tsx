@@ -4,12 +4,47 @@ import { useState } from "react";
 import { AskChatWidget } from "./ask-chat-widget";
 import { SearchChatWidget } from "./search-chat-widget";
 import { VersionsChatWidget } from "./versions-chat-widget";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 type TabType = "ask" | "search" | "versions";
 
 export function AIChatContainer() {
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>("ask");
+  const [isLoading, setIsLoading] = useState(false);
+  const [showTabSwitchWarning, setShowTabSwitchWarning] = useState(false);
+  const [pendingTab, setPendingTab] = useState<TabType | null>(null);
+
+  const handleTabClick = (tab: TabType) => {
+    if (tab === activeTab) return;
+    if (isLoading) {
+      setPendingTab(tab);
+      setShowTabSwitchWarning(true);
+    } else {
+      setActiveTab(tab);
+    }
+  };
+
+  const handleConfirmTabSwitch = () => {
+    setShowTabSwitchWarning(false);
+    if (pendingTab) {
+      setActiveTab(pendingTab);
+    }
+    setIsLoading(false);
+    setPendingTab(null);
+  };
+
+  const handleCancelTabSwitch = () => {
+    setShowTabSwitchWarning(false);
+    setPendingTab(null);
+  };
 
   if (!isOpen) {
     return (
@@ -41,89 +76,116 @@ export function AIChatContainer() {
   }
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 w-[32rem] max-w-[calc(100vw-3rem)] h-[32rem] min-h-[32rem] bg-white rounded-lg shadow-xl flex flex-col overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-3 bg-[#0d7377] text-white rounded-t-lg h-12 flex-shrink-0">
-        <div className="flex items-center gap-2">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
+    <>
+      <div className="fixed bottom-6 right-6 z-50 w-[32rem] max-w-[calc(100vw-3rem)] h-[32rem] min-h-[32rem] bg-white rounded-lg shadow-xl flex flex-col overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 bg-[#0d7377] text-white rounded-t-lg h-12 flex-shrink-0">
+          <div className="flex items-center gap-2">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M12 8V4H8" />
+              <rect width="16" height="12" x="4" y="8" rx="2" />
+              <path d="M2 14h2" />
+              <path d="M20 14h2" />
+              <path d="M15 13v2" />
+              <path d="M9 13v2" />
+            </svg>
+            <span className="font-semibold">AI Assistant</span>
+          </div>
+          <button
+            onClick={() => setIsOpen(false)}
+            className="p-1 hover:bg-white/20 rounded transition-colors"
+            title="Close"
           >
-            <path d="M12 8V4H8" />
-            <rect width="16" height="12" x="4" y="8" rx="2" />
-            <path d="M2 14h2" />
-            <path d="M20 14h2" />
-            <path d="M15 13v2" />
-            <path d="M9 13v2" />
-          </svg>
-          <span className="font-semibold">AI Assistant</span>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M18 6L6 18" />
+              <path d="M6 6l12 12" />
+            </svg>
+          </button>
         </div>
-        <button
-          onClick={() => setIsOpen(false)}
-          className="p-1 hover:bg-white/20 rounded transition-colors"
-          title="Close"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
+
+        <div className="flex border-b border-gray-200 h-10 flex-shrink-0">
+          <button
+            onClick={() => handleTabClick("ask")}
+            className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+              activeTab === "ask"
+                ? "bg-[#0d7377] text-white"
+                : "text-gray-600 hover:bg-gray-50"
+            }`}
           >
-            <path d="M18 6L6 18" />
-            <path d="M6 6l12 12" />
-          </svg>
-        </button>
+            Ask
+          </button>
+          <button
+            onClick={() => handleTabClick("versions")}
+            className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+              activeTab === "versions"
+                ? "bg-[#0d7377] text-white"
+                : "text-gray-600 hover:bg-gray-50"
+            }`}
+          >
+            Versions
+          </button>
+          <button
+            onClick={() => handleTabClick("search")}
+            className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+              activeTab === "search"
+                ? "bg-[#0d7377] text-white"
+                : "text-gray-600 hover:bg-gray-50"
+            }`}
+          >
+            Search
+          </button>
+        </div>
+
+        <div className="flex-shrink-0 h-[calc(32rem-88px)]">
+          {activeTab === "ask" && (
+            <AskChatWidget isLoading={isLoading} setIsLoading={setIsLoading} />
+          )}
+          {activeTab === "search" && (
+            <SearchChatWidget isLoading={isLoading} setIsLoading={setIsLoading} />
+          )}
+          {activeTab === "versions" && (
+            <VersionsChatWidget isLoading={isLoading} setIsLoading={setIsLoading} />
+          )}
+        </div>
       </div>
 
-      <div className="flex border-b border-gray-200 h-10 flex-shrink-0">
-        <button
-          onClick={() => setActiveTab("ask")}
-          className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
-            activeTab === "ask"
-              ? "bg-[#0d7377] text-white"
-              : "text-gray-600 hover:bg-gray-50"
-          }`}
-        >
-          Ask
-        </button>
-        <button
-          onClick={() => setActiveTab("versions")}
-          className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
-            activeTab === "versions"
-              ? "bg-[#0d7377] text-white"
-              : "text-gray-600 hover:bg-gray-50"
-          }`}
-        >
-          Versions
-        </button>
-        <button
-          onClick={() => setActiveTab("search")}
-          className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
-            activeTab === "search"
-              ? "bg-[#0d7377] text-white"
-              : "text-gray-600 hover:bg-gray-50"
-          }`}
-        >
-          Search
-        </button>
-      </div>
-
-      <div className="flex-shrink-0 h-[calc(32rem-88px)]">
-        {activeTab === "ask" && <AskChatWidget />}
-        {activeTab === "search" && <SearchChatWidget />}
-        {activeTab === "versions" && <VersionsChatWidget />}
-      </div>
-    </div>
+      <Dialog open={showTabSwitchWarning} onOpenChange={setShowTabSwitchWarning}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Switch Tabs?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-gray-600">
+            You have an active request in progress. Switching tabs will cancel it. Are you sure you want to continue?
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={handleCancelTabSwitch}>
+              Stay
+            </Button>
+            <Button onClick={handleConfirmTabSwitch}>
+              Switch Anyway
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

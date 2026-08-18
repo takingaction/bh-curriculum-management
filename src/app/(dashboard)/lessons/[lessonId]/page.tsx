@@ -123,7 +123,7 @@ export default function LessonContentPage({
   const [pdfCacheBust, setPdfCacheBust] = useState<string>("");
   const [sectionPickerOpen, setSectionPickerOpen] = useState(false);
 
-  const canUseAI = profile?.email === "ron@myherocreative.com" || profile?.email === "emili@betterhumanseducation.com" || profile?.email === "tavis.danz@sanjuan.edu";
+  const canUseAI = profile?.role === "admin" || profile?.role === "teacher";
 
   const [versions, setVersions] = useState<LessonVersion[]>([]);
   const [activeVersionId, setActiveVersionId] = useState<string | null>(null);
