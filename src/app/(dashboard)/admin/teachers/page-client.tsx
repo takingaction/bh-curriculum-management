@@ -228,10 +228,11 @@ function TeacherList() {
 
       setTeachers((prev) =>
         prev.map((teacher) => {
-          if (pendingStatusChanges.has(teacher.id)) {
+          const newStatus = pendingStatusChanges.get(teacher.id);
+          if (newStatus !== undefined) {
             return {
               ...teacher,
-              enrollment_status: pendingStatusChanges.get(teacher.id),
+              enrollment_status: newStatus,
             };
           }
           return teacher;
