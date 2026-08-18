@@ -64,6 +64,7 @@ export default function EditTeacherPage({
     enrollment_status: "trial",
     enrollments: ["ALL"],
     role: "teacher",
+    trial_ends_at: "",
   });
 
   useEffect(() => {
@@ -90,6 +91,7 @@ export default function EditTeacherPage({
           enrollment_status: profile.enrollment_status || "trial",
           enrollments: profile.enrollments || ["ALL"],
           role: profile.role || "teacher",
+          trial_ends_at: profile.trial_ends_at || "",
         });
       } catch {
         setError("Failed to fetch teacher");
@@ -111,6 +113,29 @@ export default function EditTeacherPage({
 
   const handleEnrollmentsChange = (enrollments: string[]) => {
     setFormData(prev => ({ ...prev, enrollments }));
+  };
+
+  const handleTrialDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setFormData(prev => ({
+      ...prev,
+      trial_ends_at: value ? new Date(value).toISOString() : "",
+    }));
+  };
+
+  const getTrialTimeRemaining = (endsAt: string): string => {
+    const end = new Date(endsAt);
+    const now = new Date();
+    const diff = end.getTime() - now.getTime();
+
+    if (diff < 0) return "Expired";
+
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+
+    if (days > 0) return `${days} day${days !== 1 ? "s" : ""} remaining`;
+    if (hours > 0) return `${hours} hour${hours !== 1 ? "s" : ""} remaining`;
+    return "Less than 1 hour";
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -144,6 +169,7 @@ export default function EditTeacherPage({
           enrollment_status: formData.enrollment_status,
           enrollments: formData.enrollments,
           role: formData.role,
+          trial_ends_at: formData.trial_ends_at || null,
         }),
       });
 
@@ -373,12 +399,30 @@ export default function EditTeacherPage({
               </div>
             </div>
 
-            {teacher.trial_ends_at && (
-              <div className="text-sm text-gray-500 border-t pt-4">
-                Trial ends: {new Date(teacher.trial_ends_at).toLocaleDateString()}
-                {new Date(teacher.trial_ends_at) < new Date() && (
-                  <span className="text-red-600 ml-2">(expired)</span>
-                )}
+            {formData.enrollment_status === "trial" && (
+              <div className="space-y-3 border-t pt-4">
+                <div className="flex items-center gap-4">
+                  <Label htmlFor="trial_ends_at" className="text-base font-semibold">Trial End Date</Label>
+                  {teacher.trial_ends_at && (
+                    <span className="text-sm font-medium text-[#0d7377]">
+                      ({getTrialTimeRemaining(teacher.trial_ends_at)})
+                    </span>
+                  )}
+                </div>
+                <Input
+                  id="trial_ends_at"
+                  name="trial_ends_at"
+                  type="date"
+                  value={formData.trial_ends_at ? formData.trial_ends_at.split("T")[0] : ""}
+                  onChange={handleTrialDateChange}
+                  className="w-auto"
+                />
+                <p className="text-xs text-gray-500">
+                  {teacher.trial_ends_at && new Date(teacher.trial_ends_at) < new Date() && (
+                    <span className="text-red-600">Trial has expired. </span>
+                  )}
+                  Changing status to &quot;Trial&quot; will reset to 14 days from today.
+                </p>
               </div>
             )}
 

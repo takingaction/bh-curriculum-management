@@ -48,7 +48,8 @@ export async function PUT(
       enrollment_status,
       enrollments,
       role,
-      password
+      password,
+      trial_ends_at
     } = body;
 
     const validDisciplines = ['N/A', 'MUSIC', 'THEATRE', 'DANCE'];
@@ -72,11 +73,15 @@ export async function PUT(
       updateData.enrollment_status = enrollment_status;
       if (enrollment_status === 'trial') {
         updateData.trial_starts_at = new Date().toISOString();
-        updateData.trial_ends_at = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
+        updateData.trial_ends_at = trial_ends_at !== undefined
+          ? trial_ends_at
+          : new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
       } else {
         updateData.trial_starts_at = null;
         updateData.trial_ends_at = null;
       }
+    } else if (trial_ends_at !== undefined) {
+      updateData.trial_ends_at = trial_ends_at;
     }
     if (enrollments !== undefined) updateData.enrollments = enrollments;
     if (role !== undefined) updateData.role = role;
