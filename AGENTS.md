@@ -1151,3 +1151,10 @@ Landing page at `/` with the following sections:
 - X button dismisses the banner; floating info button appears to re-show it
 - Uses CSS variables `--header-height` and `--banner-height` for content spacing
 - Banner text includes magic link sign-in info and support email (opens in new tab)
+
+#### Dashboard Copyright Banner
+Dashboard at `/dashboard` displays a coral (`#e37c64`) copyright notice banner above the welcome video section:
+- `src/components/dashboard-client.tsx` - Dashboard client component containing the banner
+- Background: coral (`#e37c64`), white text, centered content with `AlertTriangle` icon
+- Message: "All Performers Ready materials are protected by copyright and cannot be shared or distributed to any person or entity that does not have an active license."
+- Displayed for all users (admin and teachers)
