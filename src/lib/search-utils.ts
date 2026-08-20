@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { findMatchesInContent, generateSnippet, TEXT_FIELDS_LIST } from "@/lib/html-utils";
+import { findMatchesInContent, generateSnippet, TEXT_FIELDS_LIST, htmlToPlainText } from "@/lib/html-utils";
 
 export interface SearchResult {
   lesson_id: string;
@@ -78,6 +78,23 @@ export interface ListMyCoursesResult {
     lesson_count: number;
   }[];
   total_count: number;
+}
+
+export interface GetCourseLessonsResult {
+  course: {
+    id: string;
+    title: string;
+    discipline: string;
+    grade: string;
+  };
+  lessons: {
+    id: string;
+    lesson_number: number;
+    title: string;
+    content: {
+      [key: string]: string;
+    };
+  }[];
 }
 
 function filterCoursesByEnrollment(courses: Course[], enrollments: string[]): Course[] {
@@ -348,5 +365,70 @@ export async function listMyCourses(userId: string): Promise<ListMyCoursesResult
   return {
     courses,
     total_count: courses.length,
+  };
+}
+
+/**
+ * Fetches ALL lessons for a course with full content (no query/filtering).
+ * Used by Course scope in Ask tab to give Sonnet full course content for reasoning.
+ * Note: searchLessons is deactivated for Course scope - use this instead.
+ *
+ * @param courseId - The course UUID
+ * @returns Course info + all lessons with full content (htmlToPlainText applied)
+ */
+export async function getCourseLessons(courseId: string): Promise<GetCourseLessonsResult> {
+  const supabase = await createClient();
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    throw new Error("Unauthorized");
+  }
+
+  // Fetch course info
+  const { data: course, error: courseError } = await supabase
+    .from("courses")
+    .select("id, title, discipline, grade")
+    .eq("id", courseId)
+    .single();
+
+  if (courseError || !course) {
+    throw new Error("Failed to fetch course");
+  }
+
+  // Fetch all lessons for this course with full content
+  const { data: lessons, error: lessonsError } = await supabase
+    .from("lessons")
+    .select("id, lesson_number, title, " + TEXT_FIELDS_LIST.join(", "))
+    .eq("course_id", courseId)
+    .order("lesson_number");
+
+  if (lessonsError || !lessons) {
+    throw new Error("Failed to fetch lessons");
+  }
+
+  // Process lessons with htmlToPlainText applied to each content field
+  const processedLessons = lessons.map((lesson: any) => {
+    const content: { [key: string]: string } = {};
+    for (const fieldName of TEXT_FIELDS_LIST) {
+      if (lesson[fieldName]) {
+        content[fieldName] = htmlToPlainText(lesson[fieldName]);
+      }
+    }
+    return {
+      id: lesson.id,
+      lesson_number: lesson.lesson_number,
+      title: lesson.title,
+      content,
+    };
+  });
+
+  return {
+    course: {
+      id: course.id,
+      title: course.title,
+      discipline: course.discipline,
+      grade: course.grade,
+    },
+    lessons: processedLessons,
   };
 }

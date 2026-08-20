@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
-import { searchLessons, getLessonDetails, listMyCourses, GetLessonDetailsResult } from "@/lib/search-utils";
+import { searchLessons, getLessonDetails, getCourseLessons, listMyCourses, GetLessonDetailsResult } from "@/lib/search-utils";
 import { htmlToPlainText } from "@/lib/html-utils";
 
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
@@ -78,16 +78,43 @@ const TOOL_LIST_MY_COURSES = {
   }
 };
 
+// Note: searchLessons is DEACTIVATED for Course scope - use get_course_lessons instead
+const TOOL_GET_COURSE_LESSONS = {
+  name: "get_course_lessons",
+  description: `Retrieves all lessons in a course with their full content.
+
+Use this when the user wants to see all lessons in a course, reason over the entire course content, or ask general questions about the course.
+
+Note: searchLessons is deactivated for Course scope. Use this tool instead.`,
+  input_schema: {
+    type: "object",
+    properties: {
+      course_id: {
+        type: "string",
+        description: "The UUID of the course. Optional - if not provided, the system will use the current course context."
+      }
+    },
+    required: []
+  }
+};
+
 function getTools(scope: string | null) {
-  if (scope === "course" || scope === "lesson") {
+  if (scope === "course") {
+    // searchLessons DEACTIVATED for Course scope - use get_course_lessons instead
+    return [TOOL_GET_COURSE_LESSONS, TOOL_GET_LESSON_DETAILS];
+  }
+  if (scope === "lesson") {
     return [TOOL_SEARCH_LESSONS, TOOL_GET_LESSON_DETAILS];
   }
+  // curriculum scope
   return [TOOL_SEARCH_LESSONS, TOOL_GET_LESSON_DETAILS, TOOL_LIST_MY_COURSES];
 }
 
 export async function POST(request: Request) {
   const body = await request.json();
   const { message, lessonId, courseId, scope, conversationHistory } = body;
+
+  console.log("[ASK API] Received request:", { scope, courseId, lessonId, hasMessage: !!message });
 
   if (!message) {
     return NextResponse.json({ error: "Message is required" }, { status: 400 });
@@ -140,7 +167,19 @@ SCOPE: The user has selected "Curriculum" scope. Search across ALL enrolled cour
   } else if (scope === "course") {
     systemPrompt += `
 
-SCOPE: The user has selected "Course" scope. Use search_lessons tool with the provided course_id to search within the current course only.`;
+SCOPE: The user has selected "Course" scope. You MUST use the get_course_lessons tool to get all lessons with their full content. The course_id is automatically provided by the system - do NOT ask the user for it.
+
+CRITICAL RULES FOR COURSE SCOPE:
+1. You MUST call get_course_lessons tool - do NOT skip this step
+2. Do NOT make up lesson names, lesson numbers, or course information from your training data
+3. Do NOT say you cannot access course data - you CAN via the get_course_lessons tool
+4. Always call get_course_lessons FIRST before answering any question about course lessons
+
+TOOLS:
+- get_course_lessons: Call this tool with course_id (auto-provided) to get ALL lessons with full content
+- get_lesson_details: Rarely needed - user should use Lesson button for single lesson questions
+
+If the user asks about lessons in this course, call get_course_lessons immediately.`;
   } else if (scope === "lesson") {
     systemPrompt += `
 
@@ -269,6 +308,14 @@ IMPORTANT: This platform cannot receive files or images. Only ask for text-based
           result = lessonDetails;
         } else if (toolName === "list_my_courses") {
           result = await listMyCourses(userId);
+        } else if (toolName === "get_course_lessons") {
+          const courseId = toolInput.course_id || searchCourseId;
+          console.log("[ASK API] get_course_lessons called with:", { toolInputCourseId: toolInput.course_id, searchCourseId, finalCourseId: courseId });
+          if (!courseId) {
+            result = { error: "Please navigate to a course page first." };
+          } else {
+            result = await getCourseLessons(courseId);
+          }
         } else {
           result = { error: `Unknown tool: ${toolName}` };
         }

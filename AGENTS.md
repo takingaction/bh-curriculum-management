@@ -859,6 +859,7 @@ Claude Sonnet uses tool use to search the curriculum intelligently. Available to
    - Parameters: `query` (required), `grade`, `course_id`, `discipline`, `max_results`
    - Searches all 15 lesson content fields
    - Returns lessons with field-level matches and snippets
+   - **DEACTIVATED for Course scope** - use `get_course_lessons` instead
 
 2. **get_lesson_details**: Get full content of a specific lesson
    - Parameters: `lesson_id` (required), `sections` (optional array)
@@ -868,6 +869,12 @@ Claude Sonnet uses tool use to search the curriculum intelligently. Available to
    - No parameters
    - Returns courses grouped by discipline/grade (only available when no scope selected)
 
+4. **get_course_lessons**: Get all lessons in a course with full content
+   - Parameters: `course_id` (optional - system uses current course context automatically)
+   - Returns all lessons for the course with full content (htmlToPlainText applied)
+   - **Only available for Course scope**
+   - Use when user wants to reason over entire course content
+
 **Ask Mode - Scope Buttons**:
 Three toggle buttons control search scope (radio behavior - only one active at a time):
 - **Curriculum**: Search all enrolled courses (always available)
@@ -875,6 +882,12 @@ Three toggle buttons control search scope (radio behavior - only one active at a
 - **Lesson**: Search within current lesson (requires being on a lesson page)
 
 When scope is set to "course" or "lesson", the `list_my_courses` tool is removed from the available tools to force the AI to use the correct search scope.
+
+**Course Scope Special Handling**:
+- `search_lessons` is **DEACTIVATED** for Course scope
+- Uses `get_course_lessons` instead to fetch ALL lessons with full content
+- Allows Sonnet to reason over entire course content rather than just matching snippets
+- `get_lesson_details` is still available but rarely needed (user should use Lesson button for single lesson questions)
 
 **Scope Persistence**:
 - Chat history persists across page refreshes and syncs across browser tabs

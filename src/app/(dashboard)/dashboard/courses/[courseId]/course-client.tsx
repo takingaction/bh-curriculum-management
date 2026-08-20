@@ -41,6 +41,11 @@ export default function CourseClient({
   const [isTrial, setIsTrial] = useState(false);
   const [showTrialModal, setShowTrialModal] = useState(false);
   const [showMaterialsModal, setShowMaterialsModal] = useState(false);
+  const [pdfTimestamp, setPdfTimestamp] = useState("0");
+
+  useEffect(() => {
+    setPdfTimestamp(Date.now().toString());
+  }, []);
 
   useEffect(() => {
     async function checkTrial() {
@@ -104,7 +109,7 @@ export default function CourseClient({
               </button>
             )}
             <a
-              href={`/api/courses/${courseId}/pdf?download=false&t=${Date.now()}`}
+              href={`/api/courses/${courseId}/pdf?download=false&t=${pdfTimestamp}`}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-1.5 text-xs text-[#0d7377] hover:underline mt-2"
