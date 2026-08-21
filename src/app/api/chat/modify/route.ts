@@ -623,16 +623,18 @@ function extractFieldsFromTruncatedJson(text: string): Record<string, unknown> |
 // Batch translation system prompt - for a specific set of fields
 function getBatchTranslationSystemPrompt(fieldsToTranslate: string[], targetLanguage: string): string {
   const fieldList = fieldsToTranslate.map(f => `  - ${f}`).join('\n');
-  const excludeList = fieldsToTranslate.map(f => `"${f}"`).join(', ');
 
   return `You are translating specific fields of a lesson into ${targetLanguage}.
 
-IMPORTANT: You are ONLY translating these fields:
+You are ONLY producing content for these specific fields:
 ${fieldList}
 
-For ALL other fields, return the ORIGINAL content UNCHANGED. Do not translate, modify, or reformat them.
-
-Maintain all HTML tags, structure, and formatting exactly as provided.
+IMPORTANT RULES:
+1. ONLY output JSON for the fields listed above - no other fields
+2. If a field has no content in the original lesson, return empty string: ""
+3. If you cannot translate a field properly, return the ORIGINAL content as-is
+4. Every HTML tag must be properly closed before ending your response
+5. Do NOT invent or hallucinate content - translate only what is provided
 
 CRITICAL - SONG LYRICS AND CHANTS: Do NOT translate songs, chants, or call-and-response lyrics. Keep them 100% in English. If a translation is helpful, you MAY add it in parentheses AFTER the English.
 
@@ -647,7 +649,7 @@ If you cannot complete the HTML properly, do NOT output partial content - output
 Respond with ONLY this JSON structure (no markdown, no explanation):
 {
   "modifiedFields": {
-    "field_name": { "html": "[translated or original content]", "original_length": N }
+    "${fieldsToTranslate[0]}": { "html": "[translated content]", "original_length": N }
   }
 }`;
 }
