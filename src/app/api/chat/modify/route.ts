@@ -5,7 +5,7 @@ import { streamAnthropicResponse } from "@/lib/anthropic-stream";
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
 const MODEL = "claude-haiku-4-5";
 const MODIFICATION_MODEL = "claude-sonnet-4-5";
-const MAX_TOKENS = 160000;
+const MAX_TOKENS = 16000;
 
 // Field name alias mapping - maps alternate field names to canonical database names
 const FIELD_ALIAS_MAP: Record<string, string> = {
