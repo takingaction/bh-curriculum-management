@@ -1122,9 +1122,9 @@ ${fieldsContent}
 
           // Skip empty fields - no need to translate
           const originalContent = getFieldContent(field);
-          if (!originalContent || originalContent.trim() === "" || originalContent === "(empty)") {
-            console.log(`[MODIFY API] Skipping ${field} - field is empty in original lesson`);
-            mergedFields[field] = { html: "", original_length: 0 };
+          const strippedText = originalContent.replace(/<[^>]*>/g, '').trim();
+          if (!originalContent || strippedText === "" || originalContent === "(empty)") {
+            console.log(`[MODIFY API] Skipping ${field} - field is empty`);
             continue;
           }
 
@@ -1154,11 +1154,18 @@ ${fieldsContent}
             });
           }
 
-          mergedFields = { ...mergedFields, ...result.fields };
-          console.log(`[MODIFY API] Field ${field} translated successfully`);
+          // Only add fields with actual translated content
+          const translatedContent = result.fields[field]?.html || "";
+          const translatedStripped = translatedContent.replace(/<[^>]*>/g, '').trim();
+          if (translatedStripped !== "") {
+            mergedFields[field] = result.fields[field];
+            console.log(`[MODIFY API] Field ${field} translated successfully`);
+          } else {
+            console.log(`[MODIFY API] Field ${field} translated to empty - skipping`);
+          }
         }
 
-        console.log("[MODIFY API] All 15 fields translated successfully");
+        console.log(`[MODIFY API] Translation complete. ${Object.keys(mergedFields).length} fields with content.`);
       } else {
         // DURATION: Single call (simplified, no retry, 160K tokens)
         const systemPrompt = getModificationSystemPrompt(effectiveModType, modDirection, !!editingVersionId, targetLanguage, modTargetDuration);
