@@ -97,6 +97,20 @@ export interface GetCourseLessonsResult {
   }[];
 }
 
+export interface GetAllLessonsResult {
+  lessons: {
+    id: string;
+    lesson_number: number;
+    title: string;
+    course_id: string;
+    course_title: string;
+    discipline: string;
+    grade: string;
+    learning_objectives: string;
+  }[];
+  total_count: number;
+}
+
 function filterCoursesByEnrollment(courses: Course[], enrollments: string[]): Course[] {
   if (enrollments.includes("ALL")) {
     return courses;
@@ -430,5 +444,78 @@ export async function getCourseLessons(courseId: string): Promise<GetCourseLesso
       grade: course.grade,
     },
     lessons: processedLessons,
+  };
+}
+
+/**
+ * Fetches all enrolled lessons with metadata for Curriculum scope reasoning.
+ * Returns title, lesson_number, course info, and learning_objectives only.
+ * Used by Curriculum scope in Ask tab to give Sonnet full curriculum picture.
+ *
+ * @param userId - The user ID for enrollment filtering
+ * @returns All enrolled lessons with metadata (not full content)
+ */
+export async function getAllLessons(userId: string): Promise<GetAllLessonsResult> {
+  const supabase = await createClient();
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    throw new Error("Unauthorized");
+  }
+
+  // Get user enrollments
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("enrollments")
+    .eq("id", userId)
+    .single();
+
+  const enrollments = profile?.enrollments || [];
+
+  // Get all courses
+  const { data: allCourses } = await supabase
+    .from("courses")
+    .select("id, title, discipline, grade");
+
+  // Filter courses by enrollment
+  const filteredCourses = filterCoursesByEnrollment(
+    (allCourses || []) as Course[],
+    enrollments
+  );
+
+  if (filteredCourses.length === 0) {
+    return { lessons: [], total_count: 0 };
+  }
+
+  const filteredCourseIds = filteredCourses.map((c: Course) => c.id);
+
+  // Fetch all lessons from enrolled courses with course info
+  const { data: lessons, error: lessonsError } = await supabase
+    .from("lessons")
+    .select("id, lesson_number, title, course_id, courses(id, title, discipline, grade), learning_objectives")
+    .in("course_id", filteredCourseIds)
+    .order("lesson_number");
+
+  if (lessonsError || !lessons) {
+    throw new Error("Failed to fetch lessons");
+  }
+
+  const processedLessons = lessons.map((lesson: any) => {
+    const course = lesson.courses as Course;
+    return {
+      id: lesson.id,
+      lesson_number: lesson.lesson_number,
+      title: lesson.title,
+      course_id: lesson.course_id,
+      course_title: course?.title || "Unknown Course",
+      discipline: course?.discipline || "",
+      grade: course?.grade || "",
+      learning_objectives: lesson.learning_objectives || "",
+    };
+  });
+
+  return {
+    lessons: processedLessons,
+    total_count: processedLessons.length,
   };
 }

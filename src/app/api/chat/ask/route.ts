@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
-import { searchLessons, getLessonDetails, getCourseLessons, listMyCourses, GetLessonDetailsResult } from "@/lib/search-utils";
+import { searchLessons, getLessonDetails, getCourseLessons, getAllLessons, listMyCourses, GetLessonDetailsResult } from "@/lib/search-utils";
 import { htmlToPlainText } from "@/lib/html-utils";
 
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
@@ -98,6 +98,20 @@ Note: searchLessons is deactivated for Course scope. Use this tool instead.`,
   }
 };
 
+// Note: searchLessons is DEACTIVATED for Curriculum scope - use get_all_lessons instead
+const TOOL_GET_ALL_LESSONS = {
+  name: "get_all_lessons",
+  description: `Retrieves all enrolled lessons with their learning objectives for curriculum-level reasoning.
+
+Use this to get a complete picture of the user's curriculum. Returns all enrolled courses and lessons with learning_objectives summaries.
+
+Note: searchLessons is deactivated for Curriculum scope. Use this tool instead. For specific keyword searches in full content, direct the user to the Search tab.`,
+  input_schema: {
+    type: "object",
+    properties: {}
+  }
+};
+
 function getTools(scope: string | null) {
   if (scope === "course") {
     // searchLessons DEACTIVATED for Course scope - use get_course_lessons instead
@@ -106,15 +120,13 @@ function getTools(scope: string | null) {
   if (scope === "lesson") {
     return [TOOL_SEARCH_LESSONS, TOOL_GET_LESSON_DETAILS];
   }
-  // curriculum scope
-  return [TOOL_SEARCH_LESSONS, TOOL_GET_LESSON_DETAILS, TOOL_LIST_MY_COURSES];
+  // curriculum scope - searchLessons DEACTIVATED - use get_all_lessons instead
+  return [TOOL_GET_ALL_LESSONS, TOOL_GET_LESSON_DETAILS, TOOL_LIST_MY_COURSES];
 }
 
 export async function POST(request: Request) {
   const body = await request.json();
   const { message, lessonId, courseId, scope, conversationHistory } = body;
-
-  console.log("[ASK API] Received request:", { scope, courseId, lessonId, hasMessage: !!message });
 
   if (!message) {
     return NextResponse.json({ error: "Message is required" }, { status: 400 });
@@ -163,7 +175,31 @@ You help teachers with questions about VAPA standards, NCAS standards, curriculu
   if (scope === "curriculum") {
     systemPrompt += `
 
-SCOPE: The user has selected "Curriculum" scope. Search across ALL enrolled courses using the search_lessons tool (without course_id filter).`;
+SCOPE: The user has selected "Curriculum" scope. You MUST use the get_all_lessons tool to get all enrolled lessons with their learning objectives.
+
+CRITICAL RULES FOR CURRICULUM SCOPE:
+1. You MUST call get_all_lessons tool - do NOT skip this step
+2. Do NOT make up lesson names, course names, or content from your training data
+3. You see only learning_objectives summaries (not full lesson content)
+4. Always call get_all_lessons FIRST before answering any curriculum question
+
+WHAT YOU CAN ANSWER:
+- Questions about topics, skills, standards across the curriculum
+- Which lessons are about certain themes (based on learning_objectives)
+- Curriculum overview and progression
+- Comparison of courses or grades
+
+WHAT YOU CANNOT ANSWER:
+- Specific word/phrase searches in full lesson content
+- Details not in learning_objectives
+- If asked "which lessons mention [specific word]", say: "I only have access to learning objectives summaries, not full content. For keyword searches, please use the Search tab."
+
+TOOLS:
+- get_all_lessons: Call this tool to get all enrolled lessons with learning_objectives
+- list_my_courses: Lists enrolled courses (use for course names/structure)
+- get_lesson_details: For full content of a specific lesson - user should use Lesson button instead
+
+If the user asks about curriculum structure, topics, or overview, call get_all_lessons immediately.`;
   } else if (scope === "course") {
     systemPrompt += `
 
@@ -310,12 +346,13 @@ IMPORTANT: This platform cannot receive files or images. Only ask for text-based
           result = await listMyCourses(userId);
         } else if (toolName === "get_course_lessons") {
           const courseId = toolInput.course_id || searchCourseId;
-          console.log("[ASK API] get_course_lessons called with:", { toolInputCourseId: toolInput.course_id, searchCourseId, finalCourseId: courseId });
           if (!courseId) {
             result = { error: "Please navigate to a course page first." };
           } else {
             result = await getCourseLessons(courseId);
           }
+        } else if (toolName === "get_all_lessons") {
+          result = await getAllLessons(userId);
         } else {
           result = { error: `Unknown tool: ${toolName}` };
         }
