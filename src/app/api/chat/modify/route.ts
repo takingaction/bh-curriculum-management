@@ -622,36 +622,24 @@ function extractFieldsFromTruncatedJson(text: string): Record<string, unknown> |
 
 // Batch translation system prompt - for a specific set of fields
 function getBatchTranslationSystemPrompt(fieldsToTranslate: string[], targetLanguage: string): string {
-  const fieldList = fieldsToTranslate.map(f => `  - ${f}`).join('\n');
+  const field = fieldsToTranslate[0];
 
-  return `You are translating specific fields of a lesson into ${targetLanguage}.
+  return `You are translating ONE specific field of a lesson into ${targetLanguage}.
 
-You are ONLY producing content for these specific fields:
-${fieldList}
+FIELD TO TRANSLATE: ${field}
 
-IMPORTANT RULES:
-1. ONLY output JSON for the fields listed above - no other fields
-2. If a field has no content in the original lesson, return empty string: ""
-3. If you cannot translate a field properly, return the ORIGINAL content as-is
-4. Every HTML tag must be properly closed before ending your response
-5. Do NOT invent or hallucinate content - translate only what is provided
+CRITICAL INSTRUCTIONS:
+1. You are translating ONLY the field shown above
+2. You MUST output the COMPLETE translated field - all content must be translated
+3. Every HTML tag must be properly closed: <table> needs </table>, <tr> needs </tr>, <td> needs </td>, etc.
+4. Do NOT truncate, shorten, or omit any content
+5. Do NOT invent or hallucinate content
+6. If the original content has tables, translate ALL rows and ALL cells completely
 
 CRITICAL - SONG LYRICS AND CHANTS: Do NOT translate songs, chants, or call-and-response lyrics. Keep them 100% in English. If a translation is helpful, you MAY add it in parentheses AFTER the English.
 
-CRITICAL - HTML COMPLETENESS: Every HTML tag you open MUST be properly closed before ending your response. Check that:
-- All <table> tags have matching </table>
-- All <tr> tags have matching </tr>
-- All <td> tags have matching </td>
-- All <tbody> tags have matching </tbody>
-- All <colgroup> tags have matching </colgroup>
-If you cannot complete the HTML properly, do NOT output partial content - output the original English content unchanged instead.
-
-Respond with ONLY this JSON structure (no markdown, no explanation):
-{
-  "modifiedFields": {
-    "${fieldsToTranslate[0]}": { "html": "[translated content]", "original_length": N }
-  }
-}`;
+Respond with ONLY this JSON (no markdown, no explanation):
+{"modifiedFields":{"${field}":{"html":"[complete translated HTML with all tags properly closed]","original_length":N}}}`;
 }
 
 // Log translation failure to database
@@ -1128,9 +1116,17 @@ ${fieldsContent}
             continue;
           }
 
+          // Build content for THIS field only - not the full lesson
+          const singleFieldContent = `LESSON: ${lessonTitle} (Grade ${courseGrade})
+
+TRANSLATE THIS FIELD: ${field}
+
+Original content:
+${originalContent}`;
+
           const result = await runTranslationBatch(
             [field],
-            modificationLessonContent,
+            singleFieldContent,
             conversationHistory || [],
             targetLanguage || "the target language",
             userId,
