@@ -4,7 +4,7 @@ import { streamAnthropicResponse } from "@/lib/anthropic-stream";
 
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
 const MODEL = "claude-haiku-4-5";
-const MODIFICATION_MODEL = "claude-sonnet-4-5";
+const MODIFICATION_MODEL = "claude-opus-4-5";
 const MAX_TOKENS = 32000;
 
 // Field name alias mapping - maps alternate field names to canonical database names
@@ -635,6 +635,14 @@ For ALL other fields, return the ORIGINAL content UNCHANGED. Do not translate, m
 Maintain all HTML tags, structure, and formatting exactly as provided.
 
 CRITICAL - SONG LYRICS AND CHANTS: Do NOT translate songs, chants, or call-and-response lyrics. Keep them 100% in English. If a translation is helpful, you MAY add it in parentheses AFTER the English.
+
+CRITICAL - HTML COMPLETENESS: Every HTML tag you open MUST be properly closed before ending your response. Check that:
+- All <table> tags have matching </table>
+- All <tr> tags have matching </tr>
+- All <td> tags have matching </td>
+- All <tbody> tags have matching </tbody>
+- All <colgroup> tags have matching </colgroup>
+If you cannot complete the HTML properly, do NOT output partial content - output the original English content unchanged instead.
 
 Respond with ONLY this JSON structure (no markdown, no explanation):
 {
