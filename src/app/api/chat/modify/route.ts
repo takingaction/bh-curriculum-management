@@ -1093,78 +1093,54 @@ ${fieldsContent}
 
       let mergedFields: Record<string, { html: string; original_length: number }> = {};
 
-      // TRANSLATION: Use batch processing
+      // TRANSLATION: One API call per field
       if (effectiveModType === "translation") {
-        console.log("[MODIFY API] Starting batch translation for lesson:", lessonId);
+        console.log("[MODIFY API] Starting per-field translation for lesson:", lessonId);
 
-        // Batch 1: lesson_outline + assessment (table-heavy fields)
-        const batch1Fields = ['lesson_outline', 'assessment'];
-        const batch1Result = await runTranslationBatch(
-          batch1Fields,
-          modificationLessonContent,
-          conversationHistory || [],
-          targetLanguage || "the target language",
-          userId,
-          lessonId,
-          1,
-          supabase,
-          apiKey
-        );
-
-        if ('error' in batch1Result) {
-          return NextResponse.json({
-            response: `Translation failed: ${batch1Result.error.errorMessage} Failed fields: ${batch1Result.error.failedFields.join(', ')}. Please try again.`,
-            links: [],
-            results: [],
-            isModificationRequest: true,
-            needsConfirmation: false,
-            translationFailed: true,
-            failedFields: batch1Result.error.failedFields,
-            failedBatch: 1,
-            errorType: batch1Result.error.errorType
-          });
-        }
-
-        // Add batch 1 results to merged fields
-        mergedFields = { ...batch1Result.fields };
-        console.log("[MODIFY API] Batch 1 completed, fields:", Object.keys(mergedFields).join(', '));
-
-        // Batch 2: All other 13 fields in lesson order
-        const batch2Fields = [
-          'learning_objectives', 'vocabulary', 'materials', 'vapa_text_block', 'ncas_text_block',
-          'welcome_opening', 'actual_class_expectations', 'warm_up', 'lesson_hook',
-          'main_activity', 'instrument_expectations', 'reflection', 'closing_ceremony'
+        const allFields = [
+          'lesson_outline', 'learning_objectives', 'vocabulary', 'materials',
+          'vapa_text_block', 'ncas_text_block', 'welcome_opening', 'actual_class_expectations',
+          'warm_up', 'lesson_hook', 'main_activity', 'instrument_expectations',
+          'reflection', 'closing_ceremony', 'assessment'
         ];
-        const batch2Result = await runTranslationBatch(
-          batch2Fields,
-          modificationLessonContent,
-          conversationHistory || [],
-          targetLanguage || "the target language",
-          userId,
-          lessonId,
-          2,
-          supabase,
-          apiKey
-        );
 
-        if ('error' in batch2Result) {
-          return NextResponse.json({
-            response: `Translation failed: ${batch2Result.error.errorMessage} Failed fields: ${batch2Result.error.failedFields.join(', ')}. Please try again.`,
-            links: [],
-            results: [],
-            isModificationRequest: true,
-            needsConfirmation: false,
-            translationFailed: true,
-            failedFields: batch2Result.error.failedFields,
-            failedBatch: 2,
-            errorType: batch2Result.error.errorType
-          });
+        let mergedFields: Record<string, { html: string; original_length: number }> = {};
+
+        for (let i = 0; i < allFields.length; i++) {
+          const field = allFields[i];
+          console.log(`[MODIFY API] Translating field ${i + 1}/${allFields.length}: ${field}`);
+
+          const result = await runTranslationBatch(
+            [field],
+            modificationLessonContent,
+            conversationHistory || [],
+            targetLanguage || "the target language",
+            userId,
+            lessonId,
+            i + 1,
+            supabase,
+            apiKey
+          );
+
+          if ('error' in result) {
+            return NextResponse.json({
+              response: `Translation failed: ${result.error.errorMessage} Failed field: ${field}. Please try again.`,
+              links: [],
+              results: [],
+              isModificationRequest: true,
+              needsConfirmation: false,
+              translationFailed: true,
+              failedFields: [field],
+              failedBatch: i + 1,
+              errorType: result.error.errorType
+            });
+          }
+
+          mergedFields = { ...mergedFields, ...result.fields };
+          console.log(`[MODIFY API] Field ${field} translated successfully`);
         }
 
-        // Add batch 2 results to merged fields
-        mergedFields = { ...mergedFields, ...batch2Result.fields };
-        console.log("[MODIFY API] Batch 2 completed, total fields:", Object.keys(mergedFields).length);
-
+        console.log("[MODIFY API] All 15 fields translated successfully");
       } else {
         // DURATION: Single call (simplified, no retry, 160K tokens)
         const systemPrompt = getModificationSystemPrompt(effectiveModType, modDirection, !!editingVersionId, targetLanguage, modTargetDuration);
