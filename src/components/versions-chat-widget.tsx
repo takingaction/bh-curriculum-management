@@ -33,6 +33,13 @@ export function VersionsChatWidget({ isLoading, setIsLoading }: VersionsChatWidg
   const [pendingMode, setPendingMode] = useState<'create' | 'edit' | null>(null);
   const [detectedLanguage, setDetectedLanguage] = useState<string | null>(null);
   const [originalTargetLanguage, setOriginalTargetLanguage] = useState<string | null>(null);
+  const [showTranslationError, setShowTranslationError] = useState(false);
+  const [translationError, setTranslationError] = useState<{
+    errorType: string;
+    failedFields: string[];
+    failedBatch: number;
+    message: string;
+  } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -214,6 +221,19 @@ export function VersionsChatWidget({ isLoading, setIsLoading }: VersionsChatWidg
       console.log("[VersionsChat] API response received", response.status);
 
       const data = await response.json();
+
+      // Check for translation failure
+      if (data.translationFailed) {
+        setTranslationError({
+          errorType: data.errorType || 'unknown',
+          failedFields: data.failedFields || [],
+          failedBatch: data.failedBatch || 1,
+          message: data.response || 'Translation failed. Please try again.'
+        });
+        setShowTranslationError(true);
+        setIsLoading(false);
+        return;
+      }
       
       // Add AI response to messages
       if (data.response) {
@@ -356,6 +376,45 @@ export function VersionsChatWidget({ isLoading, setIsLoading }: VersionsChatWidg
             >
               Continue
             </button>
+          </div>
+        </div>
+      )}
+
+      {showTranslationError && translationError && (
+        <div className="p-3 border-t border-gray-200 bg-red-50">
+          <div className="bg-white border border-red-200 rounded-lg p-4 shadow-sm">
+            <h4 className="text-sm font-semibold text-red-700 mb-2">Translation Failed</h4>
+            <p className="text-sm text-gray-700 mb-2">
+              {translationError.message}
+            </p>
+            <p className="text-xs text-gray-500 mb-3">
+              <strong>Batch {translationError.failedBatch}</strong> failed.{" "}
+              <strong>Failed fields:</strong> {translationError.failedFields.join(", ")}
+              {translationError.errorType && (
+                <> (<span className="italic">{translationError.errorType}</span>)</>
+              )}
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  setShowTranslationError(false);
+                  setTranslationError(null);
+                }}
+                className="flex-1 px-3 py-1.5 bg-gray-200 text-gray-700 text-xs font-medium rounded hover:bg-gray-300 transition-colors"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => {
+                  setShowTranslationError(false);
+                  setTranslationError(null);
+                  handleProceed();
+                }}
+                className="flex-1 px-3 py-1.5 bg-[#0d7377] text-white text-xs font-medium rounded hover:bg-[#0a5c5f] transition-colors"
+              >
+                Retry
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -5,8 +5,7 @@ import { streamAnthropicResponse } from "@/lib/anthropic-stream";
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
 const MODEL = "claude-haiku-4-5";
 const MODIFICATION_MODEL = "claude-sonnet-4-5";
-const MAX_TOKENS = 60000;
-const RETRY_MAX_TOKENS = 80000;
+const MAX_TOKENS = 160000;
 
 // Field name alias mapping - maps alternate field names to canonical database names
 const FIELD_ALIAS_MAP: Record<string, string> = {
@@ -621,6 +620,285 @@ function extractFieldsFromTruncatedJson(text: string): Record<string, unknown> |
   return null;
 }
 
+// Batch translation system prompt - for a specific set of fields
+function getBatchTranslationSystemPrompt(fieldsToTranslate: string[], targetLanguage: string): string {
+  const fieldList = fieldsToTranslate.map(f => `  - ${f}`).join('\n');
+  const excludeList = fieldsToTranslate.map(f => `"${f}"`).join(', ');
+
+  return `You are translating specific fields of a lesson into ${targetLanguage}.
+
+IMPORTANT: You are ONLY translating these fields:
+${fieldList}
+
+For ALL other fields, return the ORIGINAL content UNCHANGED. Do not translate, modify, or reformat them.
+
+Maintain all HTML tags, structure, and formatting exactly as provided.
+
+CRITICAL - SONG LYRICS AND CHANTS: Do NOT translate songs, chants, or call-and-response lyrics. Keep them 100% in English. If a translation is helpful, you MAY add it in parentheses AFTER the English.
+
+Respond with ONLY this JSON structure (no markdown, no explanation):
+{
+  "modifiedFields": {
+    "field_name": { "html": "[translated or original content]", "original_length": N }
+  }
+}`;
+}
+
+// Log translation failure to database
+async function logTranslationFailure(
+  userId: string,
+  lessonId: string,
+  batchNumber: number,
+  failedFields: string[],
+  errorType: string,
+  errorMessage: string,
+  aiResponseLength: number,
+  supabase: any
+): Promise<void> {
+  try {
+    await supabase
+      .from("translation_failures")
+      .insert({
+        user_id: userId,
+        lesson_id: lessonId,
+        batch_number: batchNumber,
+        failed_fields: failedFields,
+        error_type: errorType,
+        error_message: errorMessage,
+        ai_response_length: aiResponseLength
+      });
+  } catch (err) {
+    console.error("[MODIFY API] Failed to log translation failure:", err);
+  }
+}
+
+// Run a single translation batch - returns fields on success, error details on failure
+async function runTranslationBatch(
+  fieldsToTranslate: string[],
+  allFieldsContent: string,
+  messages: Array<{ role: string; content: string }>,
+  targetLanguage: string,
+  userId: string,
+  lessonId: string,
+  batchNumber: number,
+  supabase: any,
+  apiKey: string
+): Promise<{
+  fields: Record<string, { html: string; original_length: number }>;
+} | {
+  error: {
+    errorType: string;
+    failedFields: string[];
+    errorMessage: string;
+    aiResponseLength: number;
+  };
+}> {
+  const systemPrompt = getBatchTranslationSystemPrompt(fieldsToTranslate, targetLanguage);
+
+  const lessonContextMessage = {
+    role: "user" as const,
+    content: `Please translate these fields of the lesson:\n\n${allFieldsContent}`
+  };
+
+  const finalMessages = [
+    lessonContextMessage,
+    ...messages.map((m: { role: string; content: string }) => ({ role: m.role, content: m.content })),
+    { role: "user" as const, content: "Please translate the assigned fields now." }
+  ];
+
+  console.log(`[MODIFY API] Batch ${batchNumber}: Translating fields: ${fieldsToTranslate.join(', ')}`);
+
+  let aiResponse = "";
+  let streamSuccess = false;
+  let attempts = 0;
+  const maxStreamAttempts = 2;
+
+  while (!streamSuccess && attempts < maxStreamAttempts) {
+    attempts++;
+
+    let response;
+    try {
+      response = await fetch(ANTHROPIC_API_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model: MODIFICATION_MODEL,
+          max_tokens: MAX_TOKENS,
+          stream: true,
+          system: systemPrompt,
+          messages: finalMessages.map((m: { role: string; content: string }) => ({
+            role: m.role,
+            content: m.content,
+          })),
+        }),
+      });
+    } catch (err) {
+      console.error(`[MODIFY API] Batch ${batchNumber} network error:`, err);
+      return {
+        error: {
+          errorType: "network_error",
+          failedFields: fieldsToTranslate,
+          errorMessage: "Network error. Please check your connection and try again.",
+          aiResponseLength: 0
+        }
+      };
+    }
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[MODIFY API] Batch ${batchNumber} API error:`, response.status, errorText);
+      return {
+        error: {
+          errorType: "api_error",
+          failedFields: fieldsToTranslate,
+          errorMessage: `AI API error (${response.status}). Please try again.`,
+          aiResponseLength: 0
+        }
+      };
+    }
+
+    try {
+      let charCount = 0;
+      for await (const chunk of streamAnthropicResponse(response)) {
+        aiResponse += chunk;
+        charCount += chunk.length;
+        if (charCount % 1000 === 0) {
+          await new Promise(resolve => setImmediate(resolve));
+        }
+      }
+      streamSuccess = true;
+    } catch (streamErr) {
+      console.error(`[MODIFY API] Batch ${batchNumber} stream error:`, streamErr);
+      if (attempts >= maxStreamAttempts) {
+        return {
+          error: {
+            errorType: "stream_error",
+            failedFields: fieldsToTranslate,
+            errorMessage: "Failed to process AI response. Please try again.",
+            aiResponseLength: aiResponse.length
+          }
+        };
+      }
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+  }
+
+  console.log(`[MODIFY API] Batch ${batchNumber}: Stream completed, ${aiResponse.length} chars`);
+
+  // Extract fields from response
+  let jsonStr = "";
+
+  // Try code block first
+  const codeBlockMatch = aiResponse.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (codeBlockMatch && codeBlockMatch[1]) {
+    jsonStr = codeBlockMatch[1].trim();
+  }
+
+  // Try to find JSON in response
+  if (!jsonStr || !jsonStr.includes('"modifiedFields"')) {
+    const firstBrace = aiResponse.indexOf('{');
+    const lastBrace = aiResponse.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      jsonStr = aiResponse.substring(firstBrace, lastBrace + 1);
+    }
+  }
+
+  if (!jsonStr) {
+    await logTranslationFailure(userId, lessonId, batchNumber, fieldsToTranslate, "parse_error", "No JSON found in response", aiResponse.length, supabase);
+    return {
+      error: {
+        errorType: "parse_error",
+        failedFields: fieldsToTranslate,
+        errorMessage: "Could not parse AI response. Please try again.",
+        aiResponseLength: aiResponse.length
+      }
+    };
+  }
+
+  let parsed: Record<string, unknown> | null = null;
+  try {
+    parsed = JSON.parse(jsonStr);
+  } catch (parseErr) {
+    // Try field-by-field extraction
+    console.log(`[MODIFY API] Batch ${batchNumber}: JSON parse failed, attempting field extraction`);
+    parsed = extractFieldsFromTruncatedJson(aiResponse);
+  }
+
+  if (!parsed) {
+    await logTranslationFailure(userId, lessonId, batchNumber, fieldsToTranslate, "parse_error", "Failed to extract fields from response", aiResponse.length, supabase);
+    return {
+      error: {
+        errorType: "parse_error",
+        failedFields: fieldsToTranslate,
+        errorMessage: "Failed to extract fields from AI response. Please try again.",
+        aiResponseLength: aiResponse.length
+      }
+    };
+  }
+
+  const rawFields = parsed.modifiedFields || parsed.modified_fields || {};
+
+  // Normalize field keys
+  const normalizedFields: Record<string, { html?: string; original_length?: number }> = {};
+  for (const [key, value] of Object.entries(rawFields)) {
+    const canonicalKey = normalizeFieldName(key);
+    if (!normalizedFields[canonicalKey]) {
+      normalizedFields[canonicalKey] = value as { html?: string; original_length?: number };
+    }
+  }
+
+  // Check which fields were actually translated vs returned as original
+  const translatedFields = fieldsToTranslate.filter(f => {
+    const field = normalizedFields[f];
+    return field && field.html && field.html.length > 0;
+  });
+
+  const missingFields = fieldsToTranslate.filter(f => {
+    const field = normalizedFields[f];
+    return !field || !field.html || field.html.length === 0;
+  });
+
+  console.log(`[MODIFY API] Batch ${batchNumber}: Translated ${translatedFields.length}/${fieldsToTranslate.length} fields`);
+  console.log(`[MODIFY API] Batch ${batchNumber}: Missing fields: ${missingFields.join(', ') || 'none'}`);
+
+  // Check for truncation indicators
+  const hasTruncation =
+    /\<table[^>]*\>\s*\<colgroup\>/.test(aiResponse) &&
+    !/\<\/table\>/.test(aiResponse.substring(aiResponse.indexOf('<table')));
+
+  if (missingFields.length > 0 || hasTruncation) {
+    const errorType = hasTruncation ? "truncation" : "missing_fields";
+    const errorMessage = hasTruncation
+      ? "AI response was truncated. Some fields may be incomplete."
+      : `Missing fields: ${missingFields.join(', ')}`;
+
+    await logTranslationFailure(userId, lessonId, batchNumber, missingFields.length > 0 ? missingFields : fieldsToTranslate, errorType, errorMessage, aiResponse.length, supabase);
+
+    return {
+      error: {
+        errorType,
+        failedFields: missingFields.length > 0 ? missingFields : fieldsToTranslate,
+        errorMessage,
+        aiResponseLength: aiResponse.length
+      }
+    };
+  }
+
+  // Return successfully extracted fields
+  const resultFields: Record<string, { html: string; original_length: number }> = {};
+  for (const [key, val] of Object.entries(normalizedFields)) {
+    if (val && val.html) {
+      resultFields[key] = { html: val.html, original_length: val.original_length || val.html.length };
+    }
+  }
+
+  return { fields: resultFields };
+}
+
 export async function POST(request: Request) {
   const body = await request.json();
   const { message, lessonId, courseId, conversationHistory, editingVersionId, waitingForConfirmation, userSaidProceed, detectedLanguage, originalTargetLanguage, confirmationModificationType, confirmationModDirection, confirmationTargetDuration } = body;
@@ -803,18 +1081,6 @@ ${fieldsContent}
 `;
 
     if (waitingForConfirmation && userSaidProceed) {
-      const systemPrompt = getModificationSystemPrompt(effectiveModType, modDirection, !!editingVersionId, targetLanguage, modTargetDuration);
-
-      const lessonContextMessage = {
-        role: "user" as const,
-        content: `Please translate this lesson content:\n\n${modificationLessonContent}`
-      };
-
-      const finalUserMessage = userMessage.trim() || "Proceed with creating the version now.";
-      const messages = conversationHistory
-        ? [lessonContextMessage, ...conversationHistory.map((m: { role: string; content: string }) => ({ role: m.role, content: m.content })), { role: "user", content: finalUserMessage }]
-        : [lessonContextMessage, { role: "user", content: finalUserMessage }];
-
       const apiKey = process.env.ANTHROPIC_API_KEY;
       if (!apiKey) {
         return NextResponse.json({
@@ -825,36 +1091,100 @@ ${fieldsContent}
         });
       }
 
-      let aiResponse = "";
-      let streamSuccess = false;
-      let attempts = 0;
-      let truncationRetryCount = 0;
-      const maxStreamAttempts = 2;
-      const maxTruncationRetries = 1;
+      let mergedFields: Record<string, { html: string; original_length: number }> = {};
 
-      // Expected fields for truncation detection
-      const expectedFields: string[] = isDurationMod ? DURATION_MODIFIABLE_FIELDS : ALL_FIELDS.map(f => f.key);
+      // TRANSLATION: Use batch processing
+      if (effectiveModType === "translation") {
+        console.log("[MODIFY API] Starting batch translation for lesson:", lessonId);
 
-      let parsedPreview: Record<string, unknown> | null = null;
+        // Batch 1: lesson_outline + assessment (table-heavy fields)
+        const batch1Fields = ['lesson_outline', 'assessment'];
+        const batch1Result = await runTranslationBatch(
+          batch1Fields,
+          modificationLessonContent,
+          conversationHistory || [],
+          targetLanguage || "the target language",
+          userId,
+          lessonId,
+          1,
+          supabase,
+          apiKey
+        );
 
-      while (truncationRetryCount <= maxTruncationRetries) {
-        const currentMaxTokens = truncationRetryCount === 0 ? MAX_TOKENS : RETRY_MAX_TOKENS;
-        console.log(`[MODIFY API] Stream attempt ${attempts + 1}, max_tokens: ${currentMaxTokens}`);
+        if ('error' in batch1Result) {
+          return NextResponse.json({
+            response: `Translation failed: ${batch1Result.error.errorMessage} Failed fields: ${batch1Result.error.failedFields.join(', ')}. Please try again.`,
+            links: [],
+            results: [],
+            isModificationRequest: true,
+            needsConfirmation: false,
+            translationFailed: true,
+            failedFields: batch1Result.error.failedFields,
+            failedBatch: 1,
+            errorType: batch1Result.error.errorType
+          });
+        }
 
-        const requestBody = JSON.stringify({
-          model: MODIFICATION_MODEL,
-          max_tokens: currentMaxTokens,
-          stream: true,
-          system: systemPrompt,
-          messages: messages.map((m: { role: string; content: string }) => ({
-            role: m.role,
-            content: m.content,
-          })),
-        });
+        // Add batch 1 results to merged fields
+        mergedFields = { ...batch1Result.fields };
+        console.log("[MODIFY API] Batch 1 completed, fields:", Object.keys(mergedFields).join(', '));
 
-        aiResponse = "";
-        streamSuccess = false;
-        attempts = 0;
+        // Batch 2: All other 13 fields in lesson order
+        const batch2Fields = [
+          'learning_objectives', 'vocabulary', 'materials', 'vapa_text_block', 'ncas_text_block',
+          'welcome_opening', 'actual_class_expectations', 'warm_up', 'lesson_hook',
+          'main_activity', 'instrument_expectations', 'reflection', 'closing_ceremony'
+        ];
+        const batch2Result = await runTranslationBatch(
+          batch2Fields,
+          modificationLessonContent,
+          conversationHistory || [],
+          targetLanguage || "the target language",
+          userId,
+          lessonId,
+          2,
+          supabase,
+          apiKey
+        );
+
+        if ('error' in batch2Result) {
+          return NextResponse.json({
+            response: `Translation failed: ${batch2Result.error.errorMessage} Failed fields: ${batch2Result.error.failedFields.join(', ')}. Please try again.`,
+            links: [],
+            results: [],
+            isModificationRequest: true,
+            needsConfirmation: false,
+            translationFailed: true,
+            failedFields: batch2Result.error.failedFields,
+            failedBatch: 2,
+            errorType: batch2Result.error.errorType
+          });
+        }
+
+        // Add batch 2 results to merged fields
+        mergedFields = { ...mergedFields, ...batch2Result.fields };
+        console.log("[MODIFY API] Batch 2 completed, total fields:", Object.keys(mergedFields).length);
+
+      } else {
+        // DURATION: Single call (simplified, no retry, 160K tokens)
+        const systemPrompt = getModificationSystemPrompt(effectiveModType, modDirection, !!editingVersionId, targetLanguage, modTargetDuration);
+
+        const lessonContextMessage = {
+          role: "user" as const,
+          content: `Please modify this lesson content:\n\n${modificationLessonContent}`
+        };
+
+        const finalUserMessage = userMessage.trim() || "Proceed with creating the version now.";
+        const messages = conversationHistory
+          ? [lessonContextMessage, ...conversationHistory.map((m: { role: string; content: string }) => ({ role: m.role, content: m.content })), { role: "user", content: finalUserMessage }]
+          : [lessonContextMessage, { role: "user", content: finalUserMessage }];
+
+        console.log("[MODIFY API] Starting duration modification, max_tokens:", MAX_TOKENS);
+
+        let aiResponse = "";
+        let streamSuccess = false;
+        let attempts = 0;
+        const maxStreamAttempts = 2;
 
         while (!streamSuccess && attempts < maxStreamAttempts) {
           attempts++;
@@ -868,7 +1198,16 @@ ${fieldsContent}
                 "x-api-key": apiKey,
                 "anthropic-version": "2023-06-01",
               },
-              body: requestBody,
+              body: JSON.stringify({
+                model: MODIFICATION_MODEL,
+                max_tokens: MAX_TOKENS,
+                stream: true,
+                system: systemPrompt,
+                messages: messages.map((m: { role: string; content: string }) => ({
+                  role: m.role,
+                  content: m.content,
+                })),
+              }),
             });
           } catch (err) {
             return NextResponse.json({
@@ -895,7 +1234,6 @@ ${fieldsContent}
             for await (const chunk of streamAnthropicResponse(response)) {
               aiResponse += chunk;
               charCount += chunk.length;
-
               if (charCount % 1000 === 0) {
                 await new Promise(resolve => setImmediate(resolve));
               }
@@ -915,224 +1253,131 @@ ${fieldsContent}
           }
         }
 
-        console.log(`[MODIFY API] Stream completed: ${aiResponse.length} chars, ${attempts} attempt(s)`);
+        console.log(`[MODIFY API] Duration stream completed: ${aiResponse.length} chars`);
 
-        // Comprehensive logging for debugging
-        console.log("[MODIFY API] ========== DEBUG START ==========");
-        console.log("[MODIFY API] modDirection value:", modDirection);
-        console.log("[MODIFY API] userSaidProceed:", userSaidProceed);
-        console.log("[MODIFY API] confirmationModificationType:", confirmationModificationType);
-        console.log("[MODIFY API] originalTargetLanguage:", originalTargetLanguage);
-        console.log("[MODIFY API] AI response length:", aiResponse.length);
-        console.log("[MODIFY API] AI response first 500 chars:", aiResponse.substring(0, 500));
-        console.log("[MODIFY API] AI response last 500 chars:", aiResponse.substring(aiResponse.length - 500));
-        console.log("[MODIFY API] ========== DEBUG END ==========");
+        // Extract fields from response
+        let jsonStr = "";
+        const codeBlockMatch = aiResponse.match(/```(?:json)?\s*([\s\S]*?)```/);
+        if (codeBlockMatch && codeBlockMatch[1]) {
+          jsonStr = codeBlockMatch[1].trim();
+        }
+        if (!jsonStr || !jsonStr.includes('"modifiedFields"')) {
+          const firstBrace = aiResponse.indexOf('{');
+          const lastBrace = aiResponse.lastIndexOf('}');
+          if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+            jsonStr = aiResponse.substring(firstBrace, lastBrace + 1);
+          }
+        }
 
-        // Run truncation detection BEFORE attempting extraction
-        const truncationDetection = detectTruncation(aiResponse, expectedFields);
+        if (!jsonStr) {
+          return NextResponse.json({
+            response: "Could not parse AI response. Please try again.",
+            links: [],
+            results: [],
+            isModificationRequest: true,
+          });
+        }
 
-        parsedPreview = null;
+        let parsed: Record<string, unknown> | null = null;
         try {
-          // Try multiple strategies to extract complete JSON
-          let jsonStr = "";
-
-          // Strategy 1: Extract from markdown code blocks
-          const codeBlockMatch = aiResponse.match(/```(?:json)?\s*([\s\S]*?)```/);
-          if (codeBlockMatch && codeBlockMatch[1]) {
-            jsonStr = codeBlockMatch[1].trim();
-          }
-
-          // Strategy 2: If no complete JSON from code block, find the largest complete object
-          if (!jsonStr || !jsonStr.includes('"modifiedFields"')) {
-            const firstBrace = aiResponse.indexOf('{');
-            const lastBrace = aiResponse.lastIndexOf('}');
-            if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-              jsonStr = aiResponse.substring(firstBrace, lastBrace + 1);
-            }
-          }
-
-          // Strategy 3: If JSON is truncated (incomplete), try to find complete field objects
-          if (jsonStr) {
-            try {
-              parsedPreview = JSON.parse(jsonStr);
-            } catch (parseErr) {
-              // JSON is incomplete/truncated - try to extract individual complete fields
-              console.log("[MODIFY API] JSON parse failed, attempting field-by-field extraction");
-              parsedPreview = extractFieldsFromTruncatedJson(aiResponse);
-            }
-          }
-
-          // Normalize modifiedFields (handle both camelCase, snake_case, and field aliases)
-          if (parsedPreview) {
-            const rawFields = parsedPreview.modifiedFields || parsedPreview.modified_fields || {};
-
-            // Normalize all field keys to canonical database names
-            const normalizedFields: Record<string, { html?: string; original_length?: number }> = {};
-            for (const [key, value] of Object.entries(rawFields)) {
-              const canonicalKey = normalizeFieldName(key);
-              if (!normalizedFields[canonicalKey]) {
-                normalizedFields[canonicalKey] = value;
-              }
-            }
-            parsedPreview.modifiedFields = normalizedFields;
-            const fields = normalizedFields;
-
-            console.log("[MODIFY API] Parsed fields:", Object.keys(fields).join(', '));
-            console.log("[MODIFY API] Field content lengths:");
-            const fieldEntries = Object.entries(fields);
-            for (let i = 0; i < fieldEntries.length; i++) {
-              const [key, val] = fieldEntries[i];
-              const fieldVal = val as { html?: string };
-              const html = fieldVal?.html || "";
-              console.log(`[MODIFY API]   ${key}: ${html.length} chars`);
-              if (html.length > 100 && !html.includes('<') && !html.includes('>')) {
-                console.log(`[MODIFY API]   WARNING: Field ${key} appears to contain narrative text (no HTML tags), content preview: ${html.substring(0, 100)}...`);
-              }
-              if (i % 5 === 0) {
-                await new Promise(resolve => setImmediate(resolve));
-              }
-            }
-
-            // Validate we have meaningful content for duration modifications
-            if (effectiveModType === "duration") {
-              const fieldCount = Object.keys(fields).length;
-              const totalChars = Object.values(fields).reduce((sum: number, val: unknown) => sum + ((val as { html?: string })?.html?.length || 0), 0);
-              console.log(`[MODIFY API] Duration mod validation: ${fieldCount} fields, ${totalChars} total chars`);
-
-              // For duration, expect meaningful content - at least 500 total chars (rough indicator of valid HTML)
-              // Also check that non-empty fields have at least 50 chars (empty fields are OK - they'll use original content)
-              const fieldLengths = Object.values(fields).map((val: unknown) => ((val as { html?: string })?.html?.length || 0)).filter(len => len > 0);
-              const minFieldLength = fieldLengths.length > 0 ? Math.min(...fieldLengths) : 0;
-              console.log(`[MODIFY API] Duration mod: ${fieldCount} fields, ${totalChars} total chars, smallest non-empty field: ${minFieldLength} chars`);
-
-              // Check if we should retry due to truncation
-              const needsRetry = truncationRetryCount < maxTruncationRetries &&
-                (truncationDetection.isTruncated || fieldCount < expectedFields.length - 2 || totalChars < 1000);
-
-              if (needsRetry) {
-                console.log(`[MODIFY API] Truncation detected (${truncationDetection.reason || 'insufficient content'}), retrying with higher max_tokens...`);
-                truncationRetryCount++;
-                continue; // Retry the while loop
-              }
-
-              if (fieldCount < 1 || totalChars < 500 || (fieldLengths.length > 0 && minFieldLength < 50)) {
-                console.log("[MODIFY API] Duration modification appears incomplete, returning error");
-                return NextResponse.json({
-                  response: "I ran out of tokens to complete this job correctly. Please try again.",
-                  links: [],
-                  results: [],
-                  isModificationRequest: true,
-                  needsConfirmation: false,
-                });
-              }
-            }
-          }
-
-          // If we got here with valid parsedPreview, break out of the retry loop
-          if (parsedPreview) {
-            break;
-          }
-        } catch (err) {
-          console.log("[MODIFY API] JSON extraction error:", err);
+          parsed = JSON.parse(jsonStr);
+        } catch (parseErr) {
+          parsed = extractFieldsFromTruncatedJson(aiResponse);
         }
 
-        // If no valid parsedPreview but we haven't exhausted retries, try again
-        if (truncationRetryCount < maxTruncationRetries) {
-          console.log("[MODIFY API] No valid preview extracted, retrying with higher max_tokens...");
-          truncationRetryCount++;
-          continue;
+        if (!parsed || !parsed.modifiedFields) {
+          return NextResponse.json({
+            response: "Failed to extract fields from AI response. Please try again.",
+            links: [],
+            results: [],
+            isModificationRequest: true,
+          });
         }
 
-        // We've exhausted retries
-        break;
+        const rawFields = parsed.modifiedFields || parsed.modified_fields || {};
+        for (const [key, value] of Object.entries(rawFields)) {
+          const canonicalKey = normalizeFieldName(key);
+          if (!mergedFields[canonicalKey]) {
+            mergedFields[canonicalKey] = value as { html: string; original_length: number };
+          }
+        }
       }
 
-      if (parsedPreview && parsedPreview.modifiedFields) {
-        modificationPreview = parsedPreview;
+      // Build modificationPreview from merged fields
+      modificationPreview = { modifiedFields: mergedFields };
 
-        // Validate all 15 fields are present; fill missing fields with original content
-        const allFieldKeys = [
-          'lesson_outline', 'learning_objectives', 'vocabulary', 'materials',
-          'vapa_text_block', 'ncas_text_block', 'welcome_opening', 'actual_class_expectations',
-          'warm_up', 'lesson_hook', 'main_activity', 'instrument_expectations',
-          'reflection', 'closing_ceremony', 'assessment'
-        ];
+      // Validate all 15 fields are present; fill missing fields with original content
+      const allFieldKeys = [
+        'lesson_outline', 'learning_objectives', 'vocabulary', 'materials',
+        'vapa_text_block', 'ncas_text_block', 'welcome_opening', 'actual_class_expectations',
+        'warm_up', 'lesson_hook', 'main_activity', 'instrument_expectations',
+        'reflection', 'closing_ceremony', 'assessment'
+      ];
 
-        const modifiedFields = modificationPreview.modifiedFields as Record<string, { html?: string; original_length?: number }>;
-        const missingFields: string[] = [];
+      const modifiedFields = modificationPreview.modifiedFields as Record<string, { html?: string; original_length?: number }>;
+      const missingFields: string[] = [];
 
-        for (const fieldKey of allFieldKeys) {
-          if (!modifiedFields[fieldKey] || !modifiedFields[fieldKey].html) {
-            missingFields.push(fieldKey);
-            // Get original content from fullLesson
-            const fullLessonAny = fullLesson as unknown as Record<string, string>;
-            const originalHtml = fullLessonAny[fieldKey] || "";
-            if (originalHtml) {
-              modifiedFields[fieldKey] = { html: originalHtml, original_length: originalHtml.length };
-              console.log(`[MODIFY API] Filled missing field '${fieldKey}' with original content (${originalHtml.length} chars)`);
-            }
+      for (const fieldKey of allFieldKeys) {
+        if (!modifiedFields[fieldKey] || !modifiedFields[fieldKey].html) {
+          missingFields.push(fieldKey);
+          const fullLessonAny = fullLesson as unknown as Record<string, string>;
+          const originalHtml = fullLessonAny[fieldKey] || "";
+          if (originalHtml) {
+            modifiedFields[fieldKey] = { html: originalHtml, original_length: originalHtml.length };
+            console.log(`[MODIFY API] Filled missing field '${fieldKey}' with original content (${originalHtml.length} chars)`);
           }
         }
+      }
 
-        if (missingFields.length > 0) {
-          console.log(`[MODIFY API] Missing fields filled from original: ${missingFields.join(', ')}`);
-        }
+      if (missingFields.length > 0) {
+        console.log(`[MODIFY API] Missing fields filled from original: ${missingFields.join(', ')}`);
+      }
 
-        const timestamp = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      const timestamp = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
-        if (effectiveModType === "translation" && targetLanguage) {
-          suggestedVersionName = `${targetLanguage.charAt(0).toUpperCase() + targetLanguage.slice(1)} Translation - ${timestamp}`;
-        } else if (effectiveModType === "duration") {
-          const durationSuffix = modTargetDuration ? ` (${modTargetDuration} min)` : "";
-          suggestedVersionName = `${modDirection === "shorter" ? "Shorter" : "Longer"} Version${durationSuffix} - ${timestamp}`;
-        } else {
-          suggestedVersionName = `Modified Version - ${timestamp}`;
-        }
-
-        // Check for duplicate version names and append (2), (3), etc. if needed
-        const { data: existingVersions } = await supabase
-          .from("lesson_versions")
-          .select("version_name")
-          .eq("lesson_id", lessonId)
-          .is("deleted_at", null);
-
-        if (existingVersions) {
-          const existingNames = existingVersions.map(v => v.version_name);
-          let finalName = suggestedVersionName;
-          let counter = 2;
-
-          while (existingNames.includes(finalName)) {
-            finalName = `${suggestedVersionName} (${counter})`;
-            counter++;
-          }
-
-          if (finalName !== suggestedVersionName) {
-            console.log(`[MODIFY API] Duplicate version name detected, renamed to: ${finalName}`);
-            suggestedVersionName = finalName;
-          }
-        }
-
-        return NextResponse.json({
-          response: `I've created "${suggestedVersionName}". This version is now loaded in the lesson view.`,
-          links: [],
-          results: [],
-          isModificationRequest: true,
-          needsConfirmation: false,
-          modificationType: effectiveModType,
-          modificationPreview,
-          editingVersionId: editingVersionId || null,
-          suggestedVersionName,
-        });
+      if (effectiveModType === "translation" && targetLanguage) {
+        suggestedVersionName = `${targetLanguage.charAt(0).toUpperCase() + targetLanguage.slice(1)} Translation - ${timestamp}`;
+      } else if (effectiveModType === "duration") {
+        const durationSuffix = modTargetDuration ? ` (${modTargetDuration} min)` : "";
+        suggestedVersionName = `${modDirection === "shorter" ? "Shorter" : "Longer"} Version${durationSuffix} - ${timestamp}`;
       } else {
-        const fieldKeys = parsedPreview?.modifiedFields ? Object.keys(parsedPreview.modifiedFields).join(',') : 'none';
-        const debugInfo = `parsed fields: ${fieldKeys}`;
-        return NextResponse.json({
-          response: `I ran out of tokens to complete this job correctly. Please try again.`,
-          links: [],
-          results: [],
-          isModificationRequest: true,
-        });
+        suggestedVersionName = `Modified Version - ${timestamp}`;
       }
+
+      // Check for duplicate version names and append (2), (3), etc. if needed
+      const { data: existingVersions } = await supabase
+        .from("lesson_versions")
+        .select("version_name")
+        .eq("lesson_id", lessonId)
+        .is("deleted_at", null);
+
+      if (existingVersions) {
+        const existingNames = existingVersions.map(v => v.version_name);
+        let finalName = suggestedVersionName;
+        let counter = 2;
+
+        while (existingNames.includes(finalName)) {
+          finalName = `${suggestedVersionName} (${counter})`;
+          counter++;
+        }
+
+        if (finalName !== suggestedVersionName) {
+          console.log(`[MODIFY API] Duplicate version name detected, renamed to: ${finalName}`);
+          suggestedVersionName = finalName;
+        }
+      }
+
+      return NextResponse.json({
+        response: `I've created "${suggestedVersionName}". This version is now loaded in the lesson view.`,
+        links: [],
+        results: [],
+        isModificationRequest: true,
+        needsConfirmation: false,
+        modificationType: effectiveModType,
+        modificationPreview,
+        editingVersionId: editingVersionId || null,
+        suggestedVersionName,
+      });
     } else {
       const systemPrompt = effectiveModType === "translation"
         ? getTranslationQuestionsSystemPrompt(targetLanguage || detectedLanguage || "the target language")
