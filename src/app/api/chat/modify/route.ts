@@ -1120,6 +1120,14 @@ ${fieldsContent}
           const field = allFields[i];
           console.log(`[MODIFY API] Translating field ${i + 1}/${allFields.length}: ${field}`);
 
+          // Skip empty fields - no need to translate
+          const originalContent = getFieldContent(field);
+          if (!originalContent || originalContent.trim() === "" || originalContent === "(empty)") {
+            console.log(`[MODIFY API] Skipping ${field} - field is empty in original lesson`);
+            mergedFields[field] = { html: "", original_length: 0 };
+            continue;
+          }
+
           const result = await runTranslationBatch(
             [field],
             modificationLessonContent,
