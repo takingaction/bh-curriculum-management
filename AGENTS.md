@@ -1083,6 +1083,25 @@ For duration modifications, only 9 modifiable fields are sent to AI (to reduce t
 Skipped (static fields - not sent to AI):
 - learning_objectives, vocabulary, materials, vapa_text_block, ncas_text_block, assessment
 
+**Translation Architecture (August 2026)**:
+- Uses **per-field batch processing**: 15 API calls (one per field), not batches
+- Model: `claude-opus-4-5` for both translation and duration
+- `MAX_TOKENS = 32000` (32K = max model output limit per call)
+- Empty fields (e.g., `<p></p>`) are skipped automatically
+- System prompt: "translate THIS field only" - sends only the specific field content, not full lesson context
+- Each field is translated independently with HTML completeness requirements
+
+**Why Per-Field Processing?**
+- Large tables (lesson_outline, assessment) exceed single-call output limits when translated
+- Per-field architecture ensures each field completes fully before moving to next
+- Reduces context confusion - AI only sees one field at a time
+
+**Translation Failure Logging**:
+- Table: `translation_failures` (migration 027)
+- Admin page: `/admin/translation-failures`
+- Tracks: user_id, lesson_id, batch_number (field index), failed_fields, error_type, ai_response_length
+- RLS: users see own failures, admins see all
+
 **Duplicate Version Name Handling**:
 When creating a version, if the suggested name already exists:
 - Appends (2), (3), etc. to the name
@@ -1111,6 +1130,13 @@ Generic numeric duration patterns are detected via regex fallback:
 - `src/app/api/pdf-usage/route.ts` - Weekly PDF usage tracking
 - `supabase/migrations/024_lesson_versions.sql` - Database migration
 - `supabase/migrations/025_increase_version_limit.sql` - Increased limit to 10 versions
+- `supabase/migrations/027_translation_failure_log.sql` - Translation failure logging table
+
+**Lessons Learned - Translation Bug (August 2026)**:
+- Bug: Two `let mergedFields` declarations caused inner one to shadow outer
+- Symptom: All fields filled with original English despite successful translation logs showing "14 fields translated"
+- Fix: Single declaration at outer scope - mergedFields must persist after translation block ends
+- Root cause: Variable shadowing in JavaScript - inner block declaration hides outer scope variable
 
 ### Relevant Files
 - `src/app/(dashboard)/admin/courses/[id]/page.tsx` - Course edit page with Spotify section
