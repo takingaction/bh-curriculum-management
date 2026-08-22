@@ -64,6 +64,7 @@ function SortableLessonItem({ lesson, courseId }: SortableLessonItemProps) {
     <div
       ref={setNodeRef}
       style={style}
+      suppressHydrationWarning
       className={`flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-gray-200 hover:bg-gray-50 ${
         isDragging ? "shadow-lg ring-2 ring-[#0d7377]" : ""
       }`}
@@ -74,6 +75,7 @@ function SortableLessonItem({ lesson, courseId }: SortableLessonItemProps) {
         {...attributes}
         {...listeners}
         title="Drag to reorder"
+        suppressHydrationWarning
       >
         <GripVertical className="w-4 h-4" />
       </button>

@@ -207,7 +207,7 @@ export function SortableUnitCard({ unit, onTitleChange, onDelete }: SortableUnit
   };
 
   return (
-    <div ref={setNodeRef} style={style}>
+    <div ref={setNodeRef} style={style} suppressHydrationWarning>
       <UnitCard
         unit={unit}
         onTitleChange={onTitleChange}
