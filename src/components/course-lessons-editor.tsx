@@ -176,8 +176,7 @@ export function CourseLessonsEditor({ courseId, initialLessons, initialUnits }: 
   };
 
   const handleAddUnit = async () => {
-    const unitNumber = units.length + 1;
-    const title = `UNIT [${unitNumber}]: NEW UNIT`;
+    const title = `UNIT`;
 
     try {
       const res = await fetch(`/api/courses/${courseId}/units`, {
