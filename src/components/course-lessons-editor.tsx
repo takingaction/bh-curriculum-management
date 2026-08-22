@@ -3,7 +3,6 @@
 import { useState, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   DndContext,
   closestCenter,
@@ -19,9 +18,11 @@ import {
   SortableContext,
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
+  useSortable,
 } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { SortableUnitCard } from "@/components/unit-card";
-import { PlusIcon } from "lucide-react";
+import { PlusIcon, GripVertical } from "lucide-react";
 
 interface Lesson {
   id: string;
@@ -35,6 +36,66 @@ interface Unit {
   id: string;
   title: string;
   display_order: number;
+}
+
+interface SortableLessonItemProps {
+  lesson: Lesson;
+  courseId: string;
+}
+
+function SortableLessonItem({ lesson, courseId }: SortableLessonItemProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: lesson.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 50 : "auto",
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-gray-200 hover:bg-gray-50 ${
+        isDragging ? "shadow-lg ring-2 ring-[#0d7377]" : ""
+      }`}
+    >
+      <button
+        type="button"
+        className="p-1 hover:bg-gray-200 rounded cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600"
+        {...attributes}
+        {...listeners}
+        title="Drag to reorder"
+      >
+        <GripVertical className="w-4 h-4" />
+      </button>
+      <span className="w-8 text-center font-medium text-gray-500">
+        {lesson.lesson_number}
+      </span>
+      <span className="flex-1 text-sm">{lesson.title}</span>
+      <span className="text-xs text-gray-400">{lesson.total_time || "-"}</span>
+      <div className="flex gap-2">
+        <Link href={`/lessons/${lesson.id}`}>
+          <Button variant="outline" size="sm">
+            View
+          </Button>
+        </Link>
+        <Link href={`/admin/courses/${courseId}/lessons/${lesson.id}`}>
+          <Button variant="outline" size="sm">
+            Edit
+          </Button>
+        </Link>
+      </div>
+    </div>
+  );
 }
 
 type SortableItem = {
@@ -116,7 +177,7 @@ export function CourseLessonsEditor({ courseId, initialLessons, initialUnits }: 
 
   const handleAddUnit = async () => {
     const unitNumber = units.length + 1;
-    const title = `UNIT [${unitNumber}]: `;
+    const title = `UNIT [${unitNumber}]: NEW UNIT`;
 
     try {
       const res = await fetch(`/api/courses/${courseId}/units`, {
@@ -124,12 +185,12 @@ export function CourseLessonsEditor({ courseId, initialLessons, initialUnits }: 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title,
-          displayOrder: lessons.length > 0 ? Math.max(...lessons.map((l) => l.display_order)) + 1 : 1,
+          displayOrder: 0.5,
         }),
       });
       const data = await res.json();
       if (data.unit) {
-        setUnits([...units, data.unit]);
+        setUnits([data.unit, ...units]);
       }
     } catch (error) {
       console.error("Failed to add unit:", error);
@@ -271,28 +332,11 @@ export function CourseLessonsEditor({ courseId, initialLessons, initialUnits }: 
                 } else {
                   const lesson = item.data as Lesson;
                   return (
-                    <div
+                    <SortableLessonItem
                       key={lesson.id}
-                      className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-gray-200 hover:bg-gray-50"
-                    >
-                      <span className="w-8 text-center font-medium text-gray-500">
-                        {lesson.lesson_number}
-                      </span>
-                      <span className="flex-1 text-sm">{lesson.title}</span>
-                      <span className="text-xs text-gray-400">{lesson.total_time || "-"}</span>
-                      <div className="flex gap-2">
-                        <Link href={`/lessons/${lesson.id}`}>
-                          <Button variant="outline" size="sm">
-                            View
-                          </Button>
-                        </Link>
-                        <Link href={`/admin/courses/${courseId}/lessons/${lesson.id}`}>
-                          <Button variant="outline" size="sm">
-                            Edit
-                          </Button>
-                        </Link>
-                      </div>
-                    </div>
+                      lesson={lesson}
+                      courseId={courseId}
+                    />
                   );
                 }
               })}

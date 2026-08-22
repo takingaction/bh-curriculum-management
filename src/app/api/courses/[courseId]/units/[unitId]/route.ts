@@ -8,14 +8,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ co
     const body = await request.json();
     const { title } = body;
 
-    if (title !== undefined) {
-      if (!title) {
-        return NextResponse.json({ error: "Title is required" }, { status: 400 });
-      }
-
-      if (!title.match(/^UNIT \[/i)) {
-        return NextResponse.json({ error: "Title must start with 'UNIT ['" }, { status: 400 });
-      }
+    if (title !== undefined && !title.trim()) {
+      return NextResponse.json({ error: "Title is required" }, { status: 400 });
     }
 
     const updateData: { title?: string; updated_at?: string } = {};

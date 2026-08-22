@@ -30,12 +30,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ cou
     const body = await request.json();
     const { title, displayOrder } = body;
 
-    if (!title) {
+    if (!title || !title.trim()) {
       return NextResponse.json({ error: "Title is required" }, { status: 400 });
-    }
-
-    if (!title.match(/^UNIT \[/i)) {
-      return NextResponse.json({ error: "Title must start with 'UNIT ['" }, { status: 400 });
     }
 
     let newDisplayOrder = displayOrder;
