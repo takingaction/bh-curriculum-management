@@ -177,7 +177,7 @@ export default function CourseClient({
                   if (item.type === "unit") {
                     const unit = item.data as Unit;
                     return (
-                      <TableRow key={`unit-${unit.id}`} className="bg-[#e37c64]">
+                      <TableRow key={`unit-${unit.id}`} className="bg-[#e37c64] hover:bg-[#e37c64]">
                         <TableCell colSpan={4} className="text-white font-bold py-2 px-4">
                           {unit.title}
                         </TableCell>
