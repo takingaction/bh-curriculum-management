@@ -829,6 +829,32 @@ Admin page for managing teacher accounts with real-time search and bulk operatio
 - `src/app/api/admin/teachers/bulk/route.ts` - Bulk delete/patch endpoints
 - `src/components/bulk-delete-modal.tsx` - Delete confirmation modal
 
+#### Course Units
+Feature for adding titled section headers (e.g., "UNIT 1: WELCOME TO DANCE") between lessons in admin course editor.
+
+**Behavior:**
+- Units appear as inline separators in admin view, coral header rows in teacher view
+- New units always appear at the absolute top (before all lessons)
+- Arrow buttons (▲/▼) move units up/down through lesson positions
+- Renaming a unit preserves its position (does not trigger re-sort)
+- Units only appear in Course Scope & Sequence PDFs (not discipline PDFs)
+- Deleting a unit causes lessons below to collapse up
+
+**Database table:** `course_units` with `course_id`, `title`, `display_order`, timestamps
+
+**API endpoints:**
+- `GET /api/courses/[courseId]/units` - List units ordered by display_order
+- `POST /api/courses/[courseId]/units` - Create unit (displayOrder = min - 1)
+- `PATCH /api/courses/[courseId]/units/[unitId]` - Update title or displayOrder
+- `DELETE /api/courses/[courseId]/units/[unitId]` - Delete unit
+
+**Key files:**
+- `src/components/course-lessons-editor.tsx` - Admin UI with unit/lesson list and arrow reordering
+- `src/components/unit-card.tsx` - Unit card with inline title editing
+- `src/app/(dashboard)/admin/courses/[id]/page.tsx` - Uses CourseLessonsEditor
+- `src/app/(dashboard)/dashboard/courses/[courseId]/course-client.tsx` - Teacher view with unit headers
+- `pdf-service/src/template.js` - Unit headers (16pt coral) in course PDF
+
 #### AI Chat Assistant
 Feature for exploring lesson content and answering questions about music/dance/theatre education.
 

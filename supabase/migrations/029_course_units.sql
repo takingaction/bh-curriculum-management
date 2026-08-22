@@ -4,7 +4,7 @@
 CREATE TABLE IF NOT EXISTS public.course_units (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   course_id UUID NOT NULL REFERENCES public.courses(id) ON DELETE CASCADE,
-  title TEXT NOT NULL CHECK (title ~* '^UNIT \['),
+  title TEXT NOT NULL,
   display_order FLOAT NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()

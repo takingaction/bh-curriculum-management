@@ -3,26 +3,14 @@
 import { useState, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { GripVertical, Pencil, X, Check, PlusIcon, ChevronUp, ChevronDown } from "lucide-react";
 import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  DragEndEvent,
-  DragOverlay,
-  DragStartEvent,
-} from "@dnd-kit/core";
-import {
-  SortableContext,
-  sortableKeyboardCoordinates,
-  verticalListSortingStrategy,
-  useSortable,
-} from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
-import { SortableUnitCard } from "@/components/unit-card";
-import { PlusIcon, GripVertical } from "lucide-react";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 interface Lesson {
   id: string;
@@ -38,50 +26,182 @@ interface Unit {
   display_order: number;
 }
 
-interface SortableLessonItemProps {
-  lesson: Lesson;
-  courseId: string;
+interface SortableItem {
+  type: "lesson" | "unit";
+  id: string;
+  data: Lesson | Unit;
+  displayOrder: number;
 }
 
-function SortableLessonItem({ lesson, courseId }: SortableLessonItemProps) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: lesson.id });
+interface CourseLessonsEditorProps {
+  courseId: string;
+  initialLessons: Lesson[];
+  initialUnits: Unit[];
+}
 
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-    zIndex: isDragging ? 50 : "auto",
+function UnitCard({
+  unit,
+  onTitleChange,
+  onDelete,
+  onMoveUp,
+  onMoveDown,
+  isFirst,
+  isLast,
+}: {
+  unit: Unit;
+  onTitleChange: (id: string, newTitle: string) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
+  onMoveUp?: (id: string) => void;
+  onMoveDown?: (id: string) => void;
+  isFirst?: boolean;
+  isLast?: boolean;
+}) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState(unit.title);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleSave = async () => {
+    if (!editTitle.trim()) {
+      alert("Title cannot be empty");
+      return;
+    }
+    setIsSaving(true);
+    try {
+      await onTitleChange(unit.id, editTitle.trim());
+      setIsEditing(false);
+    } catch (error) {
+      console.error("Failed to update unit:", error);
+      setEditTitle(unit.title);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
+  const handleDelete = async () => {
+    setIsDeleting(true);
+    try {
+      await onDelete(unit.id);
+      setShowDeleteConfirm(false);
+    } catch (error) {
+      console.error("Failed to delete unit:", error);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  if (isEditing) {
+    return (
+      <div className="flex items-center gap-2 px-3 py-2 rounded-lg border bg-gray-50 border-gray-300">
+        <div className="w-6" />
+        <input
+          type="text"
+          value={editTitle}
+          onChange={(e) => setEditTitle(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") handleSave();
+            if (e.key === "Escape") {
+              setEditTitle(unit.title);
+              setIsEditing(false);
+            }
+          }}
+          className="flex-1 px-2 py-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-[#0d7377]"
+          autoFocus
+        />
+        <button
+          onClick={handleSave}
+          disabled={isSaving}
+          className="p-1 hover:bg-green-100 rounded text-green-600"
+        >
+          <Check className="w-4 h-4" />
+        </button>
+        <button
+          onClick={() => {
+            setEditTitle(unit.title);
+            setIsEditing(false);
+          }}
+          className="p-1 hover:bg-gray-200 rounded text-gray-600"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+    );
+  }
+
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      suppressHydrationWarning
-      className={`flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-gray-200 hover:bg-gray-50 ${
-        isDragging ? "shadow-lg ring-2 ring-[#0d7377]" : ""
-      }`}
-    >
-      <button
-        type="button"
-        className="p-1 hover:bg-gray-200 rounded cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600"
-        {...attributes}
-        {...listeners}
-        title="Drag to reorder"
-        suppressHydrationWarning
-      >
-        <GripVertical className="w-4 h-4" />
-      </button>
-      <span className="w-8 text-center font-medium text-gray-500">
+    <>
+      <div className="flex items-center gap-2 px-3 py-2 rounded-lg border bg-gray-100 border-gray-200 hover:bg-gray-50">
+        <GripVertical className="w-4 h-4 cursor-grab text-gray-400" />
+        <span className="flex-1 font-medium text-sm">{unit.title}</span>
+
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => onMoveUp?.(unit.id)}
+            disabled={isFirst}
+            className={`p-1 rounded ${isFirst ? 'text-gray-300 cursor-not-allowed' : 'hover:bg-gray-200 text-gray-500'}`}
+            title="Move up"
+          >
+            <ChevronUp className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => onMoveDown?.(unit.id)}
+            disabled={isLast}
+            className={`p-1 rounded ${isLast ? 'text-gray-300 cursor-not-allowed' : 'hover:bg-gray-200 text-gray-500'}`}
+            title="Move down"
+          >
+            <ChevronDown className="w-4 h-4" />
+          </button>
+        </div>
+
+        <button
+          onClick={() => setIsEditing(true)}
+          className="p-1 hover:bg-gray-200 rounded text-gray-400 hover:text-gray-600"
+        >
+          <Pencil className="w-3.5 h-3.5" />
+        </button>
+        <button
+          onClick={() => setShowDeleteConfirm(true)}
+          className="p-1 hover:bg-red-100 rounded text-gray-400 hover:text-red-600"
+        >
+          <X className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
+      <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Unit</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-gray-600">
+            Are you sure you want to delete &quot;{unit.title}&quot;? This action cannot be undone.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDeleteConfirm(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={isDeleting}>
+              {isDeleting ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+function LessonItem({
+  lesson,
+  courseId,
+}: {
+  lesson: Lesson;
+  courseId: string;
+}) {
+  return (
+    <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-gray-200">
+      <div className="w-8 text-center font-medium text-gray-500">
         {lesson.lesson_number}
-      </span>
+      </div>
       <span className="flex-1 text-sm">{lesson.title}</span>
       <span className="text-xs text-gray-400">{lesson.total_time || "-"}</span>
       <div className="flex gap-2">
@@ -100,36 +220,10 @@ function SortableLessonItem({ lesson, courseId }: SortableLessonItemProps) {
   );
 }
 
-type SortableItem = {
-  type: "lesson" | "unit";
-  id: string;
-  data: Lesson | Unit;
-  displayOrder: number;
-};
-
-interface CourseLessonsEditorProps {
-  courseId: string;
-  initialLessons: Lesson[];
-  initialUnits: Unit[];
-}
-
 export function CourseLessonsEditor({ courseId, initialLessons, initialUnits }: CourseLessonsEditorProps) {
   const [lessons, setLessons] = useState<Lesson[]>(initialLessons);
   const [units, setUnits] = useState<Unit[]>(initialUnits);
   const [isLoading, setIsLoading] = useState(false);
-  const [activeId, setActiveId] = useState<string | null>(null);
-  const [activeItem, setActiveItem] = useState<SortableItem | null>(null);
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8,
-      },
-    }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  );
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
@@ -153,7 +247,7 @@ export function CourseLessonsEditor({ courseId, initialLessons, initialUnits }: 
     fetchData();
   }, [fetchData]);
 
-  const getSortableItems = (): SortableItem[] => {
+  const getItems = (): SortableItem[] => {
     const items: SortableItem[] = [];
 
     lessons.forEach((lesson) => {
@@ -179,6 +273,13 @@ export function CourseLessonsEditor({ courseId, initialLessons, initialUnits }: 
 
   const handleAddUnit = async () => {
     const title = `UNIT`;
+    const allOrders = [
+      0,
+      ...lessons.map(l => l.display_order),
+      ...units.map(u => u.display_order),
+    ];
+    const minOrder = Math.min(...allOrders);
+    const newOrder = minOrder - 1;
 
     try {
       const res = await fetch(`/api/courses/${courseId}/units`, {
@@ -186,7 +287,7 @@ export function CourseLessonsEditor({ courseId, initialLessons, initialUnits }: 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title,
-          displayOrder: 0.5,
+          displayOrder: newOrder,
         }),
       });
       const data = await res.json();
@@ -199,6 +300,9 @@ export function CourseLessonsEditor({ courseId, initialLessons, initialUnits }: 
   };
 
   const handleUnitTitleChange = async (unitId: string, newTitle: string) => {
+    const currentUnit = units.find(u => u.id === unitId);
+    const preservedOrder = currentUnit?.display_order;
+
     const res = await fetch(`/api/courses/${courseId}/units/${unitId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -206,7 +310,7 @@ export function CourseLessonsEditor({ courseId, initialLessons, initialUnits }: 
     });
     const data = await res.json();
     if (data.unit) {
-      setUnits(units.map((u) => (u.id === unitId ? data.unit : u)));
+      setUnits(units.map((u) => u.id === unitId ? { ...data.unit, display_order: preservedOrder } : u));
     } else {
       throw new Error(data.error || "Failed to update unit");
     }
@@ -223,63 +327,24 @@ export function CourseLessonsEditor({ courseId, initialLessons, initialUnits }: 
     }
   };
 
-  const handleDragStart = (event: DragStartEvent) => {
-    const { active } = event;
-    setActiveId(active.id as string);
-    const items = getSortableItems();
-    const item = items.find((i) => i.id === active.id);
-    setActiveItem(item || null);
-  };
+  const handleMoveUp = async (unitId: string) => {
+    const items = getItems();
+    const unitIndex = items.findIndex((i) => i.type === "unit" && i.id === unitId);
+    if (unitIndex <= 0) return;
 
-  const handleDragEnd = async (event: DragEndEvent) => {
-    const { active, over } = event;
-    setActiveId(null);
-    setActiveItem(null);
+    const unit = items[unitIndex];
+    const above = items[unitIndex - 1];
 
-    if (!over || active.id === over.id) return;
+    // Move unit to just above the item before it
+    const newUnitOrder = above.displayOrder - 0.5;
 
-    const items = getSortableItems();
-    const oldIndex = items.findIndex((i) => i.id === active.id);
-    const newIndex = items.findIndex((i) => i.id === over.id);
-
-    if (oldIndex === -1 || newIndex === -1) return;
-
-    const reorderedItems = [...items];
-    const [movedItem] = reorderedItems.splice(oldIndex, 1);
-    reorderedItems.splice(newIndex, 0, movedItem);
-
-    const updatedItems = reorderedItems.map((item, index) => ({
-      ...item,
-      displayOrder: index + 1,
-    }));
-
-    if (movedItem.type === "lesson") {
-      setLessons((prev) =>
-        prev.map((l) => {
-          const updated = updatedItems.find((i) => i.id === l.id);
-          return updated ? { ...l, display_order: updated.displayOrder } : l;
-        })
-      );
-    } else {
-      setUnits((prev) =>
-        prev.map((u) => {
-          const updated = updatedItems.find((i) => i.id === u.id);
-          return updated ? { ...u, display_order: updated.displayOrder } : u;
-        })
-      );
-    }
+    setUnits(units.map((u) => u.id === unitId ? { ...u, display_order: newUnitOrder } : u));
 
     try {
-      const payload = updatedItems.map((item) => ({
-        type: item.type,
-        id: item.id,
-        displayOrder: item.displayOrder,
-      }));
-
-      await fetch(`/api/courses/${courseId}/units/reorder`, {
+      await fetch(`/api/courses/${courseId}/units/${unitId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items: payload }),
+        body: JSON.stringify({ displayOrder: newUnitOrder }),
       });
     } catch (error) {
       console.error("Failed to reorder:", error);
@@ -287,9 +352,33 @@ export function CourseLessonsEditor({ courseId, initialLessons, initialUnits }: 
     }
   };
 
-  const sortableItems = getSortableItems();
-  const activeType = activeItem?.type;
-  const activeData = activeItem?.data;
+  const handleMoveDown = async (unitId: string) => {
+    const items = getItems();
+    const unitIndex = items.findIndex((i) => i.type === "unit" && i.id === unitId);
+    if (unitIndex < 0 || unitIndex >= items.length - 1) return;
+
+    const unit = items[unitIndex];
+    const below = items[unitIndex + 1];
+
+    // Move unit to just below the item after it
+    const newUnitOrder = below.displayOrder + 0.5;
+
+    setUnits(units.map((u) => u.id === unitId ? { ...u, display_order: newUnitOrder } : u));
+
+    try {
+      await fetch(`/api/courses/${courseId}/units/${unitId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ displayOrder: newUnitOrder }),
+      });
+    } catch (error) {
+      console.error("Failed to reorder:", error);
+      fetchData();
+    }
+  };
+
+  const items = getItems();
+  const unitItems = items.filter((i) => i.type === "unit");
 
   return (
     <div className="space-y-4">
@@ -309,62 +398,46 @@ export function CourseLessonsEditor({ courseId, initialLessons, initialUnits }: 
           Loading...
         </div>
       ) : (
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragStart={handleDragStart}
-          onDragEnd={handleDragEnd}
-        >
-          <SortableContext
-            items={sortableItems.map((i) => i.id)}
-            strategy={verticalListSortingStrategy}
-          >
-            <div className="space-y-2">
-              {sortableItems.map((item) => {
-                if (item.type === "unit") {
-                  return (
-                    <SortableUnitCard
-                      key={item.id}
-                      unit={item.data as Unit}
-                      onTitleChange={handleUnitTitleChange}
-                      onDelete={handleUnitDelete}
-                    />
-                  );
-                } else {
-                  const lesson = item.data as Lesson;
-                  return (
-                    <SortableLessonItem
-                      key={lesson.id}
-                      lesson={lesson}
-                      courseId={courseId}
-                    />
-                  );
-                }
-              })}
-            </div>
-          </SortableContext>
+        <div className="space-y-2">
+          {items.map((item, index) => {
+            if (item.type === "unit") {
+              const unit = item.data as Unit;
+              const unitIndexInItems = index;
+              const prevItem = unitIndexInItems > 0 ? items[unitIndexInItems - 1] : null;
+              const nextItem = unitIndexInItems < items.length - 1 ? items[unitIndexInItems + 1] : null;
 
-          <DragOverlay>
-            {activeId && activeType === "unit" && (
-              <div className="flex items-center gap-2 px-3 py-2 rounded-lg border bg-[#e37c64] border-[#e37c64] text-white shadow-lg">
-                <span className="font-medium text-sm">{(activeData as Unit).title}</span>
-              </div>
-            )}
-            {activeId && activeType === "lesson" && (
-              <div className="flex items-center gap-2 px-3 py-2 rounded-lg border bg-white border-gray-300 shadow-lg">
-                <span className="w-8 text-center font-medium text-gray-500">
-                  {(activeData as Lesson).lesson_number}
-                </span>
-                <span className="text-sm">{(activeData as Lesson).title}</span>
-              </div>
-            )}
-          </DragOverlay>
-        </DndContext>
+              // A unit is "first" only if nothing above it (at absolute top)
+              // A unit is "last" only if nothing below it (at absolute bottom)
+              const isFirst = !prevItem;
+              const isLast = !nextItem;
+
+              return (
+                <UnitCard
+                  key={unit.id}
+                  unit={unit}
+                  onTitleChange={handleUnitTitleChange}
+                  onDelete={handleUnitDelete}
+                  onMoveUp={handleMoveUp}
+                  onMoveDown={handleMoveDown}
+                  isFirst={isFirst}
+                  isLast={isLast}
+                />
+              );
+            } else {
+              const lesson = item.data as Lesson;
+              return (
+                <LessonItem
+                  key={lesson.id}
+                  lesson={lesson}
+                  courseId={courseId}
+                />
+              );
+            }
+          })}
+        </div>
       )}
 
-      {sortableItems.length === 0 && (
-        <p className="text-gray-500 text-sm">No lessons yet</p>
-      )}
+      {items.length === 0 && <p className="text-gray-500 text-sm">No lessons yet</p>}
 
       <div>
         <Link href={`/admin/courses/${courseId}/lessons/new`}>

@@ -6,15 +6,18 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ co
     const { courseId, unitId } = await params;
     const supabaseAdmin = await createServiceClient();
     const body = await request.json();
-    const { title } = body;
+    const { title, displayOrder } = body;
 
     if (title !== undefined && !title.trim()) {
       return NextResponse.json({ error: "Title is required" }, { status: 400 });
     }
 
-    const updateData: { title?: string; updated_at?: string } = {};
+    const updateData: { title?: string; display_order?: number; updated_at?: string } = {};
     if (title !== undefined) {
       updateData.title = title;
+    }
+    if (displayOrder !== undefined) {
+      updateData.display_order = displayOrder;
     }
 
     const { data, error } = await supabaseAdmin
