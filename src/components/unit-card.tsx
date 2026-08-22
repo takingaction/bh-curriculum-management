@@ -47,8 +47,8 @@ export function UnitCard({ unit, onTitleChange, onDelete, isDragging }: UnitCard
       return;
     }
 
-    if (!editTitle.match(/^UNIT \[/i)) {
-      alert("Title must start with 'UNIT ['");
+    if (!editTitle.trim()) {
+      alert("Title cannot be empty");
       return;
     }
 
