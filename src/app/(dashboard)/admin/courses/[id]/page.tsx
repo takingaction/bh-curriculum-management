@@ -5,7 +5,6 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CourseImageUpload } from "@/components/course-image-upload";
 import { CoursePdfImageUpload } from "@/components/course-pdf-image-upload";
 import { CoursePdfCard } from "@/components/course-pdf-card";
@@ -13,6 +12,7 @@ import { ManageImagesButton } from "@/components/manage-images-button";
 import { DeleteCourseButton } from "@/components/delete-course-button";
 import { CourseSpotifySection } from "@/components/course-spotify-section";
 import { CourseAssetsPanel } from "@/components/course-assets-panel";
+import { CourseLessonsEditor } from "@/components/course-lessons-editor";
 import { InlineDeleteButton } from "@/components/inline-delete-button";
 
 export default async function CourseDetailPage({
@@ -37,9 +37,15 @@ export default async function CourseDetailPage({
 
   const { data: lessons } = await supabase
     .from("lessons")
+    .select("id, lesson_number, title, total_time, display_order")
+    .eq("course_id", id)
+    .order("display_order", { ascending: true });
+
+  const { data: units } = await supabase
+    .from("course_units")
     .select("*")
     .eq("course_id", id)
-    .order("lesson_number");
+    .order("display_order", { ascending: true });
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -88,47 +94,14 @@ export default async function CourseDetailPage({
 
       <Card className="mb-8">
         <CardHeader>
-          <CardTitle>Lessons ({lessons?.length || 0})</CardTitle>
+          <CardTitle>Course Content</CardTitle>
         </CardHeader>
         <CardContent>
-          {lessons && lessons.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>#</TableHead>
-                  <TableHead>Title</TableHead>
-                  <TableHead>Duration</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {lessons.map((lesson) => (
-                  <TableRow key={lesson.id}>
-                    <TableCell>{lesson.lesson_number}</TableCell>
-                    <TableCell>{lesson.title}</TableCell>
-                    <TableCell>{lesson.total_time || "-"}</TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
-                        <Link href={`/lessons/${lesson.id}`}>
-                          <Button variant="outline" size="sm">View</Button>
-                        </Link>
-                        <Link href={`/admin/courses/${id}/lessons/${lesson.id}`}>
-                          <Button variant="outline" size="sm">Edit</Button>
-                        </Link>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          ) : (
-            <p className="text-gray-500">No lessons yet</p>
-          )}
-          <div className="mt-4">
-            <Link href={`/admin/courses/${id}/lessons/new`}>
-              <Button>Add Lesson</Button>
-            </Link>
-          </div>
+          <CourseLessonsEditor
+            courseId={course.id}
+            initialLessons={lessons || []}
+            initialUnits={units || []}
+          />
         </CardContent>
       </Card>
     </div>

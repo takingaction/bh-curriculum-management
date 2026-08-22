@@ -32,9 +32,15 @@ export default async function TeacherCoursePage({
 
   const { data: lessons } = await supabaseAdmin
     .from("lessons")
+    .select("id, lesson_number, title, total_time, display_order")
+    .eq("course_id", courseId)
+    .order("display_order", { ascending: true });
+
+  const { data: units } = await supabaseAdmin
+    .from("course_units")
     .select("*")
     .eq("course_id", courseId)
-    .order("lesson_number");
+    .order("display_order", { ascending: true });
 
   await supabaseAdmin
     .from("user_activity_log")
@@ -55,6 +61,7 @@ export default async function TeacherCoursePage({
         summary={course.summary}
         materials={course.materials}
         lessons={lessons || []}
+        units={units || []}
         userId={user.id}
       />
     </div>

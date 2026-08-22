@@ -45,13 +45,23 @@ export async function POST(
 
     const { data: lessons, error: lessonsError } = await supabase
       .from("lessons")
-      .select("id, lesson_number, title, learning_objectives")
+      .select("id, lesson_number, title, learning_objectives, display_order")
       .eq("course_id", courseId)
-      .order("lesson_number");
+      .order("display_order", { ascending: true });
 
     if (lessonsError) {
       console.error("Error fetching lessons:", lessonsError);
       return NextResponse.json({ error: "Failed to fetch lessons" }, { status: 500 });
+    }
+
+    const { data: units, error: unitsError } = await supabase
+      .from("course_units")
+      .select("*")
+      .eq("course_id", courseId)
+      .order("display_order", { ascending: true });
+
+    if (unitsError) {
+      console.error("Error fetching units:", unitsError);
     }
 
     const storagePath = `${courseId}/scope-and-sequence.pdf`;
@@ -68,7 +78,7 @@ export async function POST(
     const renderResponse = await fetch(`${pdfServiceUrl}/course-pdf`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ course, lessons }),
+      body: JSON.stringify({ course, lessons, units }),
       signal: AbortSignal.timeout(120000),
     });
 

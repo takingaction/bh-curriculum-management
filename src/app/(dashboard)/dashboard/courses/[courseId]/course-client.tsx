@@ -15,6 +15,13 @@ interface Lesson {
   lesson_number: number;
   title: string;
   total_time: string | null;
+  display_order: number;
+}
+
+interface Unit {
+  id: string;
+  title: string;
+  display_order: number;
 }
 
 interface CourseClientProps {
@@ -26,6 +33,7 @@ interface CourseClientProps {
   summary?: string | null;
   materials?: string | null;
   lessons: Lesson[];
+  units: Unit[];
   userId: string;
 }
 
@@ -38,6 +46,7 @@ export default function CourseClient({
   summary,
   materials,
   lessons,
+  units,
 }: CourseClientProps) {
   const [isTrial, setIsTrial] = useState(false);
   const [showTrialModal, setShowTrialModal] = useState(false);
@@ -146,44 +155,77 @@ export default function CourseClient({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {lessons.map((lesson) => (
-                <TableRow key={lesson.id}>
-                  <TableCell>{lesson.lesson_number}</TableCell>
-                  <TableCell>{lesson.title}</TableCell>
-                  <TableCell>{lesson.total_time || "-"}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Link href={`/lessons/${lesson.id}`}>
-                        <Button variant="outline" size="sm" className="text-xs text-[#0d7377] border-[#e5e5e0] hover:bg-[#d7ffef]">
-                          <Eye className="w-3 h-3 mr-1" />
-                          View Lesson
-                        </Button>
-                      </Link>
-                      <a
-                        href={`/api/lessons/${lesson.id}/pdf?download=false`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => handlePdfClick(e, false)}
-                      >
-                        <Button variant="outline" size="sm" className="text-xs text-[#0d7377] border-[#e5e5e0] hover:bg-[#d7ffef]">
-                          <FileText className="w-3 h-3 mr-1" />
-                          View PDF
-                        </Button>
-                      </a>
-                      <a
-                        href={`/api/lessons/${lesson.id}/pdf?download=true`}
-                        download
-                        onClick={(e) => handlePdfClick(e, true)}
-                      >
-                        <Button variant="outline" size="sm" className="text-xs text-[#0d7377] border-[#e5e5e0] hover:bg-[#d7ffef]">
-                          <Download className="w-3 h-3 mr-1" />
-                          Download PDF
-                        </Button>
-                      </a>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {(() => {
+                const items: Array<{ type: "lesson" | "unit"; data: Lesson | Unit }> = [];
+                lessons.forEach((lesson) => {
+                  const unitsBeforeLesson = units.filter(
+                    (u) => u.display_order < lesson.display_order &&
+                    !items.some((i) => i.type === "unit" && i.data.id === u.id)
+                  );
+                  unitsBeforeLesson.forEach((unit) => {
+                    items.push({ type: "unit", data: unit });
+                  });
+                  items.push({ type: "lesson", data: lesson });
+                });
+                units.forEach((unit) => {
+                  if (!items.some((i) => i.type === "unit" && i.data.id === unit.id)) {
+                    items.push({ type: "unit", data: unit });
+                  }
+                });
+
+                return items.map((item) => {
+                  if (item.type === "unit") {
+                    const unit = item.data as Unit;
+                    return (
+                      <TableRow key={`unit-${unit.id}`} className="bg-[#e37c64]">
+                        <TableCell colSpan={4} className="text-white font-bold py-2 px-4">
+                          {unit.title}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  } else {
+                    const lesson = item.data as Lesson;
+                    return (
+                      <TableRow key={lesson.id}>
+                        <TableCell>{lesson.lesson_number}</TableCell>
+                        <TableCell>{lesson.title}</TableCell>
+                        <TableCell>{lesson.total_time || "-"}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Link href={`/lessons/${lesson.id}`}>
+                              <Button variant="outline" size="sm" className="text-xs text-[#0d7377] border-[#e5e5e0] hover:bg-[#d7ffef]">
+                                <Eye className="w-3 h-3 mr-1" />
+                                View Lesson
+                              </Button>
+                            </Link>
+                            <a
+                              href={`/api/lessons/${lesson.id}/pdf?download=false`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => handlePdfClick(e, false)}
+                            >
+                              <Button variant="outline" size="sm" className="text-xs text-[#0d7377] border-[#e5e5e0] hover:bg-[#d7ffef]">
+                                <FileText className="w-3 h-3 mr-1" />
+                                View PDF
+                              </Button>
+                            </a>
+                            <a
+                              href={`/api/lessons/${lesson.id}/pdf?download=true`}
+                              download
+                              onClick={(e) => handlePdfClick(e, true)}
+                            >
+                              <Button variant="outline" size="sm" className="text-xs text-[#0d7377] border-[#e5e5e0] hover:bg-[#d7ffef]">
+                                <Download className="w-3 h-3 mr-1" />
+                                Download PDF
+                              </Button>
+                            </a>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  }
+                });
+              })()}
             </TableBody>
           </Table>
         ) : (
