@@ -4,9 +4,10 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Eye, FileText, Download } from "lucide-react";
+import { Eye, FileText, Download, StickyNote } from "lucide-react";
 import { TrialPdfModal } from "@/components/trial-pdf-modal";
 import { CourseMaterialsModal } from "@/components/course-materials-modal";
+import { TeacherNotesModal } from "@/components/teacher-notes-modal";
 import { SetChatContext } from "@/components/set-chat-context";
 
 interface Lesson {
@@ -41,6 +42,7 @@ export default function CourseClient({
   const [isTrial, setIsTrial] = useState(false);
   const [showTrialModal, setShowTrialModal] = useState(false);
   const [showMaterialsModal, setShowMaterialsModal] = useState(false);
+  const [showTeacherNotesModal, setShowTeacherNotesModal] = useState(false);
   const [pdfTimestamp, setPdfTimestamp] = useState("0");
 
   useEffect(() => {
@@ -117,6 +119,14 @@ export default function CourseClient({
               <FileText className="w-3 h-3" />
               Course Scope & Sequence
             </a>
+            <button
+              type="button"
+              onClick={() => setShowTeacherNotesModal(true)}
+              className="flex items-center gap-1.5 text-xs text-[#0d7377] hover:underline mt-2"
+            >
+              <StickyNote className="w-3 h-3" />
+              Teacher Notes
+            </button>
           </div>
         </div>
       </div>
@@ -193,6 +203,14 @@ export default function CourseClient({
         onClose={() => setShowMaterialsModal(false)}
         courseName={courseName}
         materials={materials}
+      />
+
+      <TeacherNotesModal
+        open={showTeacherNotesModal}
+        onClose={() => setShowTeacherNotesModal(false)}
+        type="course"
+        courseId={courseId}
+        initialTitle={courseName}
       />
     </>
   );

@@ -8,7 +8,8 @@ import { PresentationLink } from "@/components/presentation-modal";
 import { SpotifyEmbed } from "@/components/spotify-embed";
 import YouTubeDialog from "@/components/youtube-dialog";
 import { TrialPdfModal } from "@/components/trial-pdf-modal";
-import { Download, X, Volume2, EyeIcon, FileTextIcon, VideoIcon, DownloadIcon, List } from "lucide-react";
+import { TeacherNotesModal } from "@/components/teacher-notes-modal";
+import { Download, X, Volume2, EyeIcon, FileTextIcon, VideoIcon, DownloadIcon, List, StickyNote } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { FindReplacePanel } from "@/components/find-replace-panel";
 import { LessonNavigation } from "@/components/lesson-navigation";
@@ -111,6 +112,7 @@ export default function LessonContentPage({
   const [error, setError] = useState("");
   const [isAdmin, setIsAdmin] = useState(false);
   const [showSpotify, setShowSpotify] = useState(false);
+  const [showTeacherNotesModal, setShowTeacherNotesModal] = useState(false);
   const [showVideo, setShowVideo] = useState(false);
   const [showTrialPdfModal, setShowTrialPdfModal] = useState(false);
   const [showBackToTop, setShowBackToTop] = useState(false);
@@ -1001,6 +1003,17 @@ export default function LessonContentPage({
                 </div>
               )}
 
+              <div className="mt-4 pt-4 border-t border-gray-200">
+                <button
+                  type="button"
+                  onClick={() => setShowTeacherNotesModal(true)}
+                  className="flex items-center gap-1.5 text-xs text-[#0d7377] hover:underline"
+                >
+                  <StickyNote className="w-3 h-3" />
+                  Teacher Notes
+                </button>
+              </div>
+
               {courseAssets.length > 0 && (
                 <div className="mt-4 pt-4 border-t border-gray-200">
                   <h3 className="text-sm font-semibold text-gray-700 mb-2">Course Resources</h3>
@@ -1234,6 +1247,14 @@ export default function LessonContentPage({
       <TrialPdfModal
         open={showTrialPdfModal}
         onClose={() => setShowTrialPdfModal(false)}
+      />
+
+      <TeacherNotesModal
+        open={showTeacherNotesModal}
+        onClose={() => setShowTeacherNotesModal(false)}
+        type="lesson"
+        lessonId={lesson?.id}
+        initialTitle={lesson?.title}
       />
 
       {showBackToTop && (
