@@ -1102,8 +1102,6 @@ ${fieldsContent}
           'reflection', 'closing_ceremony', 'assessment'
         ];
 
-        let mergedFields: Record<string, { html: string; original_length: number }> = {};
-
         for (let i = 0; i < allFields.length; i++) {
           const field = allFields[i];
           console.log(`[MODIFY API] Translating field ${i + 1}/${allFields.length}: ${field}`);
@@ -1162,6 +1160,7 @@ ${originalContent}`;
         }
 
         console.log(`[MODIFY API] Translation complete. ${Object.keys(mergedFields).length} fields with content.`);
+        console.log(`[MODIFY API] mergedFields keys before save:`, Object.keys(mergedFields).join(', '));
       } else {
         // DURATION: Single call (simplified, no retry, 160K tokens)
         const systemPrompt = getModificationSystemPrompt(effectiveModType, modDirection, !!editingVersionId, targetLanguage, modTargetDuration);
