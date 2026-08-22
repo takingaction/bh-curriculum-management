@@ -1003,7 +1003,7 @@ export default function LessonContentPage({
 
               {courseAssets.length > 0 && (
                 <div className="mt-4 pt-4 border-t border-gray-200">
-                  <h3 className="text-sm font-semibold text-gray-700 mb-2">Course Materials</h3>
+                  <h3 className="text-sm font-semibold text-gray-700 mb-2">Course Resources</h3>
                   <div className="space-y-0">
                     {courseAssets.slice(0, 6).map((asset) => {
                       const Icon = asset.file_type === 'pdf' ? FileTextIcon :

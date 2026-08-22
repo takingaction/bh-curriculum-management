@@ -1,8 +1,8 @@
-# Course Summary and Course Materials
+# Course Summary and Course Resources
 
 ## Overview
 
-Added ability for admins to add a course summary and attach course-wide materials that display on all lesson pages.
+Added ability for admins to add a course summary and attach course-wide resources that display on all lesson pages.
 
 ## Features
 
@@ -12,11 +12,11 @@ Added ability for admins to add a course summary and attach course-wide material
 - Displays below the course title, discipline, and grade inputs
 - Simple textarea for plain text input
 
-### Course Materials
+### Course Resources
 
-- New "Course Materials" section below Spotify Playlist on course edit page
+- New "Course Resources" section below Spotify Playlist on course edit page
 - Admins can add resources from the asset library that apply to all lessons in a course
-- Resources are displayed in a separate "Course Materials" section on lesson pages (below "Lesson Materials")
+- Resources are displayed in a separate "Course Resources" section on lesson pages (below "Lesson Materials")
 - Supports full drag-drop reordering, preview, download, and removal
 
 ## Database Changes
@@ -64,5 +64,5 @@ Added ability for admins to add a course summary and attach course-wide material
 ### Updated: `src/app/(dashboard)/lessons/[lessonId]/page.tsx`
 
 - Added course assets fetch using `lesson.course_id`
-- Added "Course Materials" section below "Lesson Materials" on lesson pages
+- Added "Course Resources" section below "Lesson Materials" on lesson pages
 - Shows up to 6 course materials with preview/download actions
