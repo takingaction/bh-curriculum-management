@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ExternalLink, Play } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 
 interface PresentationModalProps {
   open: boolean;
@@ -115,7 +115,7 @@ export function PresentationLink({ name, url }: PresentationLinkProps) {
         <ExternalLink className="w-3 h-3" />
         {name}
       </a>
-      {presentUrl && (
+      {/* {presentUrl && (
         <a
           href={presentUrl}
           target="_blank"
@@ -125,7 +125,7 @@ export function PresentationLink({ name, url }: PresentationLinkProps) {
         >
           <Play className="w-3 h-3" fill="#0d7377" />
         </a>
-      )}
+      )} */}
     </div>
   );
 }
