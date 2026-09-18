@@ -13,14 +13,19 @@ interface TeacherMetrics {
   enrollment_status: string;
   days_active_last_7: number;
   days_active_last_30: number;
+  days_active_last_90: number;
   logins_7d: number;
   logins_30d: number;
+  logins_90d: number;
   lessons_viewed_7d: number;
   lessons_viewed_30d: number;
+  lessons_viewed_90d: number;
   courses_viewed_7d: number;
   courses_viewed_30d: number;
+  courses_viewed_90d: number;
   total_actions_7d: number;
   total_actions_30d: number;
+  total_actions_90d: number;
   last_active: string | null;
   is_daily_active: boolean;
   is_weekly_active: boolean;
@@ -30,6 +35,7 @@ interface Summary {
   totalTeachers: number;
   activeLast7Days: number;
   activeLast30Days: number;
+  activeLast90Days: number;
   avgDaysActivePerWeek: number;
   dailyActiveRate: number;
   mostActiveDay: string;
@@ -42,8 +48,34 @@ interface Pagination {
   hasMore: boolean;
 }
 
-type SortField = "name" | "days_active_last_7" | "total_actions_7d" | "last_active" | "logins_7d" | "lessons_viewed_7d";
+type WindowSize = 7 | 30 | 90;
+
+type DaysField = "days_active_last_7" | "days_active_last_30" | "days_active_last_90";
+type LoginsField = "logins_7d" | "logins_30d" | "logins_90d";
+type LessonsField = "lessons_viewed_7d" | "lessons_viewed_30d" | "lessons_viewed_90d";
+type TotalField = "total_actions_7d" | "total_actions_30d" | "total_actions_90d";
+
+type SortField =
+  | "name"
+  | "last_active"
+  | DaysField
+  | LoginsField
+  | LessonsField
+  | TotalField;
 type SortOrder = "asc" | "desc";
+
+const daysFieldForWindow = (w: WindowSize): DaysField =>
+  w === 7 ? "days_active_last_7" : w === 30 ? "days_active_last_30" : "days_active_last_90";
+const loginsFieldForWindow = (w: WindowSize): LoginsField =>
+  w === 7 ? "logins_7d" : w === 30 ? "logins_30d" : "logins_90d";
+const lessonsFieldForWindow = (w: WindowSize): LessonsField =>
+  w === 7 ? "lessons_viewed_7d" : w === 30 ? "lessons_viewed_30d" : "lessons_viewed_90d";
+const totalFieldForWindow = (w: WindowSize): TotalField =>
+  w === 7 ? "total_actions_7d" : w === 30 ? "total_actions_30d" : "total_actions_90d";
+
+// Floor(N/4) — the "not Weekly" upper bound for the fallback bucket.
+// Weekly is fixed at 4/7, so the fallback for window N is "< N/4" days active.
+const fallbackUpperBound = (w: WindowSize) => Math.floor(w / 4);
 
 export default function TeacherAnalyticsClientPage() {
   const [loading, setLoading] = useState(true);
@@ -52,7 +84,7 @@ export default function TeacherAnalyticsClientPage() {
   const [pagination, setPagination] = useState<Pagination | null>(null);
   const [sortField, setSortField] = useState<SortField>("days_active_last_7");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
-  const [daysFilter, setDaysFilter] = useState<7 | 30 | 90>(7);
+  const [daysFilter, setDaysFilter] = useState<WindowSize>(7);
   const [currentPage, setCurrentPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -161,7 +193,7 @@ export default function TeacherAnalyticsClientPage() {
             <select
               value={daysFilter}
               onChange={(e) => {
-                setDaysFilter(parseInt(e.target.value) as 7 | 30 | 90);
+                setDaysFilter(parseInt(e.target.value) as WindowSize);
                 setCurrentPage(1);
               }}
               className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#0d7377]"
@@ -183,7 +215,7 @@ export default function TeacherAnalyticsClientPage() {
 
         {/* Summary Cards */}
         {summary && (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-[repeat(7,minmax(0,1fr))] gap-4 mb-6">
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-gray-500 flex items-center gap-2">
@@ -222,6 +254,22 @@ export default function TeacherAnalyticsClientPage() {
                 <p className="text-xs text-gray-500">
                   {summary.totalTeachers > 0
                     ? Math.round((summary.activeLast30Days / summary.totalTeachers) * 100)
+                    : 0}% of total
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-gray-500 flex items-center gap-2">
+                  <Calendar className="w-4 h-4" /> Active (90d)
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold text-[#2d2d2d]">{summary.activeLast90Days}</p>
+                <p className="text-xs text-gray-500">
+                  {summary.totalTeachers > 0
+                    ? Math.round((summary.activeLast90Days / summary.totalTeachers) * 100)
                     : 0}% of total
                 </p>
               </CardContent>
@@ -312,30 +360,30 @@ export default function TeacherAnalyticsClientPage() {
                 </th>
                 <th
                   className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
-                  onClick={() => handleSort("days_active_last_7")}
+                  onClick={() => handleSort(daysFieldForWindow(daysFilter))}
                 >
-                  Days Active (7d) <SortIcon field="days_active_last_7" />
+                  Days Active ({daysFilter}d) <SortIcon field={daysFieldForWindow(daysFilter)} />
                 </th>
                 <th
                   className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
-                  onClick={() => handleSort("logins_7d")}
+                  onClick={() => handleSort(loginsFieldForWindow(daysFilter))}
                 >
-                  Logins (7d) <SortIcon field="logins_7d" />
+                  Logins ({daysFilter}d) <SortIcon field={loginsFieldForWindow(daysFilter)} />
                 </th>
                 <th
                   className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
-                  onClick={() => handleSort("lessons_viewed_7d")}
+                  onClick={() => handleSort(lessonsFieldForWindow(daysFilter))}
                 >
-                  Lessons Viewed (7d) <SortIcon field="lessons_viewed_7d" />
+                  Lessons Viewed ({daysFilter}d) <SortIcon field={lessonsFieldForWindow(daysFilter)} />
                 </th>
                 <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
-                  Courses (7d)
+                  Courses ({daysFilter}d)
                 </th>
                 <th
                   className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
-                  onClick={() => handleSort("total_actions_7d")}
+                  onClick={() => handleSort(totalFieldForWindow(daysFilter))}
                 >
-                  Total Actions (7d) <SortIcon field="total_actions_7d" />
+                  Total Actions ({daysFilter}d) <SortIcon field={totalFieldForWindow(daysFilter)} />
                 </th>
                 <th
                   className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
@@ -364,62 +412,72 @@ export default function TeacherAnalyticsClientPage() {
                   </td>
                 </tr>
               ) : (
-                teachers.map((teacher) => (
-                  <tr key={teacher.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3">
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">{teacher.name}</p>
-                        <p className="text-xs text-gray-500">{teacher.email}</p>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <span className="text-sm font-medium text-gray-900">
-                        {teacher.days_active_last_7}
-                      </span>
-                      <span className="text-xs text-gray-500 ml-1">/ 7</span>
-                    </td>
-                    <td className="px-4 py-3 text-center text-sm text-gray-900">
-                      {teacher.logins_7d}
-                    </td>
-                    <td className="px-4 py-3 text-center text-sm text-gray-900">
-                      {teacher.lessons_viewed_7d}
-                    </td>
-                    <td className="px-4 py-3 text-center text-sm text-gray-900">
-                      {teacher.courses_viewed_7d}
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <span className="text-sm font-semibold text-[#0d7377]">
-                        {teacher.total_actions_7d}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-center text-sm text-gray-500">
-                      {formatLastActive(teacher.last_active)}
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      {teacher.is_daily_active ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-800 rounded text-xs">
-                          <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
-                          Daily
+                teachers.map((teacher) => {
+                  const daysField = daysFieldForWindow(daysFilter);
+                  const daysActive = teacher[daysField];
+                  return (
+                    <tr key={teacher.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3">
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">{teacher.name}</p>
+                          <p className="text-xs text-gray-500">{teacher.email}</p>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className="text-sm font-medium text-gray-900">
+                          {daysActive}
                         </span>
-                      ) : teacher.is_weekly_active ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-teal-100 text-teal-800 rounded text-xs">
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#0d7377]"></span>
-                          Weekly
+                        <span className="text-xs text-gray-500 ml-1">/ {daysFilter}</span>
+                      </td>
+                      <td className="px-4 py-3 text-center text-sm text-gray-900">
+                        {teacher[loginsFieldForWindow(daysFilter)]}
+                      </td>
+                      <td className="px-4 py-3 text-center text-sm text-gray-900">
+                        {teacher[lessonsFieldForWindow(daysFilter)]}
+                      </td>
+                      <td className="px-4 py-3 text-center text-sm text-gray-900">
+                        {teacher[
+                          daysFilter === 7
+                            ? "courses_viewed_7d"
+                            : daysFilter === 30
+                              ? "courses_viewed_30d"
+                              : "courses_viewed_90d"
+                        ]}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className="text-sm font-semibold text-[#0d7377]">
+                          {teacher[totalFieldForWindow(daysFilter)]}
                         </span>
-                      ) : teacher.days_active_last_7 > 0 ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs">
-                          <span className="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
-                          Active (1–3 days)
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-gray-50 text-gray-400 rounded text-xs">
-                          <span className="w-1.5 h-1.5 rounded-full bg-gray-300"></span>
-                          Inactive
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))
+                      </td>
+                      <td className="px-4 py-3 text-center text-sm text-gray-500">
+                        {formatLastActive(teacher.last_active)}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        {teacher.is_daily_active ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-800 rounded text-xs">
+                            <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                            Daily
+                          </span>
+                        ) : teacher.is_weekly_active ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 bg-teal-100 text-teal-800 rounded text-xs">
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#0d7377]"></span>
+                            Weekly
+                          </span>
+                        ) : daysActive > 0 ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs">
+                            <span className="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
+                            Active (1–{fallbackUpperBound(daysFilter)} days)
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 bg-gray-50 text-gray-400 rounded text-xs">
+                            <span className="w-1.5 h-1.5 rounded-full bg-gray-300"></span>
+                            Inactive
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>

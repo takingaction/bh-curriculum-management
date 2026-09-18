@@ -5,6 +5,9 @@ export async function GET(request: Request) {
   try {
     const supabaseAdmin = await createServiceClient();
     const { searchParams } = new URL(request.url);
+    // `days` is accepted for API compatibility; all windows (7/30/90) are
+    // computed from a single 90-day query below, so the value is unused.
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const days = parseInt(searchParams.get("days") || "7", 10);
     const sortBy = searchParams.get("sort") || "days_active_last_7";
     const sortOrder = searchParams.get("order") || "desc";
@@ -20,7 +23,7 @@ export async function GET(request: Request) {
     const now = new Date();
     const startDate7 = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     const startDate30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    const startDate = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+    const startDate90 = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
 
     // Get all teachers (exclude admins)
     let teachersQuery = supabaseAdmin
@@ -47,6 +50,7 @@ export async function GET(request: Request) {
           totalTeachers: 0,
           activeLast7Days: 0,
           activeLast30Days: 0,
+          activeLast90Days: 0,
           avgDaysActivePerWeek: 0,
           dailyActiveRate: 0,
           mostActiveDay: "N/A",
@@ -63,12 +67,13 @@ export async function GET(request: Request) {
 
     const teacherIds = teachers.map((t) => t.id);
 
-    // Get activity data for all teachers in date range
+    // Get activity data for all teachers in date range (90 days covers the largest
+    // window we report; 7d and 30d are computed from the same array below).
     const { data: activities, error: activityError } = await supabaseAdmin
       .from("user_activity_log")
       .select("user_id, action, resource_id, created_at")
       .in("user_id", teacherIds)
-      .gte("created_at", startDate30.toISOString())
+      .gte("created_at", startDate90.toISOString())
       .order("created_at", { ascending: false });
 
     if (activityError) {
@@ -83,16 +88,17 @@ export async function GET(request: Request) {
       const teacherActivities30 = activities?.filter(
         (a) => a.user_id === teacher.id && new Date(a.created_at) >= startDate30
       ) || [];
-      const teacherActivitiesAll = activities?.filter((a) => a.user_id === teacher.id) || [];
+      const teacherActivities90 = activities?.filter((a) => a.user_id === teacher.id) || [];
 
-      // Unique days active in last 7 days
+      // Unique days active in last 7 / 30 / 90 days
       const uniqueDays7 = new Set(
         teacherActivities7.map((a) => new Date(a.created_at).toISOString().split("T")[0])
       );
-
-      // Unique days active in last 30 days
       const uniqueDays30 = new Set(
         teacherActivities30.map((a) => new Date(a.created_at).toISOString().split("T")[0])
+      );
+      const uniqueDays90 = new Set(
+        teacherActivities90.map((a) => new Date(a.created_at).toISOString().split("T")[0])
       );
 
       // Action counts last 7 days
@@ -105,18 +111,24 @@ export async function GET(request: Request) {
       const lessonsViewed30 = teacherActivities30.filter((a) => a.action === "view_lesson").length;
       const coursesViewed30 = teacherActivities30.filter((a) => a.action === "view_course").length;
 
+      // Action counts last 90 days
+      const logins90 = teacherActivities90.filter((a) => a.action === "login").length;
+      const lessonsViewed90 = teacherActivities90.filter((a) => a.action === "view_lesson").length;
+      const coursesViewed90 = teacherActivities90.filter((a) => a.action === "view_course").length;
+
       // Total actions
       const totalActions7 = logins7 + lessonsViewed7 + coursesViewed7;
       const totalActions30 = logins30 + lessonsViewed30 + coursesViewed30;
+      const totalActions90 = logins90 + lessonsViewed90 + coursesViewed90;
 
       // Last activity
-      const lastActivity = teacherActivitiesAll[0]?.created_at || null;
+      const lastActivity = teacherActivities90[0]?.created_at || null;
 
       // Is daily active (had activity today)
       const today = new Date().toISOString().split("T")[0];
       const isDailyActive = Array.from(uniqueDays7).includes(today);
 
-      // Is weekly active (active at least 4 days per week)
+      // Is weekly active (active at least 4 days per week) — always a 7-day concept
       const isWeeklyActive = uniqueDays7.size >= 4;
 
       return {
@@ -127,14 +139,19 @@ export async function GET(request: Request) {
         enrollment_status: teacher.enrollment_status,
         days_active_last_7: uniqueDays7.size,
         days_active_last_30: uniqueDays30.size,
+        days_active_last_90: uniqueDays90.size,
         logins_7d: logins7,
         logins_30d: logins30,
+        logins_90d: logins90,
         lessons_viewed_7d: lessonsViewed7,
         lessons_viewed_30d: lessonsViewed30,
+        lessons_viewed_90d: lessonsViewed90,
         courses_viewed_7d: coursesViewed7,
         courses_viewed_30d: coursesViewed30,
+        courses_viewed_90d: coursesViewed90,
         total_actions_7d: totalActions7,
         total_actions_30d: totalActions30,
+        total_actions_90d: totalActions90,
         last_active: lastActivity,
         is_daily_active: isDailyActive,
         is_weekly_active: isWeeklyActive,
@@ -158,6 +175,7 @@ export async function GET(request: Request) {
     const paginatedTeachers = teacherMetrics.slice(offset, offset + limit);
     const totalActive7 = teacherMetrics.filter((t) => t.days_active_last_7 > 0).length;
     const totalActive30 = teacherMetrics.filter((t) => t.days_active_last_30 > 0).length;
+    const totalActive90 = teacherMetrics.filter((t) => t.days_active_last_90 > 0).length;
 
     // Calculate average days active per week (for active teachers in last 7 days)
     const activeTeachers7 = teacherMetrics.filter((t) => t.days_active_last_7 > 0);
@@ -185,6 +203,7 @@ export async function GET(request: Request) {
         totalTeachers: teacherMetrics.length,
         activeLast7Days: totalActive7,
         activeLast30Days: totalActive30,
+        activeLast90Days: totalActive90,
         avgDaysActivePerWeek: Math.round(avgDaysActivePerWeek * 10) / 10,
         dailyActiveRate: Math.round(dailyActiveRate * 100),
         mostActiveDay,

@@ -733,7 +733,10 @@ CREATE TABLE IF NOT EXISTS public.universal_tokens (
 #### Teacher Activity Analytics
 Admin tool for tracking teacher engagement and site usage at `/admin/analytics`.
 
+- Window dropdown (`Last 7 / 30 / 90 days`) switches which `_Nd` set the table columns render. All three windows are computed from a single 90-day activity query. Sort field follows the active window for Days/Logins/Lessons/Total columns; user-selected sort (name, last_active) persists across window changes.
 - Client-side search by name (first/last) or email (250 ms debounce) sends `?search=` to the API; summary cards stay aggregate regardless of search.
+- Status badges: Daily = activity today, Weekly = 4+ days active in last 7 (always a 7-day concept), Active (1–N/4 days) = fallback for the active window (`1–3` for 7d, `1–7` for 30d, `1–22` for 90d), Inactive = 0 days in the window.
+- Summary cards: Total Teachers, Active (7d / 30d / 90d), Avg Days/Week (7d), Daily Active Rate, Most Active Day.
 
 **Database table:**
 - `user_activity_log` - Tracks user actions (login, view_lesson, view_course)
