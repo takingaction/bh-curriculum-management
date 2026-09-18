@@ -1,4 +1,4 @@
-export const DEFAULT_ACCESS_ENDS_AT = "2027-12-31T00:00:00.000Z";
+export const DEFAULT_ACCESS_ENDS_AT = "2027-12-31T12:00:00.000Z";
 
 export const isValidIsoDate = (value: unknown): value is string => {
   if (typeof value !== "string") return false;

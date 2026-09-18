@@ -464,14 +464,14 @@ export default function EditTeacherPage({
                     </span>
                   )}
                 </div>
-                <Input
-                  id="trial_ends_at"
-                  name="trial_ends_at"
-                  type="date"
-                  value={formData.trial_ends_at ? formData.trial_ends_at.split("T")[0] : ""}
-                  onChange={handleTrialDateChange}
-                  className="w-auto"
-                />
+                  <Input
+                    id="trial_ends_at"
+                    name="trial_ends_at"
+                    type="date"
+                    value={isoToLocalDateInput(formData.trial_ends_at)}
+                    onChange={handleTrialDateChange}
+                    className="w-auto"
+                  />
                 <p className="text-xs text-gray-500">
                   {teacher.trial_ends_at && new Date(teacher.trial_ends_at) < new Date() && (
                     <span className="text-red-600">Trial has expired. </span>
