@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, ChevronUp, ChevronDown, Users, Calendar, Activity, TrendingUp } from "lucide-react";
+import { Loader2, ChevronUp, ChevronDown, Users, Calendar, Activity, TrendingUp, Search, X } from "lucide-react";
 
 interface TeacherMetrics {
   id: string;
@@ -54,7 +54,18 @@ export default function TeacherAnalyticsClientPage() {
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
   const [daysFilter, setDaysFilter] = useState<7 | 30 | 90>(7);
   const [currentPage, setCurrentPage] = useState(1);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const pageSize = 25;
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery), 250);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearch]);
 
   const fetchAnalytics = useCallback(async () => {
     setLoading(true);
@@ -66,6 +77,9 @@ export default function TeacherAnalyticsClientPage() {
         limit: pageSize.toString(),
         offset: ((currentPage - 1) * pageSize).toString(),
       });
+      if (debouncedSearch.trim()) {
+        params.set("search", debouncedSearch.trim());
+      }
 
       const res = await fetch(`/api/analytics/teacher-activity?${params}`);
       const data = await res.json();
@@ -83,7 +97,7 @@ export default function TeacherAnalyticsClientPage() {
     } finally {
       setLoading(false);
     }
-  }, [daysFilter, sortField, sortOrder, currentPage]);
+  }, [daysFilter, sortField, sortOrder, currentPage, debouncedSearch]);
 
   useEffect(() => {
     fetchAnalytics();
@@ -264,6 +278,26 @@ export default function TeacherAnalyticsClientPage() {
 
         {/* Teachers Table */}
         <div className="bg-white rounded-lg border border-[#e5e5e0] overflow-hidden">
+          <div className="p-4 border-b border-[#e5e5e0]">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search by name or email..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full h-10 pl-10 pr-10 border border-[#e5e5e0] rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#0d7377] focus:border-transparent"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+          </div>
           <table className="w-full">
             <thead className="bg-gray-50">
               <tr>
@@ -321,7 +355,9 @@ export default function TeacherAnalyticsClientPage() {
               ) : teachers.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="px-4 py-12 text-center text-gray-500">
-                    No teacher activity data yet. Activity will appear here as teachers use the site.
+                    {debouncedSearch.trim()
+                      ? `No teachers found matching "${debouncedSearch.trim()}"`
+                      : "No teacher activity data yet. Activity will appear here as teachers use the site."}
                   </td>
                 </tr>
               ) : (

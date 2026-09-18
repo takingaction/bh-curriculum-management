@@ -10,6 +10,12 @@ export async function GET(request: Request) {
     const sortOrder = searchParams.get("order") || "desc";
     const limit = parseInt(searchParams.get("limit") || "50", 10);
     const offset = parseInt(searchParams.get("offset") || "0", 10);
+    const rawSearch = (searchParams.get("search") || "").trim();
+    // Strip PostgREST .or() syntax chars + escape ILIKE wildcards so user input
+    // is treated as a literal substring.
+    const sanitizedSearch = rawSearch
+      .replace(/[(),.]/g, "")
+      .replace(/[%_]/g, "\\$&");
 
     const now = new Date();
     const startDate7 = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -17,11 +23,19 @@ export async function GET(request: Request) {
     const startDate = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
 
     // Get all teachers (exclude admins)
-    const { data: teachers, error: teachersError } = await supabaseAdmin
+    let teachersQuery = supabaseAdmin
       .from("profiles")
       .select("id, first_name, last_name, email, role, enrollment_status, created_at")
-      .eq("role", "teacher")
-      .order("last_name", { ascending: true });
+      .eq("role", "teacher");
+
+    if (sanitizedSearch) {
+      const pattern = `%${sanitizedSearch}%`;
+      teachersQuery = teachersQuery.or(
+        `first_name.ilike.${pattern},last_name.ilike.${pattern},email.ilike.${pattern}`
+      );
+    }
+
+    const { data: teachers, error: teachersError } = await teachersQuery.order("last_name", { ascending: true });
 
     if (teachersError) {
       return NextResponse.json({ error: teachersError.message }, { status: 500 });

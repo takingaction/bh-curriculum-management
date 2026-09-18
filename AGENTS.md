@@ -733,6 +733,8 @@ CREATE TABLE IF NOT EXISTS public.universal_tokens (
 #### Teacher Activity Analytics
 Admin tool for tracking teacher engagement and site usage at `/admin/analytics`.
 
+- Client-side search by name (first/last) or email (250 ms debounce) sends `?search=` to the API; summary cards stay aggregate regardless of search.
+
 **Database table:**
 - `user_activity_log` - Tracks user actions (login, view_lesson, view_course)
 
