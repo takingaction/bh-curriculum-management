@@ -2,20 +2,62 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { DEFAULT_ACCESS_ENDS_AT, isValidIsoDate, localDateInputToUtcNoon, utcNoonInDaysFromNow } from "@/lib/access-utils";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const supabaseAdmin = await createServiceClient();
+    const { searchParams } = new URL(request.url);
 
-    const { data: profiles, error } = await supabaseAdmin
+    const status = searchParams.get("status") || "";
+    const role = searchParams.get("role") || "";
+    const disciplines = searchParams.getAll("discipline");
+    const search = (searchParams.get("search") || "").trim();
+
+    const limit = Math.min(Math.max(parseInt(searchParams.get("limit") || "50", 10) || 50, 1), 200);
+    const offset = Math.max(parseInt(searchParams.get("offset") || "0", 10) || 0, 0);
+
+    let query = supabaseAdmin
       .from("profiles")
-      .select("*")
-      .order("created_at", { ascending: false });
+      .select("*", { count: "exact" });
+
+    if (status === "active" || status === "trial" || status === "inactive") {
+      query = query.eq("enrollment_status", status);
+    }
+    if (role === "teacher" || role === "admin") {
+      query = query.eq("role", role);
+    }
+    if (disciplines.length > 0) {
+      const validDisciplines = disciplines.filter((d) =>
+        ["N/A", "MUSIC", "THEATRE", "DANCE"].includes(d)
+      );
+      if (validDisciplines.length > 0) {
+        query = query.in("primary_discipline", validDisciplines);
+      }
+    }
+    if (search) {
+      const escaped = search
+        .replace(/[(),.]/g, "")
+        .replace(/[%_]/g, "\\$&");
+      const pattern = `%${escaped}%`;
+      query = query.or(
+        `first_name.ilike.${pattern},last_name.ilike.${pattern},email.ilike.${pattern}`
+      );
+    }
+
+    const { data: profiles, count, error } = await query
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: true })
+      .range(offset, offset + limit - 1);
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ profiles });
+    return NextResponse.json({
+      profiles: profiles || [],
+      total: count ?? 0,
+      limit,
+      offset,
+    });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
