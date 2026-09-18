@@ -272,6 +272,9 @@ export default function TeacherAnalyticsClientPage() {
             <span className="w-2 h-2 rounded-full bg-[#0d7377]"></span> Weekly Active (4+ days)
           </span>
           <span className="flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full bg-gray-400"></span> Active (1–3 days)
+          </span>
+          <span className="flex items-center gap-1">
             <span className="w-2 h-2 rounded-full bg-gray-300"></span> Inactive
           </span>
         </div>
@@ -406,7 +409,7 @@ export default function TeacherAnalyticsClientPage() {
                       ) : teacher.days_active_last_7 > 0 ? (
                         <span className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs">
                           <span className="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
-                          Active
+                          Active (1–3 days)
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1 px-2 py-1 bg-gray-50 text-gray-400 rounded text-xs">
@@ -482,6 +485,7 @@ export default function TeacherAnalyticsClientPage() {
             <li>• <strong>Courses Viewed:</strong> Number of course pages visited</li>
             <li>• <strong>Daily Active:</strong> Teacher had at least one activity today</li>
             <li>• <strong>Weekly Active:</strong> Teacher was active on 4+ days in the last 7 days</li>
+            <li>• <strong>Active (1–3 days):</strong> Teacher had activity on 1–3 days in the last 7 days (not today)</li>
           </ul>
         </div>
       </div>
