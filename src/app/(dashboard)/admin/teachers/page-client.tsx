@@ -26,19 +26,19 @@ interface Teacher {
 export default function TeachersPage() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="mb-8 flex items-center justify-between">
+      <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h2 className="text-2xl font-bold text-[#2d2d2d]">Teachers</h2>
           <p className="text-[#666666]">Manage teacher accounts and course access</p>
         </div>
-        <div className="flex gap-2">
-          <Link href="/admin/teachers/onboard">
-            <Button className="bg-[#0d7377] hover:bg-[#0a5c5f] text-white">
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <Link href="/admin/teachers/onboard" className="w-full sm:w-auto">
+            <Button className="w-full bg-[#0d7377] hover:bg-[#0a5c5f] text-white">
               Onboard New Teacher
             </Button>
           </Link>
-          <Link href="/admin/teachers/import">
-            <Button variant="outline" className="border-[#0d7377] text-[#0d7377] hover:bg-[#0d7377] hover:text-white">
+          <Link href="/admin/teachers/import" className="w-full sm:w-auto">
+            <Button variant="outline" className="w-full border-[#0d7377] text-[#0d7377] hover:bg-[#0d7377] hover:text-white">
               Import from CSV
             </Button>
           </Link>
@@ -385,27 +385,94 @@ function TeacherList() {
 
         <CardContent className="pt-0">
           {filteredTeachers.length > 0 ? (
-            <Table className="teachers-table">
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-10">
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.size === filteredTeachers.length && filteredTeachers.length > 0}
-                      onChange={handleSelectAll}
-                      className="h-4 w-4 rounded border-gray-300 text-[#0d7377] focus:ring-[#0d7377]"
-                    />
-                  </TableHead>
-                  <TableHead className="name-cell">Name</TableHead>
-                  <TableHead className="email-cell">Email</TableHead>
-                  <TableHead className="w-24">Discipline</TableHead>
-                  <TableHead className="access-cell">Access</TableHead>
-                  <TableHead className="w-32">Status</TableHead>
-                  <TableHead className="w-20">Role</TableHead>
-                  <TableHead className="w-20">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+            <>
+              {/* Desktop table */}
+              <div className="hidden md:block overflow-x-auto">
+                <Table className="teachers-table">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-10">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.size === filteredTeachers.length && filteredTeachers.length > 0}
+                          onChange={handleSelectAll}
+                          className="h-4 w-4 rounded border-gray-300 text-[#0d7377] focus:ring-[#0d7377]"
+                        />
+                      </TableHead>
+                      <TableHead className="name-cell">Name</TableHead>
+                      <TableHead className="email-cell">Email</TableHead>
+                      <TableHead className="w-24">Discipline</TableHead>
+                      <TableHead className="access-cell">Access</TableHead>
+                      <TableHead className="w-32">Status</TableHead>
+                      <TableHead className="w-20">Role</TableHead>
+                      <TableHead className="w-20">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredTeachers.map((teacher) => {
+                      const isSelected = selectedIds.has(teacher.id);
+                      const pendingStatus = pendingStatusChanges.get(teacher.id);
+                      const displayStatus = pendingStatus ?? teacher.enrollment_status ?? "trial";
+                      const hasChanged = pendingStatus !== undefined && pendingStatus !== teacher.enrollment_status;
+
+                      return (
+                        <TableRow key={teacher.id} className={isSelected ? "bg-[#f0fdfa]" : ""}>
+                          <TableCell>
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => handleSelectOne(teacher.id)}
+                              className="h-4 w-4 rounded border-gray-300 text-[#0d7377] focus:ring-[#0d7377]"
+                            />
+                          </TableCell>
+                          <TableCell className="name-cell font-medium">{getName(teacher)}</TableCell>
+                          <TableCell className="email-cell text-[#666666]">{teacher.email}</TableCell>
+                          <TableCell className="text-[#666666]">{teacher.primary_discipline || "N/A"}</TableCell>
+                          <TableCell className="access-cell text-[#666666]">{formatEnrollments(teacher.enrollments)}</TableCell>
+                          <TableCell>
+                            {isSelected ? (
+                              <select
+                                value={displayStatus}
+                                onChange={(e) => handleStatusChange(teacher.id, e.target.value)}
+                                className={`w-full h-8 px-2 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-[#0d7377] ${
+                                  hasChanged ? "border-amber-400 bg-amber-50" : "border-[#e5e5e0]"
+                                }`}
+                              >
+                                <option value="trial">Trial</option>
+                                <option value="active">Active</option>
+                                <option value="inactive">Inactive</option>
+                              </select>
+                            ) : (
+                              getStatusBadge(teacher.enrollment_status)
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={teacher.role === "admin" ? "default" : "secondary"}
+                              className={teacher.role === "admin" ? "bg-[#0d7377]" : ""}
+                            >
+                              {teacher.role}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => window.location.href = `/admin/teachers/${teacher.id}`}
+                              className="border-[#0d7377] text-[#0d7377] hover:bg-[#0d7377] hover:text-white"
+                            >
+                              Edit
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Mobile card list */}
+              <div className="md:hidden space-y-3">
                 {filteredTeachers.map((teacher) => {
                   const isSelected = selectedIds.has(teacher.id);
                   const pendingStatus = pendingStatusChanges.get(teacher.id);
@@ -413,27 +480,32 @@ function TeacherList() {
                   const hasChanged = pendingStatus !== undefined && pendingStatus !== teacher.enrollment_status;
 
                   return (
-                    <TableRow key={teacher.id} className={isSelected ? "bg-[#f0fdfa]" : ""}>
-                      <TableCell>
+                    <div
+                      key={teacher.id}
+                      className={`border border-[#e5e5e0] rounded-lg p-4 space-y-3 ${
+                        isSelected ? "bg-[#f0fdfa] border-[#0d7377]" : "bg-white"
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
                         <input
                           type="checkbox"
                           checked={isSelected}
                           onChange={() => handleSelectOne(teacher.id)}
-                          className="h-4 w-4 rounded border-gray-300 text-[#0d7377] focus:ring-[#0d7377]"
+                          className="h-4 w-4 mt-1 rounded border-gray-300 text-[#0d7377] focus:ring-[#0d7377]"
+                          aria-label={`Select ${getName(teacher)}`}
                         />
-                      </TableCell>
-                      <TableCell className="name-cell font-medium">{getName(teacher)}</TableCell>
-                      <TableCell className="email-cell text-[#666666]">{teacher.email}</TableCell>
-                      <TableCell className="text-[#666666]">{teacher.primary_discipline || "N/A"}</TableCell>
-                      <TableCell className="access-cell text-[#666666]">{formatEnrollments(teacher.enrollments)}</TableCell>
-                      <TableCell>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-[#2d2d2d] truncate">{getName(teacher)}</p>
+                          <p className="text-xs text-[#666666] truncate">{teacher.email}</p>
+                        </div>
                         {isSelected ? (
                           <select
                             value={displayStatus}
                             onChange={(e) => handleStatusChange(teacher.id, e.target.value)}
-                            className={`w-full h-8 px-2 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-[#0d7377] ${
+                            className={`h-8 px-2 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-[#0d7377] ${
                               hasChanged ? "border-amber-400 bg-amber-50" : "border-[#e5e5e0]"
                             }`}
+                            aria-label={`Status for ${getName(teacher)}`}
                           >
                             <option value="trial">Trial</option>
                             <option value="active">Active</option>
@@ -442,30 +514,43 @@ function TeacherList() {
                         ) : (
                           getStatusBadge(teacher.enrollment_status)
                         )}
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={teacher.role === "admin" ? "default" : "secondary"}
-                          className={teacher.role === "admin" ? "bg-[#0d7377]" : ""}
-                        >
-                          {teacher.role}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => window.location.href = `/admin/teachers/${teacher.id}`}
-                          className="border-[#0d7377] text-[#0d7377] hover:bg-[#0d7377] hover:text-white"
-                        >
-                          Edit
-                        </Button>
-                      </TableCell>
-                    </TableRow>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div>
+                          <div className="text-xs text-gray-500">Discipline</div>
+                          <div className="text-[#666666]">{teacher.primary_discipline || "N/A"}</div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-gray-500">Role</div>
+                          <div>
+                            <Badge
+                              variant={teacher.role === "admin" ? "default" : "secondary"}
+                              className={teacher.role === "admin" ? "bg-[#0d7377]" : ""}
+                            >
+                              {teacher.role}
+                            </Badge>
+                          </div>
+                        </div>
+                        <div className="col-span-2">
+                          <div className="text-xs text-gray-500">Access</div>
+                          <div className="text-[#666666] break-words">{formatEnrollments(teacher.enrollments)}</div>
+                        </div>
+                      </div>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => window.location.href = `/admin/teachers/${teacher.id}`}
+                        className="w-full border-[#0d7377] text-[#0d7377] hover:bg-[#0d7377] hover:text-white"
+                      >
+                        Edit
+                      </Button>
+                    </div>
                   );
                 })}
-              </TableBody>
-            </Table>
+              </div>
+            </>
           ) : searchQuery ? (
             <p className="text-[#666666] text-center py-8">
               No teachers found matching &quot;{searchQuery}&quot;

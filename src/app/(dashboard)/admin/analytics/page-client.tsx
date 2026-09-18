@@ -182,9 +182,9 @@ export default function TeacherAnalyticsClientPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
           <div>
             <h1 className="text-2xl font-bold text-[#2d2d2d]">Teacher Activity Analytics</h1>
             <p className="text-sm text-gray-500">Track teacher engagement and site usage</p>
@@ -312,7 +312,7 @@ export default function TeacherAnalyticsClientPage() {
         )}
 
         {/* Status Legend */}
-        <div className="flex items-center gap-6 mb-4 text-xs text-gray-500">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mb-4 text-xs text-gray-500">
           <span className="flex items-center gap-1">
             <span className="w-2 h-2 rounded-full bg-green-500"></span> Daily Active
           </span>
@@ -349,146 +349,287 @@ export default function TeacherAnalyticsClientPage() {
               )}
             </div>
           </div>
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th
-                  className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
-                  onClick={() => handleSort("name")}
-                >
-                  Teacher <SortIcon field="name" />
-                </th>
-                <th
-                  className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
-                  onClick={() => handleSort(daysFieldForWindow(daysFilter))}
-                >
-                  Days Active ({daysFilter}d) <SortIcon field={daysFieldForWindow(daysFilter)} />
-                </th>
-                <th
-                  className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
-                  onClick={() => handleSort(loginsFieldForWindow(daysFilter))}
-                >
-                  Logins ({daysFilter}d) <SortIcon field={loginsFieldForWindow(daysFilter)} />
-                </th>
-                <th
-                  className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
-                  onClick={() => handleSort(lessonsFieldForWindow(daysFilter))}
-                >
-                  Lessons Viewed ({daysFilter}d) <SortIcon field={lessonsFieldForWindow(daysFilter)} />
-                </th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
-                  Courses ({daysFilter}d)
-                </th>
-                <th
-                  className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
-                  onClick={() => handleSort(totalFieldForWindow(daysFilter))}
-                >
-                  Total Actions ({daysFilter}d) <SortIcon field={totalFieldForWindow(daysFilter)} />
-                </th>
-                <th
-                  className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
-                  onClick={() => handleSort("last_active")}
-                >
-                  Last Active <SortIcon field="last_active" />
-                </th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
-                  Status
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {loading && teachers.length === 0 ? (
+          <div className="hidden md:block overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50">
                 <tr>
-                  <td colSpan={8} className="px-4 py-12 text-center">
-                    <Loader2 className="w-8 h-8 animate-spin text-[#0d7377] mx-auto" />
-                  </td>
+                  <th
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort("name")}
+                  >
+                    Teacher <SortIcon field="name" />
+                  </th>
+                  <th
+                    className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort(daysFieldForWindow(daysFilter))}
+                  >
+                    Days Active ({daysFilter}d) <SortIcon field={daysFieldForWindow(daysFilter)} />
+                  </th>
+                  <th
+                    className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort(loginsFieldForWindow(daysFilter))}
+                  >
+                    Logins ({daysFilter}d) <SortIcon field={loginsFieldForWindow(daysFilter)} />
+                  </th>
+                  <th
+                    className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort(lessonsFieldForWindow(daysFilter))}
+                  >
+                    Lessons Viewed ({daysFilter}d) <SortIcon field={lessonsFieldForWindow(daysFilter)} />
+                  </th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                    Courses ({daysFilter}d)
+                  </th>
+                  <th
+                    className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort(totalFieldForWindow(daysFilter))}
+                  >
+                    Total Actions ({daysFilter}d) <SortIcon field={totalFieldForWindow(daysFilter)} />
+                  </th>
+                  <th
+                    className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort("last_active")}
+                  >
+                    Last Active <SortIcon field="last_active" />
+                  </th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                    Status
+                  </th>
                 </tr>
-              ) : teachers.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="px-4 py-12 text-center text-gray-500">
-                    {debouncedSearch.trim()
-                      ? `No teachers found matching "${debouncedSearch.trim()}"`
-                      : "No teacher activity data yet. Activity will appear here as teachers use the site."}
-                  </td>
-                </tr>
-              ) : (
-                teachers.map((teacher) => {
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {loading && teachers.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="px-4 py-12 text-center">
+                      <Loader2 className="w-8 h-8 animate-spin text-[#0d7377] mx-auto" />
+                    </td>
+                  </tr>
+                ) : teachers.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="px-4 py-12 text-center text-gray-500">
+                      {debouncedSearch.trim()
+                        ? `No teachers found matching "${debouncedSearch.trim()}"`
+                        : "No teacher activity data yet. Activity will appear here as teachers use the site."}
+                    </td>
+                  </tr>
+                ) : (
+                  teachers.map((teacher) => {
+                    const daysField = daysFieldForWindow(daysFilter);
+                    const daysActive = teacher[daysField];
+                    return (
+                      <tr key={teacher.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-3">
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">{teacher.name}</p>
+                            <p className="text-xs text-gray-500">{teacher.email}</p>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <span className="text-sm font-medium text-gray-900">
+                            {daysActive}
+                          </span>
+                          <span className="text-xs text-gray-500 ml-1">/ {daysFilter}</span>
+                        </td>
+                        <td className="px-4 py-3 text-center text-sm text-gray-900">
+                          {teacher[loginsFieldForWindow(daysFilter)]}
+                        </td>
+                        <td className="px-4 py-3 text-center text-sm text-gray-900">
+                          {teacher[lessonsFieldForWindow(daysFilter)]}
+                        </td>
+                        <td className="px-4 py-3 text-center text-sm text-gray-900">
+                          {teacher[
+                            daysFilter === 7
+                              ? "courses_viewed_7d"
+                              : daysFilter === 30
+                                ? "courses_viewed_30d"
+                                : "courses_viewed_90d"
+                          ]}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <span className="text-sm font-semibold text-[#0d7377]">
+                            {teacher[totalFieldForWindow(daysFilter)]}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-center text-sm text-gray-500">
+                          {formatLastActive(teacher.last_active)}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          {teacher.is_daily_active ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-800 rounded text-xs">
+                              <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                              Daily
+                            </span>
+                          ) : teacher.is_weekly_active ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 bg-teal-100 text-teal-800 rounded text-xs">
+                              <span className="w-1.5 h-1.5 rounded-full bg-[#0d7377]"></span>
+                              Weekly
+                            </span>
+                          ) : daysActive > 0 ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs">
+                              <span className="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
+                              Active (1–{fallbackUpperBound(daysFilter)} days)
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 bg-gray-50 text-gray-400 rounded text-xs">
+                              <span className="w-1.5 h-1.5 rounded-full bg-gray-300"></span>
+                              Inactive
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile card list */}
+          <div className="md:hidden">
+            {loading && teachers.length === 0 ? (
+              <div className="px-4 py-12 text-center">
+                <Loader2 className="w-8 h-8 animate-spin text-[#0d7377] mx-auto" />
+              </div>
+            ) : teachers.length === 0 ? (
+              <p className="px-4 py-12 text-center text-gray-500">
+                {debouncedSearch.trim()
+                  ? `No teachers found matching "${debouncedSearch.trim()}"`
+                  : "No teacher activity data yet. Activity will appear here as teachers use the site."}
+              </p>
+            ) : (
+              <div className="divide-y divide-gray-200">
+                {teachers.map((teacher) => {
                   const daysField = daysFieldForWindow(daysFilter);
                   const daysActive = teacher[daysField];
                   return (
-                    <tr key={teacher.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3">
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">{teacher.name}</p>
-                          <p className="text-xs text-gray-500">{teacher.email}</p>
+                    <div key={teacher.id} className="p-4 space-y-3 hover:bg-gray-50">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-[#2d2d2d] truncate">{teacher.name}</p>
+                          <p className="text-xs text-gray-500 truncate">{teacher.email}</p>
                         </div>
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <span className="text-sm font-medium text-gray-900">
-                          {daysActive}
-                        </span>
-                        <span className="text-xs text-gray-500 ml-1">/ {daysFilter}</span>
-                      </td>
-                      <td className="px-4 py-3 text-center text-sm text-gray-900">
-                        {teacher[loginsFieldForWindow(daysFilter)]}
-                      </td>
-                      <td className="px-4 py-3 text-center text-sm text-gray-900">
-                        {teacher[lessonsFieldForWindow(daysFilter)]}
-                      </td>
-                      <td className="px-4 py-3 text-center text-sm text-gray-900">
-                        {teacher[
-                          daysFilter === 7
-                            ? "courses_viewed_7d"
-                            : daysFilter === 30
-                              ? "courses_viewed_30d"
-                              : "courses_viewed_90d"
-                        ]}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <span className="text-sm font-semibold text-[#0d7377]">
-                          {teacher[totalFieldForWindow(daysFilter)]}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-center text-sm text-gray-500">
-                        {formatLastActive(teacher.last_active)}
-                      </td>
-                      <td className="px-4 py-3 text-center">
                         {teacher.is_daily_active ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-800 rounded text-xs">
+                          <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-800 rounded text-xs flex-shrink-0">
                             <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
                             Daily
                           </span>
                         ) : teacher.is_weekly_active ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 bg-teal-100 text-teal-800 rounded text-xs">
+                          <span className="inline-flex items-center gap-1 px-2 py-1 bg-teal-100 text-teal-800 rounded text-xs flex-shrink-0">
                             <span className="w-1.5 h-1.5 rounded-full bg-[#0d7377]"></span>
                             Weekly
                           </span>
                         ) : daysActive > 0 ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs">
+                          <span className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs flex-shrink-0">
                             <span className="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
-                            Active (1–{fallbackUpperBound(daysFilter)} days)
+                            Active (1–{fallbackUpperBound(daysFilter)}d)
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 bg-gray-50 text-gray-400 rounded text-xs">
+                          <span className="inline-flex items-center gap-1 px-2 py-1 bg-gray-50 text-gray-400 rounded text-xs flex-shrink-0">
                             <span className="w-1.5 h-1.5 rounded-full bg-gray-300"></span>
                             Inactive
                           </span>
                         )}
-                      </td>
-                    </tr>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-3 text-sm">
+                        <div>
+                          <div className="text-xs text-gray-500">Days Active</div>
+                          <div className="font-medium text-gray-900">
+                            {daysActive}
+                            <span className="text-xs text-gray-500 ml-1">/ {daysFilter}</span>
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-gray-500">Logins</div>
+                          <div className="text-gray-900">{teacher[loginsFieldForWindow(daysFilter)]}</div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-gray-500">Lessons</div>
+                          <div className="text-gray-900">{teacher[lessonsFieldForWindow(daysFilter)]}</div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-gray-500">Courses</div>
+                          <div className="text-gray-900">
+                            {teacher[
+                              daysFilter === 7
+                                ? "courses_viewed_7d"
+                                : daysFilter === 30
+                                  ? "courses_viewed_30d"
+                                  : "courses_viewed_90d"
+                            ]}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-gray-500">Total</div>
+                          <div className="font-semibold text-[#0d7377]">
+                            {teacher[totalFieldForWindow(daysFilter)]}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-gray-500">Last Active</div>
+                          <div className="text-gray-500">{formatLastActive(teacher.last_active)}</div>
+                        </div>
+                      </div>
+                    </div>
                   );
-                })
-              )}
-            </tbody>
-          </table>
+                })}
+              </div>
+            )}
+          </div>
 
           {/* Pagination */}
           {pagination && pagination.total > pageSize && (
-            <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
-              <div className="text-sm text-gray-500">
-                Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, pagination.total)} of {pagination.total} teachers
+            <>
+              {/* Desktop pagination */}
+              <div className="hidden md:flex px-4 py-3 bg-gray-50 border-t border-gray-200 items-center justify-between">
+                <div className="text-sm text-gray-500">
+                  Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, pagination.total)} of {pagination.total} teachers
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(currentPage - 1)}
+                    disabled={currentPage <= 1}
+                  >
+                    Previous
+                  </Button>
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNum: number;
+                    if (totalPages <= 5) {
+                      pageNum = i + 1;
+                    } else if (currentPage <= 3) {
+                      pageNum = i + 1;
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i;
+                    } else {
+                      pageNum = currentPage - 2 + i;
+                    }
+                    return (
+                      <Button
+                        key={pageNum}
+                        variant={currentPage === pageNum ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setCurrentPage(pageNum)}
+                        className={currentPage === pageNum ? "bg-[#0d7377]" : ""}
+                      >
+                        {pageNum}
+                      </Button>
+                    );
+                  })}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(currentPage + 1)}
+                    disabled={currentPage >= totalPages}
+                  >
+                    Next
+                  </Button>
+                </div>
               </div>
-              <div className="flex gap-2">
+
+              {/* Mobile pagination */}
+              <div className="md:hidden px-4 py-3 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
                 <Button
                   variant="outline"
                   size="sm"
@@ -497,29 +638,9 @@ export default function TeacherAnalyticsClientPage() {
                 >
                   Previous
                 </Button>
-                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                  let pageNum: number;
-                  if (totalPages <= 5) {
-                    pageNum = i + 1;
-                  } else if (currentPage <= 3) {
-                    pageNum = i + 1;
-                  } else if (currentPage >= totalPages - 2) {
-                    pageNum = totalPages - 4 + i;
-                  } else {
-                    pageNum = currentPage - 2 + i;
-                  }
-                  return (
-                    <Button
-                      key={pageNum}
-                      variant={currentPage === pageNum ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setCurrentPage(pageNum)}
-                      className={currentPage === pageNum ? "bg-[#0d7377]" : ""}
-                    >
-                      {pageNum}
-                    </Button>
-                  );
-                })}
+                <div className="text-sm text-gray-500">
+                  Page {currentPage} of {totalPages}
+                </div>
                 <Button
                   variant="outline"
                   size="sm"
@@ -529,7 +650,7 @@ export default function TeacherAnalyticsClientPage() {
                   Next
                 </Button>
               </div>
-            </div>
+            </>
           )}
         </div>
 

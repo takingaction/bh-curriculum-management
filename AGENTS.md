@@ -737,6 +737,7 @@ Admin tool for tracking teacher engagement and site usage at `/admin/analytics`.
 - Client-side search by name (first/last) or email (250 ms debounce) sends `?search=` to the API; summary cards stay aggregate regardless of search.
 - Status badges: Daily = activity today, Weekly = 4+ days active in last 7 (always a 7-day concept), Active (1–N/4 days) = fallback for the active window (`1–3` for 7d, `1–7` for 30d, `1–22` for 90d), Inactive = 0 days in the window.
 - Summary cards: Total Teachers, Active (7d / 30d / 90d), Avg Days/Week (7d), Daily Active Rate, Most Active Day.
+- Mobile: teachers table is hidden below `md`, replaced by a stacked card list showing the same fields. Pagination is simplified to `Previous | Page X of Y | Next` on mobile (full numeric page buttons only at `md+`).
 
 **Database table:**
 - `user_activity_log` - Tracks user actions (login, view_lesson, view_course)
@@ -789,6 +790,8 @@ Admin tool for tracking teacher engagement and site usage at `/admin/analytics`.
 
 #### Teacher Management (`/admin/teachers`)
 Admin page for managing teacher accounts with real-time search and bulk operations.
+
+- Mobile: teachers table is hidden below `md`, replaced by a stacked card list with checkbox, name/email, status badge or select (when selected), Discipline/Role/Access grid, and full-width Edit button. Bulk action bar continues to work on mobile (cards have checkboxes; bulk bar wraps).
 
 **Features:**
 
