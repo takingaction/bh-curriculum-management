@@ -22,9 +22,15 @@ export async function GET() {
       return NextResponse.json({ error: "Profile not found" }, { status: 404 });
     }
 
-    const isExpired = profile.enrollment_status === "trial" &&
+    const now = new Date();
+    const trialExpired = profile.enrollment_status === "trial" &&
       profile.trial_ends_at &&
-      new Date(profile.trial_ends_at) < new Date();
+      new Date(profile.trial_ends_at) < now;
+    const accessExpired = profile.enrollment_status === "active" &&
+      profile.access_ends_at &&
+      new Date(profile.access_ends_at) < now;
+
+    const isExpired = trialExpired || accessExpired;
 
     if (isExpired) {
       await supabaseAdmin

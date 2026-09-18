@@ -17,10 +17,17 @@ export default async function DashboardPage() {
     .eq("id", userId)
     .single();
 
-  const isInactive = profile?.enrollment_status === "inactive" ||
-    (profile?.enrollment_status === "trial" && profile?.trial_ends_at && new Date(profile.trial_ends_at) < new Date());
+  const now = new Date();
+  const trialExpired = profile?.enrollment_status === "trial" &&
+    profile?.trial_ends_at &&
+    new Date(profile.trial_ends_at) < now;
+  const accessExpired = profile?.enrollment_status === "active" &&
+    profile?.access_ends_at &&
+    new Date(profile.access_ends_at) < now;
 
-  if (isInactive && profile?.enrollment_status === "trial") {
+  const isInactive = profile?.enrollment_status === "inactive" || trialExpired || accessExpired;
+
+  if (isInactive && (profile?.enrollment_status === "trial" || profile?.enrollment_status === "active")) {
     await supabase
       .from("profiles")
       .update({ enrollment_status: "inactive" })

@@ -21,6 +21,8 @@ const ENROLLMENT_STATUSES = [
   { value: "inactive", label: "No (Inactive)" },
 ];
 
+const DEFAULT_ACCESS_DATE = "2027-12-31";
+
 export default function OnboardTeacherPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -35,6 +37,7 @@ export default function OnboardTeacherPage() {
     primary_discipline: "N/A",
     enrollment_status: "trial",
     enrollments: ["ALL"],
+    access_ends_at: "",
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -68,6 +71,11 @@ export default function OnboardTeacherPage() {
 
     setLoading(true);
 
+    // For active teachers, default access_ends_at to 2027-12-31 if not provided.
+    const accessEndsAtToSend =
+      formData.access_ends_at ||
+      (formData.enrollment_status === "active" ? DEFAULT_ACCESS_DATE : "");
+
     try {
       const res = await fetch("/api/admin/teachers", {
         method: "POST",
@@ -82,6 +90,7 @@ export default function OnboardTeacherPage() {
           enrollment_status: formData.enrollment_status,
           enrollments: formData.enrollments,
           role: "teacher",
+          access_ends_at: accessEndsAtToSend || null,
         }),
       });
 
@@ -94,9 +103,9 @@ export default function OnboardTeacherPage() {
       }
 
       setSuccess("Teacher created successfully!");
-      
+
       setLoading(false);
-      
+
       setTimeout(() => {
         router.push("/admin/teachers");
       }, 1500);
@@ -233,6 +242,22 @@ export default function OnboardTeacherPage() {
                   </select>
                   <p className="text-xs text-gray-500">
                     Trial accounts last 14 days. Active = full access. Inactive = cannot log in.
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  <Label htmlFor="access_ends_at">Access Expiration Date</Label>
+                  <Input
+                    id="access_ends_at"
+                    name="access_ends_at"
+                    type="date"
+                    value={formData.access_ends_at}
+                    onChange={handleChange}
+                    placeholder={DEFAULT_ACCESS_DATE}
+                    className="w-auto"
+                  />
+                  <p className="text-xs text-gray-500">
+                    Optional. Defaults to {DEFAULT_ACCESS_DATE} when status is Active. Past dates will mark the teacher as inactive on next page load.
                   </p>
                 </div>
 

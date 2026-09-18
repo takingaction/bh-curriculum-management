@@ -78,6 +78,7 @@ interface Profile {
   california: boolean | null;
   enrollment_status: string | null;
   trial_ends_at: string | null;
+  access_ends_at: string | null;
   role: string;
 }
 
@@ -337,10 +338,13 @@ export default function LessonContentPage({
     }
   }, [showSaveDialog, clearModificationCallback]);
 
-  const isBlocked = profile?.enrollment_status === "inactive" ||
-    (profile?.enrollment_status === "trial" && 
-     profile?.trial_ends_at && 
-     new Date(profile?.trial_ends_at) < new Date());
+  const trialExpired = profile?.enrollment_status === "trial" &&
+    profile?.trial_ends_at &&
+    new Date(profile?.trial_ends_at) < new Date();
+  const accessExpired = profile?.enrollment_status === "active" &&
+    profile?.access_ends_at &&
+    new Date(profile?.access_ends_at) < new Date();
+  const isBlocked = profile?.enrollment_status === "inactive" || trialExpired || accessExpired;
   const showCalifornia = profile?.california !== false;
 
   useEffect(() => {

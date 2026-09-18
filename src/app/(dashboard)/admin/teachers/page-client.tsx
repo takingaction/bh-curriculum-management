@@ -21,7 +21,30 @@ interface Teacher {
   district_name: string | null;
   created_at: string;
   enrollments: string[] | null;
+  access_ends_at: string | null;
 }
+
+const formatDateOnly = (iso: string | null): string => {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  return d.toISOString().split("T")[0];
+};
+
+const formatDateDisplay = (iso: string | null): string => {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+};
+
+const isAccessExpiredForActive = (teacher: Teacher): boolean => {
+  return (
+    teacher.enrollment_status === "active" &&
+    !!teacher.access_ends_at &&
+    new Date(teacher.access_ends_at) < new Date()
+  );
+};
 
 export default function TeachersPage() {
   return (
@@ -56,7 +79,9 @@ function TeacherList() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [pendingStatusChanges, setPendingStatusChanges] = useState<Map<string, string>>(new Map());
+  const [pendingAccessDateChanges, setPendingAccessDateChanges] = useState<Map<string, string | null>>(new Map());
   const [globalStatus, setGlobalStatus] = useState<string>("");
+  const [globalAccessDate, setGlobalAccessDate] = useState<string>("");
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
@@ -156,7 +181,9 @@ function TeacherList() {
     if (selectedIds.size === filteredTeachers.length) {
       setSelectedIds(new Set());
       setPendingStatusChanges(new Map());
+      setPendingAccessDateChanges(new Map());
       setGlobalStatus("");
+      setGlobalAccessDate("");
     } else {
       setSelectedIds(new Set(filteredTeachers.map((t) => t.id)));
     }
@@ -167,6 +194,11 @@ function TeacherList() {
     if (next.has(id)) {
       next.delete(id);
       setPendingStatusChanges((prev) => {
+        const updated = new Map(prev);
+        updated.delete(id);
+        return updated;
+      });
+      setPendingAccessDateChanges((prev) => {
         const updated = new Map(prev);
         updated.delete(id);
         return updated;
@@ -197,23 +229,66 @@ function TeacherList() {
     }
   };
 
+  const handleAccessDateChange = (teacherId: string, date: string) => {
+    setPendingAccessDateChanges((prev) => {
+      const next = new Map(prev);
+      // Empty string = clear; non-empty = ISO date string from <input type="date">
+      next.set(teacherId, date === "" ? null : new Date(date).toISOString());
+      return next;
+    });
+    setGlobalAccessDate("");
+  };
+
+  const handleGlobalAccessDateChange = (date: string) => {
+    setGlobalAccessDate(date);
+    setPendingAccessDateChanges((prev) => {
+      const next = new Map(prev);
+      selectedIds.forEach((id) => {
+        if (date === "") {
+          next.set(id, null);
+        } else {
+          next.set(id, new Date(date).toISOString());
+        }
+      });
+      return next;
+    });
+  };
+
   const handleClearSelection = () => {
     setSelectedIds(new Set());
     setPendingStatusChanges(new Map());
+    setPendingAccessDateChanges(new Map());
     setGlobalStatus("");
+    setGlobalAccessDate("");
   };
 
   const handleBulkSave = async () => {
-    if (pendingStatusChanges.size === 0) return;
+    if (pendingStatusChanges.size === 0 && pendingAccessDateChanges.size === 0) return;
 
     setSaving(true);
     setSaveError("");
 
     try {
-      const updates = Array.from(pendingStatusChanges.entries()).map(([id, enrollment_status]) => ({
-        id,
-        enrollment_status,
-      }));
+      // Merge status + access date changes keyed by teacher id.
+      const idsWithChanges = new Set<string>([
+        ...pendingStatusChanges.keys(),
+        ...pendingAccessDateChanges.keys(),
+      ]);
+
+      const updates = Array.from(idsWithChanges).map((id) => {
+        const update: {
+          id: string;
+          enrollment_status?: string;
+          access_ends_at?: string | null;
+        } = { id };
+        if (pendingStatusChanges.has(id)) {
+          update.enrollment_status = pendingStatusChanges.get(id);
+        }
+        if (pendingAccessDateChanges.has(id)) {
+          update.access_ends_at = pendingAccessDateChanges.get(id) ?? null;
+        }
+        return update;
+      });
 
       const res = await fetch("/api/admin/teachers/bulk", {
         method: "PATCH",
@@ -229,18 +304,18 @@ function TeacherList() {
       setTeachers((prev) =>
         prev.map((teacher) => {
           const newStatus = pendingStatusChanges.get(teacher.id);
-          if (newStatus !== undefined) {
-            return {
-              ...teacher,
-              enrollment_status: newStatus,
-            };
-          }
-          return teacher;
+          const newAccessDate = pendingAccessDateChanges.get(teacher.id);
+          const updated = { ...teacher };
+          if (newStatus !== undefined) updated.enrollment_status = newStatus;
+          if (newAccessDate !== undefined) updated.access_ends_at = newAccessDate;
+          return updated;
         })
       );
 
       setPendingStatusChanges(new Map());
+      setPendingAccessDateChanges(new Map());
       setGlobalStatus("");
+      setGlobalAccessDate("");
       setSelectedIds(new Set());
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to save changes";
@@ -267,14 +342,16 @@ function TeacherList() {
       return next;
     });
     setPendingStatusChanges(new Map());
+    setPendingAccessDateChanges(new Map());
     setGlobalStatus("");
+    setGlobalAccessDate("");
   };
 
   if (loading) {
     return <div className="text-center py-8 text-[#666666]">Loading teachers...</div>;
   }
 
-  const hasUnsavedChanges = pendingStatusChanges.size > 0;
+  const hasUnsavedChanges = pendingStatusChanges.size > 0 || pendingAccessDateChanges.size > 0;
 
   return (
     <>
@@ -295,6 +372,11 @@ function TeacherList() {
         }
         .teachers-table .access-cell {
           max-width: 150px;
+          word-wrap: break-word;
+          white-space: normal;
+        }
+        .teachers-table .access-expires-cell {
+          max-width: 130px;
           word-wrap: break-word;
           white-space: normal;
         }
@@ -343,6 +425,26 @@ function TeacherList() {
                   <option value="active">Active</option>
                   <option value="inactive">Inactive</option>
                 </select>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-500">Access expires:</span>
+                <input
+                  type="date"
+                  value={globalAccessDate}
+                  onChange={(e) => handleGlobalAccessDateChange(e.target.value)}
+                  className="h-8 px-2 text-sm border border-[#e5e5e0] rounded focus:outline-none focus:ring-1 focus:ring-[#0d7377]"
+                  aria-label="Set access expiration for all selected teachers"
+                />
+                {globalAccessDate && (
+                  <button
+                    type="button"
+                    onClick={() => handleGlobalAccessDateChange("")}
+                    className="text-xs text-gray-500 hover:text-gray-700"
+                  >
+                    clear
+                  </button>
+                )}
               </div>
 
               <Button
@@ -403,6 +505,7 @@ function TeacherList() {
                       <TableHead className="email-cell">Email</TableHead>
                       <TableHead className="w-24">Discipline</TableHead>
                       <TableHead className="access-cell">Access</TableHead>
+                      <TableHead className="access-expires-cell">Access Expires</TableHead>
                       <TableHead className="w-32">Status</TableHead>
                       <TableHead className="w-20">Role</TableHead>
                       <TableHead className="w-20">Actions</TableHead>
@@ -414,6 +517,17 @@ function TeacherList() {
                       const pendingStatus = pendingStatusChanges.get(teacher.id);
                       const displayStatus = pendingStatus ?? teacher.enrollment_status ?? "trial";
                       const hasChanged = pendingStatus !== undefined && pendingStatus !== teacher.enrollment_status;
+
+                      // Effective access_ends_at for this row (pending override or current value)
+                      const pendingAccessDate = pendingAccessDateChanges.get(teacher.id);
+                      const hasDateChange = pendingAccessDateChanges.has(teacher.id);
+                      const effectiveDateIso =
+                        pendingAccessDate !== undefined ? pendingAccessDate : teacher.access_ends_at;
+                      const effectiveDateOnly = formatDateOnly(effectiveDateIso ?? null);
+                      const expired = isAccessExpiredForActive({
+                        ...teacher,
+                        access_ends_at: effectiveDateIso ?? null,
+                      });
 
                       return (
                         <TableRow key={teacher.id} className={isSelected ? "bg-[#f0fdfa]" : ""}>
@@ -429,6 +543,39 @@ function TeacherList() {
                           <TableCell className="email-cell text-[#666666]">{teacher.email}</TableCell>
                           <TableCell className="text-[#666666]">{teacher.primary_discipline || "N/A"}</TableCell>
                           <TableCell className="access-cell text-[#666666]">{formatEnrollments(teacher.enrollments)}</TableCell>
+                          <TableCell className="access-expires-cell">
+                            {isSelected ? (
+                              <div className="flex items-center gap-1">
+                                <input
+                                  type="date"
+                                  value={effectiveDateOnly}
+                                  onChange={(e) => handleAccessDateChange(teacher.id, e.target.value)}
+                                  className={`h-8 px-2 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-[#0d7377] ${
+                                    hasDateChange ? "border-amber-400 bg-amber-50" : "border-[#e5e5e0]"
+                                  }`}
+                                  aria-label={`Access expiration for ${getName(teacher)}`}
+                                />
+                                {hasDateChange && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAccessDateChange(teacher.id, teacher.access_ends_at ? formatDateOnly(teacher.access_ends_at) : "")}
+                                    className="text-xs text-gray-400 hover:text-gray-600"
+                                    aria-label="Reset to original date"
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </button>
+                                )}
+                              </div>
+                            ) : expired ? (
+                              <span className="text-sm text-red-600 font-medium">
+                                {formatDateDisplay(teacher.access_ends_at)} (expired)
+                              </span>
+                            ) : (
+                              <span className={`text-sm ${teacher.access_ends_at ? "text-[#666666]" : "text-gray-400"}`}>
+                                {formatDateDisplay(teacher.access_ends_at)}
+                              </span>
+                            )}
+                          </TableCell>
                           <TableCell>
                             {isSelected ? (
                               <select
@@ -478,6 +625,16 @@ function TeacherList() {
                   const pendingStatus = pendingStatusChanges.get(teacher.id);
                   const displayStatus = pendingStatus ?? teacher.enrollment_status ?? "trial";
                   const hasChanged = pendingStatus !== undefined && pendingStatus !== teacher.enrollment_status;
+
+                  const pendingAccessDate = pendingAccessDateChanges.get(teacher.id);
+                  const hasDateChange = pendingAccessDateChanges.has(teacher.id);
+                  const effectiveDateIso =
+                    pendingAccessDate !== undefined ? pendingAccessDate : teacher.access_ends_at;
+                  const effectiveDateOnly = formatDateOnly(effectiveDateIso ?? null);
+                  const expired = isAccessExpiredForActive({
+                    ...teacher,
+                    access_ends_at: effectiveDateIso ?? null,
+                  });
 
                   return (
                     <div
@@ -535,6 +692,40 @@ function TeacherList() {
                         <div className="col-span-2">
                           <div className="text-xs text-gray-500">Access</div>
                           <div className="text-[#666666] break-words">{formatEnrollments(teacher.enrollments)}</div>
+                        </div>
+                        <div className="col-span-2">
+                          <div className="text-xs text-gray-500">Access Expires</div>
+                          {isSelected ? (
+                            <div className="flex items-center gap-1">
+                              <input
+                                type="date"
+                                value={effectiveDateOnly}
+                                onChange={(e) => handleAccessDateChange(teacher.id, e.target.value)}
+                                className={`h-8 px-2 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-[#0d7377] ${
+                                  hasDateChange ? "border-amber-400 bg-amber-50" : "border-[#e5e5e0]"
+                                }`}
+                                aria-label={`Access expiration for ${getName(teacher)}`}
+                              />
+                              {hasDateChange && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleAccessDateChange(teacher.id, teacher.access_ends_at ? formatDateOnly(teacher.access_ends_at) : "")}
+                                  className="text-xs text-gray-400 hover:text-gray-600"
+                                  aria-label="Reset to original date"
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              )}
+                            </div>
+                          ) : expired ? (
+                            <div className="text-red-600 font-medium">
+                              {formatDateDisplay(teacher.access_ends_at)} (expired)
+                            </div>
+                          ) : (
+                            <div className={teacher.access_ends_at ? "text-[#666666]" : "text-gray-400"}>
+                              {formatDateDisplay(teacher.access_ends_at)}
+                            </div>
+                          )}
                         </div>
                       </div>
 

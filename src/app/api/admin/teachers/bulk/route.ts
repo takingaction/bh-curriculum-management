@@ -1,5 +1,6 @@
 import { createServiceClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
+import { isValidIsoDate, oneYearFromNow } from "@/lib/access-utils";
 
 export async function DELETE(request: Request) {
   try {
@@ -48,7 +49,7 @@ export async function PATCH(request: Request) {
     let updatedCount = 0;
 
     for (const update of updates) {
-      const { id, enrollment_status, enrollments } = update;
+      const { id, enrollment_status, enrollments, access_ends_at } = update;
 
       if (!id) continue;
 
@@ -70,6 +71,31 @@ export async function PATCH(request: Request) {
           updateData.trial_starts_at = null;
           updateData.trial_ends_at = null;
         }
+
+        // Mirror the single-teacher PUT transitions: trial->active defaults to
+        // today+1y; inactive->active clears. Explicit access_ends_at wins.
+        if (access_ends_at !== undefined) {
+          if (access_ends_at !== null && !isValidIsoDate(access_ends_at)) {
+            return NextResponse.json(
+              { error: `Invalid access_ends_at for ${id}: must be ISO timestamp or null` },
+              { status: 400 }
+            );
+          }
+          updateData.access_ends_at = access_ends_at;
+        } else if (enrollment_status === 'active') {
+          // Bulk edit doesn't know previous status per-row, so for any -> active
+          // we default to today+1y. Admins can correct individual rows after.
+          updateData.access_ends_at = oneYearFromNow();
+        }
+      } else if (access_ends_at !== undefined) {
+        // Standalone access_ends_at edit (no enrollment_status change).
+        if (access_ends_at !== null && !isValidIsoDate(access_ends_at)) {
+          return NextResponse.json(
+            { error: `Invalid access_ends_at for ${id}: must be ISO timestamp or null` },
+            { status: 400 }
+          );
+        }
+        updateData.access_ends_at = access_ends_at;
       }
 
       if (enrollments !== undefined) {

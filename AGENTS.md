@@ -792,6 +792,15 @@ Admin tool for tracking teacher engagement and site usage at `/admin/analytics`.
 Admin page for managing teacher accounts with real-time search and bulk operations.
 
 - Mobile: teachers table is hidden below `md`, replaced by a stacked card list with checkbox, name/email, status badge or select (when selected), Discipline/Role/Access grid, and full-width Edit button. Bulk action bar continues to work on mobile (cards have checkboxes; bulk bar wraps).
+- **Access expiration**: `profiles.access_ends_at TIMESTAMPTZ` is the per-teacher expiration for active accounts. Gating is enforced in three places — `src/app/(dashboard)/dashboard/page.tsx`, `src/app/(dashboard)/lessons/[lessonId]/page.tsx`, and `src/app/api/profile/check-status/route.ts`. When an active teacher's `access_ends_at` is in the past, the next request transitions their `enrollment_status` to `'inactive'` (and preserves the historical date). Display in the teachers list: red `(expired)` chip for past dates on active rows, gray date otherwise.
+- **Backfill (migration 031)**: all existing active teachers with `access_ends_at IS NULL` are set to `2027-12-31`.
+- **Status transitions that touch `access_ends_at` (PUT `/api/admin/teachers/[id]`)**:
+  - `* -> inactive`: leave `access_ends_at` unchanged.
+  - `inactive -> active`: clear `access_ends_at` (admin must set a new expiration).
+  - `trial -> active`: default `access_ends_at` to today + 1 year.
+  - Explicit `access_ends_at` in the request body always wins.
+- **Bulk-edit**: the bulk-action bar on `/admin/teachers` has a "Set access expires" date input next to the existing status dropdown. Setting a date applies to all selected rows; clearing the input sets `access_ends_at` to `null`. Bulk `* -> active` defaults new rows to today + 1 year (the bulk PATCH doesn't fetch previous status per row, so admins may need to correct individual rows after).
+- **Onboarding**: `/admin/teachers/onboard` accepts an optional date. Defaults to `2027-12-31` when status is active.
 
 **Features:**
 

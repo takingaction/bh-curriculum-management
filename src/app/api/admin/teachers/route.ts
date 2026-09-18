@@ -1,5 +1,6 @@
 import { createServiceClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
+import { DEFAULT_ACCESS_ENDS_AT, isValidIsoDate } from "@/lib/access-utils";
 
 export async function GET() {
   try {
@@ -34,7 +35,8 @@ export async function POST(request: Request) {
       primary_discipline,
       enrollment_status,
       enrollments,
-      role
+      role,
+      access_ends_at
     } = body;
 
     if (!first_name || !last_name || !email) {
@@ -56,6 +58,13 @@ export async function POST(request: Request) {
     if (enrollment_status && !validStatuses.includes(enrollment_status)) {
       return NextResponse.json(
         { error: "Invalid enrollment status" },
+        { status: 400 }
+      );
+    }
+
+    if (access_ends_at !== undefined && access_ends_at !== null && !isValidIsoDate(access_ends_at)) {
+      return NextResponse.json(
+        { error: "Invalid access_ends_at — must be ISO timestamp or null" },
         { status: 400 }
       );
     }
@@ -96,6 +105,16 @@ export async function POST(request: Request) {
     const trialStartsAt = enrollment_status === 'trial' ? new Date().toISOString() : null;
     const trialEndsAt = enrollment_status === 'trial' ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString() : null;
 
+    // Default access_ends_at: explicit value wins; otherwise backfill to 2027-12-31
+    // when creating an active teacher. Trial/inactive leave the field null
+    // unless explicitly provided.
+    const finalAccessEndsAt =
+      access_ends_at !== undefined && access_ends_at !== null
+        ? access_ends_at
+        : enrollment_status === 'active'
+          ? DEFAULT_ACCESS_ENDS_AT
+          : null;
+
     // Profile already exists due to handle_new_user trigger, so UPDATE instead of INSERT
     const { data: profile, error: profileError } = await supabaseAdmin
       .from("profiles")
@@ -111,6 +130,7 @@ export async function POST(request: Request) {
         enrollments: enrollments || ["ALL"],
         trial_starts_at: trialStartsAt,
         trial_ends_at: trialEndsAt,
+        access_ends_at: finalAccessEndsAt,
       })
       .eq("id", authData.user.id)
       .select()

@@ -40,6 +40,7 @@ interface TeacherProfile {
   role: string | null;
   trial_starts_at: string | null;
   trial_ends_at: string | null;
+  access_ends_at: string | null;
   created_at: string;
 }
 
@@ -65,6 +66,7 @@ export default function EditTeacherPage({
     enrollments: ["ALL"],
     role: "teacher",
     trial_ends_at: "",
+    access_ends_at: "",
   });
 
   useEffect(() => {
@@ -92,6 +94,7 @@ export default function EditTeacherPage({
           enrollments: profile.enrollments || ["ALL"],
           role: profile.role || "teacher",
           trial_ends_at: profile.trial_ends_at || "",
+          access_ends_at: profile.access_ends_at || "",
         });
       } catch {
         setError("Failed to fetch teacher");
@@ -123,6 +126,14 @@ export default function EditTeacherPage({
     }));
   };
 
+  const handleAccessDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setFormData(prev => ({
+      ...prev,
+      access_ends_at: value ? new Date(value).toISOString() : "",
+    }));
+  };
+
   const getTrialTimeRemaining = (endsAt: string): string => {
     const end = new Date(endsAt);
     const now = new Date();
@@ -136,6 +147,23 @@ export default function EditTeacherPage({
     if (days > 0) return `${days} day${days !== 1 ? "s" : ""} remaining`;
     if (hours > 0) return `${hours} hour${hours !== 1 ? "s" : ""} remaining`;
     return "Less than 1 hour";
+  };
+
+  const getAccessTimeRemaining = (endsAt: string): { label: string; expired: boolean } => {
+    const end = new Date(endsAt);
+    const now = new Date();
+    const diff = end.getTime() - now.getTime();
+    const absDays = Math.abs(Math.floor(diff / (1000 * 60 * 60 * 24)));
+    const absHours = Math.abs(Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)));
+
+    if (diff < 0) {
+      if (absDays > 0) return { label: `Expired ${absDays} day${absDays !== 1 ? "s" : ""} ago`, expired: true };
+      if (absHours > 0) return { label: `Expired ${absHours} hour${absHours !== 1 ? "s" : ""} ago`, expired: true };
+      return { label: "Expired", expired: true };
+    }
+    if (absDays > 0) return { label: `${absDays} day${absDays !== 1 ? "s" : ""} remaining`, expired: false };
+    if (absHours > 0) return { label: `${absHours} hour${absHours !== 1 ? "s" : ""} remaining`, expired: false };
+    return { label: "Less than 1 hour remaining", expired: false };
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -170,6 +198,7 @@ export default function EditTeacherPage({
           enrollments: formData.enrollments,
           role: formData.role,
           trial_ends_at: formData.trial_ends_at || null,
+          access_ends_at: formData.access_ends_at || null,
         }),
       });
 
@@ -386,6 +415,31 @@ export default function EditTeacherPage({
                   </select>
                   <p className="text-xs text-gray-500">
                     Trial accounts last 14 days. Active = full access. Inactive = cannot log in.
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="flex items-center gap-4">
+                    <Label htmlFor="access_ends_at" className="text-base font-semibold">Access Expiration Date</Label>
+                    {teacher.access_ends_at && (() => {
+                      const remaining = getAccessTimeRemaining(teacher.access_ends_at);
+                      return (
+                        <span className={`text-sm font-medium ${remaining.expired ? "text-red-600" : "text-[#0d7377]"}`}>
+                          ({remaining.label})
+                        </span>
+                      );
+                    })()}
+                  </div>
+                  <Input
+                    id="access_ends_at"
+                    name="access_ends_at"
+                    type="date"
+                    value={formData.access_ends_at ? formData.access_ends_at.split("T")[0] : ""}
+                    onChange={handleAccessDateChange}
+                    className="w-auto"
+                  />
+                  <p className="text-xs text-gray-500">
+                    When this teacher&apos;s access expires. Past dates will mark the teacher as inactive on next page load. Leave blank for no expiration (inactive → active will also leave this blank).
                   </p>
                 </div>
 

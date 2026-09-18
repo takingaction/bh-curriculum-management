@@ -1,5 +1,6 @@
 import { createServiceClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
+import { isValidIsoDate, oneYearFromNow } from "@/lib/access-utils";
 
 export async function GET(
   request: Request,
@@ -49,7 +50,8 @@ export async function PUT(
       enrollments,
       role,
       password,
-      trial_ends_at
+      trial_ends_at,
+      access_ends_at
     } = body;
 
     const validDisciplines = ['N/A', 'MUSIC', 'THEATRE', 'DANCE'];
@@ -62,6 +64,13 @@ export async function PUT(
       return NextResponse.json({ error: "Invalid enrollment status" }, { status: 400 });
     }
 
+    if (access_ends_at !== undefined && access_ends_at !== null && !isValidIsoDate(access_ends_at)) {
+      return NextResponse.json(
+        { error: "Invalid access_ends_at — must be ISO timestamp or null" },
+        { status: 400 }
+      );
+    }
+
     const updateData: any = {};
 
     if (first_name !== undefined) updateData.first_name = first_name;
@@ -69,6 +78,18 @@ export async function PUT(
     if (california !== undefined) updateData.california = california;
     if (district_name !== undefined) updateData.district_name = district_name;
     if (primary_discipline !== undefined) updateData.primary_discipline = primary_discipline;
+    if (enrollments !== undefined) updateData.enrollments = enrollments;
+    if (role !== undefined) updateData.role = role;
+
+    // Fetch existing profile so we can distinguish previous enrollment_status
+    // when computing default access_ends_at on transitions to 'active'.
+    const { data: existingProfile } = await supabaseAdmin
+      .from("profiles")
+      .select("enrollment_status")
+      .eq("id", id)
+      .single();
+    const previousStatus = existingProfile?.enrollment_status ?? null;
+
     if (enrollment_status !== undefined) {
       updateData.enrollment_status = enrollment_status;
       if (enrollment_status === 'trial') {
@@ -80,11 +101,29 @@ export async function PUT(
         updateData.trial_starts_at = null;
         updateData.trial_ends_at = null;
       }
+
+      // Status transitions that affect access_ends_at:
+      //   - any -> inactive: leave existing access_ends_at untouched (preserves history)
+      //   - inactive -> active: clear access_ends_at (admin must set a new expiration)
+      //   - trial    -> active: default to today + 1 year if not explicitly provided
+      // For explicit access_ends_at in the body, that always wins.
+      if (access_ends_at !== undefined) {
+        updateData.access_ends_at = access_ends_at;
+      } else if (enrollment_status === 'inactive') {
+        // no-op; preserve historical date
+      } else if (enrollment_status === 'active' && previousStatus === 'trial') {
+        updateData.access_ends_at = oneYearFromNow();
+      } else if (enrollment_status === 'active' && previousStatus === 'inactive') {
+        updateData.access_ends_at = null;
+      }
     } else if (trial_ends_at !== undefined) {
       updateData.trial_ends_at = trial_ends_at;
     }
-    if (enrollments !== undefined) updateData.enrollments = enrollments;
-    if (role !== undefined) updateData.role = role;
+
+    // Standalone access_ends_at edit (no enrollment_status change in this request).
+    if (enrollment_status === undefined && access_ends_at !== undefined) {
+      updateData.access_ends_at = access_ends_at;
+    }
 
     if (email !== undefined) {
       const { data: existing } = await supabaseAdmin
