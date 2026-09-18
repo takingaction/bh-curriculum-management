@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -94,7 +94,9 @@ function TeacherList() {
 
   const pageSize = 50;
 
-  // Hydrate state from URL on first mount
+  // Hydrate state from URL once on mount. Subsequent URL changes all
+  // come from our own router.replace calls, so we don't re-hydrate
+  // (re-running would cause a feedback loop with the page-reset effect).
   useEffect(() => {
     const initial = readFiltersFromUrl(searchParams);
     setStatusFilter(initial.status);
@@ -104,7 +106,8 @@ function TeacherList() {
     setDebouncedSearch(initial.search);
     setPage(initial.page);
     hydratedFromUrl.current = true;
-  }, [searchParams]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Debounce search input
   useEffect(() => {
@@ -133,8 +136,27 @@ function TeacherList() {
     router.replace(target, { scroll: false });
   }, [statusFilter, roleFilter, disciplines, debouncedSearch, page, router]);
 
-  // Fetch teachers when filters/page change
-  const loadTeachers = useCallback(async () => {
+  // Request-id guard: ensures only the most recent in-flight fetch is
+  // allowed to commit state. Prevents stale page-1 data from overwriting
+  // a page-2 result when the user clicks quickly through pages or filters.
+  const latestRequestId = useRef(0);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  // Stable ref pattern: the inner fetch function is rebuilt on every
+  // state change, but the effect that triggers it has a stable identity.
+  // Decouples "this state changed" from "fire a fetch" so we don't get
+  // extra re-renders between them.
+  const loadTeachersRef = useRef<() => Promise<void>>(async () => {});
+  loadTeachersRef.current = async () => {
+    const myId = ++latestRequestId.current;
+    if (!isMountedRef.current) return;
     setLoading(true);
     try {
       const params = new URLSearchParams();
@@ -147,6 +169,7 @@ function TeacherList() {
 
       const res = await fetch(`/api/admin/teachers?${params}`);
       const data = await res.json();
+      if (myId !== latestRequestId.current) return;
       if (data.error) {
         console.error("Failed to fetch teachers:", data.error);
         return;
@@ -161,20 +184,23 @@ function TeacherList() {
       setTeachers(withNames);
       setTotal(data.total ?? 0);
     } catch (error) {
+      if (myId !== latestRequestId.current) return;
       console.error("Failed to fetch teachers:", error);
     } finally {
-      setLoading(false);
+      if (myId === latestRequestId.current) {
+        setLoading(false);
+      }
     }
+  };
+
+  useEffect(() => {
+    loadTeachersRef.current();
   }, [statusFilter, roleFilter, disciplines, debouncedSearch, page]);
 
-  useEffect(() => {
-    loadTeachers();
-  }, [loadTeachers]);
-
   // Stable ref so bulk-save handlers can refresh the current page after writes.
-  const refreshRef = useRef(loadTeachers);
+  const refreshRef = useRef<() => void>(() => loadTeachersRef.current());
   useEffect(() => {
-    refreshRef.current = loadTeachers;
+    refreshRef.current = () => loadTeachersRef.current();
   });
 
   const getName = (teacher: Teacher) => {
@@ -404,11 +430,8 @@ function TeacherList() {
     refreshRef.current?.();
   };
 
-  if (loading) {
-    return <div className="text-center py-8 text-[#666666]">Loading teachers...</div>;
-  }
-
   const hasUnsavedChanges = pendingStatusChanges.size > 0 || pendingAccessDateChanges.size > 0;
+  const showFirstPaintLoader = loading && teachers.length === 0;
 
   return (
     <>
@@ -577,7 +600,16 @@ function TeacherList() {
         )}
 
         <CardContent className="pt-0">
-          {teachers.length > 0 ? (
+          {loading && (
+            <div
+              className="h-0.5 w-full bg-[#0d7377] animate-pulse mb-2"
+              role="status"
+              aria-label="Loading teachers"
+            />
+          )}
+          {showFirstPaintLoader ? (
+            <p className="text-center py-8 text-[#666666]">Loading teachers...</p>
+          ) : teachers.length > 0 ? (
             <>
               {/* Desktop table */}
               <div className="hidden md:block overflow-x-auto">
