@@ -11,11 +11,27 @@
  * data-asset-id="<uuid>" and the lesson view click handler resolves the
  * asset by ID.
  *
- * Run: node scripts/backfill-resource-link-data-asset-id.mjs [--dry-run]
+ * Match strategies (in priority order):
+ *   0. By current public_url — exact match (covers un-replaced assets)
+ *   1. By previous_public_urls — exact match against historical URLs
+ *   2. By filename substring — strips the timestamp prefix and matches on
+ *      the trailing filename fragment (catches replaces where the
+ *      sanitized filename is identical between old and new)
+ *   3. By display-name tie-break — for unmatched orphans, parses the link
+ *      text and matches against assets.display_name with strict rules:
+ *        - exact match (case-insensitive, whitespace-normalized) → accept
+ *        - link text contains full display_name AND display_name >= 8
+ *          chars AND display_name is unique across current assets → accept
+ *        - else → orphan (logged to scripts/orphaned-resource-links-report.json)
+ *
+ * Run: node scripts/backfill-resource-link-data-asset-id.mjs [--dry-run|--write]
+ *
+ * Default mode is dry-run (no DB writes). Pass --write to commit changes.
  */
 
 import { createClient } from "@supabase/supabase-js";
 import * as dotenv from "dotenv";
+import * as fs from "fs";
 import { fileURLToPath } from "url";
 import { dirname, resolve } from "path";
 
@@ -53,6 +69,9 @@ const CONTENT_FIELDS = [
   "assessment",
 ];
 
+const REPORT_PATH = resolve(__dirname, "orphaned-resource-links-report.json");
+const LOG_PATH = resolve(__dirname, "rewrite-log.json");
+
 function extractStorageFilename(url) {
   // URL form: .../curriculum-assets/assets/{timestamp}-{filename}
   // Returns the `assets/{...}` portion so that a replaced file's old URL
@@ -61,13 +80,33 @@ function extractStorageFilename(url) {
   return m ? m[1] : null;
 }
 
+function extractFilenameFragment(storagePath) {
+  // storagePath form: assets/{timestamp}-{filename}
+  // Strip the leading timestamp prefix (13-digit epoch ms + hyphen) so
+  // old and new URLs collapse to the same fragment.
+  if (!storagePath) return null;
+  const m = /^assets\/\d+-(.+)$/.exec(storagePath);
+  return m ? m[1] : null;
+}
+
+function normalizeText(text) {
+  return (text || "").replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+function extractLinkText(html, anchorEndIdx) {
+  // Find the closing </a> after anchorEndIdx and return the inner text,
+  // stripping nested tags.
+  const closeIdx = html.indexOf("</a>", anchorEndIdx);
+  if (closeIdx === -1) return "";
+  const inner = html.slice(anchorEndIdx, closeIdx);
+  return inner.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+}
+
 async function fetchAllAssets() {
   let all = [];
   let from = 0;
   const PAGE = 1000;
-  // Try with previous_public_urls first; fall back to base columns if the
-  // migration hasn't been applied yet.
-  let selectFields = "id, public_url, filename, created_at, previous_public_urls";
+  let selectFields = "id, public_url, filename, display_name, created_at, previous_public_urls";
   while (true) {
     const { data, error } = await supabase
       .from("assets")
@@ -77,9 +116,9 @@ async function fetchAllAssets() {
     if (error) {
       if (selectFields.includes("previous_public_urls")) {
         console.warn(
-          "Note: previous_public_urls column not present yet. Run supabase/migrations/033_assets_previous_public_urls.sql to enable it. Continuing without it."
+          "Note: previous_public_urls column not present. Continuing without Strategy 1."
         );
-        selectFields = "id, public_url, filename, created_at";
+        selectFields = "id, public_url, filename, display_name, created_at";
         continue;
       }
       throw error;
@@ -99,7 +138,7 @@ async function fetchAllLessons(fields) {
   while (true) {
     const { data, error } = await supabase
       .from("lessons")
-      .select(`id, ${fields.join(", ")}`)
+      .select(`id, title, ${fields.join(", ")}`)
       .range(from, from + PAGE - 1);
     if (error) throw error;
     if (!data || data.length === 0) break;
@@ -110,16 +149,15 @@ async function fetchAllLessons(fields) {
   return all;
 }
 
-function processFieldHtml(html, urlToAsset, filenameToAsset, stats) {
-  // Returns { html, changed } where html is the rewritten content (or the
-  // original if no changes were needed).
+function processFieldHtml(html, ctx, stats, rewrites, orphans, lesson, field) {
+  // Returns { html, changed }
   if (!html || typeof html !== "string") return { html, changed: false };
   if (!/<a\b[^>]*class\s*=\s*["'][^"']*\bresource-link\b/i.test(html)) {
     return { html, changed: false };
   }
 
   let changed = false;
-  const newHtml = html.replace(/<a\b([^>]*)>/g, (match, attrs) => {
+  const newHtml = html.replace(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi, (match, attrs, inner, offset) => {
     const classMatch = /\bclass\s*=\s*(?:"([^"]*)"|'([^']*)')/i.exec(attrs);
     const classValue = classMatch ? classMatch[1] || classMatch[2] : "";
     if (!classValue.split(/\s+/).includes("resource-link")) return match;
@@ -135,21 +173,93 @@ function processFieldHtml(html, urlToAsset, filenameToAsset, stats) {
       return match;
     }
 
-    let asset = urlToAsset.get(href);
-    let kind = "byUrl";
+    const anchorEndIdx = offset + match.length - inner.length - 4; // -4 for </a>
+    const linkText = extractLinkText(html, anchorEndIdx);
+
+    let asset = null;
+    let strategy = null;
+
+    // Strategy 0: exact current public_url match
+    asset = ctx.urlToAsset.get(href);
+    if (asset) strategy = "byUrl";
+
+    // Strategy 1: exact previous_public_urls match
     if (!asset) {
-      const filenameKey = extractStorageFilename(href);
-      if (filenameKey && filenameToAsset.has(filenameKey)) {
-        asset = filenameToAsset.get(filenameKey);
-        kind = "byFilename";
+      asset = ctx.previousUrlToAsset.get(href);
+      if (asset) strategy = "byPreviousUrl";
+    }
+
+    // Strategy 2: filename substring match (filename fragment unique across assets)
+    if (!asset) {
+      const oldStoragePath = extractStorageFilename(href);
+      const oldFragment = extractFilenameFragment(oldStoragePath);
+      if (oldFragment) {
+        const candidate = ctx.fragmentToAsset.get(oldFragment);
+        if (candidate && ctx.fragmentUniqueness.get(oldFragment) === 1) {
+          asset = candidate;
+          strategy = "byFilename";
+        }
       }
     }
+
+    // Strategy 3: display-name tie-break
+    if (!asset && linkText) {
+      const normText = normalizeText(linkText);
+
+      // Exact match
+      const exactCandidates = ctx.displayNameExact.get(normText) || [];
+      if (exactCandidates.length === 1) {
+        asset = exactCandidates[0];
+        strategy = "byDisplayNameExact";
+      } else if (exactCandidates.length > 1) {
+        // Multiple assets share this display name — ambiguous, fall through to substring
+      }
+
+      // Unique substring match (display_name >= 4 chars, unique across assets
+      // whose display_name contains the link text). For example, link text
+      // "Jambo" matches the unique asset whose display_name is "Jambo Sana".
+      if (!asset) {
+        const candidates = [];
+        for (const a of ctx.assets) {
+          const dn = a.display_name ? normalizeText(a.display_name) : "";
+          if (dn.length >= 4 && dn.includes(normText)) {
+            candidates.push(a);
+          }
+        }
+        if (candidates.length === 1) {
+          asset = candidates[0];
+          strategy = "byDisplayNameSubstring";
+        }
+      }
+
+      // For reporting: gather suspected matches even if not accepted
+      if (!asset) {
+        const suspected = [];
+        for (const a of ctx.assets) {
+          const dn = a.display_name ? normalizeText(a.display_name) : "";
+          if (dn && dn.includes(normText)) suspected.push(a.display_name);
+        }
+        if (suspected.length > 0) {
+          if (!ctx.suspectedByLesson) ctx.suspectedByLesson = new Map();
+          const key = `${lesson.id}:${field}:${offset}`;
+          ctx.suspectedByLesson.set(key, suspected.slice(0, 5));
+        }
+      }
+    }
+
     if (!asset) {
-      stats.skipped++;
+      stats.orphans++;
+      orphans.push({
+        lesson_id: lesson.id,
+        lesson_title: lesson.title,
+        field,
+        broken_href: href,
+        link_text: linkText,
+      });
       return match;
     }
 
-    stats[kind]++;
+    stats[strategy]++;
     stats.total++;
 
     let newAttrs = attrs;
@@ -161,46 +271,169 @@ function processFieldHtml(html, urlToAsset, filenameToAsset, stats) {
     }
     newAttrs = `${newAttrs} data-asset-id="${asset.id}"`;
     changed = true;
-    return `<a${newAttrs}>`;
+
+    rewrites.push({
+      lesson_id: lesson.id,
+      lesson_title: lesson.title,
+      field,
+      strategy,
+      asset_id: asset.id,
+      asset_display_name: asset.display_name,
+      old_href: href,
+      new_href: asset.public_url,
+    });
+
+    return `<a${newAttrs}>${inner}</a>`;
   });
 
   return { html: newHtml, changed };
 }
 
-async function main() {
-  const dryRun = process.argv.includes("--dry-run");
-  console.log(`Backfilling resource-link data-asset-id${dryRun ? " (DRY RUN)" : ""}...`);
-
-  const assets = await fetchAllAssets();
-  console.log(`Fetched ${assets.length} assets.`);
-
-  // Map current public_url -> asset, and previous_public_urls entries -> asset.
-  // Newer assets (later created_at) override older ones when URLs collide.
+function buildContext(assets) {
   const urlToAsset = new Map();
   for (const a of assets) {
     if (a.public_url) urlToAsset.set(a.public_url, a);
   }
+
+  const previousUrlToAsset = new Map();
   for (const a of assets) {
     if (Array.isArray(a.previous_public_urls)) {
       for (const oldUrl of a.previous_public_urls) {
-        if (!urlToAsset.has(oldUrl)) urlToAsset.set(oldUrl, a);
+        if (!previousUrlToAsset.has(oldUrl)) previousUrlToAsset.set(oldUrl, a);
       }
     }
   }
 
-  // Filename-based fallback for replaced assets: any URL whose path ends in
-  // `assets/{filename}` (ignoring the timestamp prefix) maps to that asset.
-  const filenameToAsset = new Map();
+  // Keyed by the filename fragment (timestamp stripped), not the full storage
+  // path, so old and new URLs of the same file collapse to one key.
+  const fragmentToAsset = new Map();
+  const fragmentCounts = new Map();
   for (const a of assets) {
     if (!a.public_url) continue;
-    const key = extractStorageFilename(a.public_url);
-    if (key) filenameToAsset.set(key, a);
+    const storagePath = extractStorageFilename(a.public_url);
+    const fragment = extractFilenameFragment(storagePath);
+    if (!fragment) continue;
+    fragmentToAsset.set(fragment, a);
+    fragmentCounts.set(fragment, (fragmentCounts.get(fragment) || 0) + 1);
   }
+  const fragmentUniqueness = new Map();
+  for (const [frag, count] of fragmentCounts) {
+    fragmentUniqueness.set(frag, count);
+  }
+
+  const displayNameExact = new Map();
+  const displayNameCounts = new Map();
+  const displayNameToAsset = new Map();
+  for (const a of assets) {
+    const dn = a.display_name ? normalizeText(a.display_name) : "";
+    if (!dn) continue;
+    if (!displayNameExact.has(dn)) displayNameExact.set(dn, []);
+    displayNameExact.get(dn).push(a);
+    displayNameCounts.set(dn, (displayNameCounts.get(dn) || 0) + 1);
+    displayNameToAsset.set(dn, a);
+  }
+  const uniqueDisplayNamesAtLeast8 = [];
+  const allDisplayNames = [];
+  for (const [dn, count] of displayNameCounts) {
+    allDisplayNames.push(dn);
+    if (count === 1 && dn.length >= 8) uniqueDisplayNamesAtLeast8.push(dn);
+  }
+
+  return {
+    urlToAsset,
+    previousUrlToAsset,
+    fragmentToAsset,
+    fragmentUniqueness,
+    displayNameExact,
+    displayNameToAsset,
+    uniqueDisplayNamesAtLeast8,
+    allDisplayNames,
+    assets,
+  };
+}
+
+function groupOrphansByAsset(orphans, assets) {
+  const assetByDisplayName = new Map();
+  for (const a of assets) {
+    if (a.display_name) {
+      assetByDisplayName.set(a.display_name, a);
+    }
+  }
+  const groups = new Map();
+  for (const orphan of orphans) {
+    // Heuristic: try to attribute orphans to an asset by link_text matching
+    // an asset display name. Falls back to "(unattributed)".
+    const normText = normalizeText(orphan.link_text);
+    let attributedTo = null;
+    for (const a of assets) {
+      if (a.display_name && normText.includes(normalizeText(a.display_name))) {
+        attributedTo = a;
+        break;
+      }
+    }
+    const key = attributedTo
+      ? `${attributedTo.display_name} (${attributedTo.id})`
+      : "(unattributed)";
+    if (!groups.has(key)) {
+      groups.set(key, {
+        asset_id: attributedTo?.id || null,
+        asset_display_name: attributedTo?.display_name || null,
+        orphan_count: 0,
+        lessons: new Set(),
+        orphans: [],
+      });
+    }
+    const group = groups.get(key);
+    group.orphan_count++;
+    group.lessons.add(orphan.lesson_id);
+    group.orphans.push(orphan);
+  }
+  const result = [];
+  for (const [key, group] of groups) {
+    result.push({
+      group_key: key,
+      asset_id: group.asset_id,
+      asset_display_name: group.asset_display_name,
+      orphan_count: group.orphan_count,
+      lesson_count: group.lessons.size,
+      lesson_ids: [...group.lessons],
+      orphans: group.orphans,
+    });
+  }
+  result.sort((a, b) => b.orphan_count - a.orphan_count);
+  return result;
+}
+
+async function main() {
+  const args = new Set(process.argv.slice(2));
+  const isWrite = args.has("--write");
+  const isDryRun = args.has("--dry-run") || !isWrite;
+  console.log(
+    `Backfilling resource-link data-asset-id (${isWrite ? "WRITE" : "DRY RUN"})...`
+  );
+
+  const assets = await fetchAllAssets();
+  console.log(`Fetched ${assets.length} assets.`);
+  const ctx = buildContext(assets);
+  console.log(
+    `Indexed ${ctx.urlToAsset.size} URLs, ${ctx.previousUrlToAsset.size} previous URLs, ${ctx.fragmentToAsset.size} filename fragments, ${ctx.uniqueDisplayNamesAtLeast8.length} unique display names >= 8 chars.`
+  );
 
   const lessons = await fetchAllLessons(CONTENT_FIELDS);
   console.log(`Fetched ${lessons.length} lessons.`);
 
-  const stats = { total: 0, byUrl: 0, byFilename: 0, byPreviousUrl: 0, skipped: 0 };
+  const stats = {
+    total: 0,
+    byUrl: 0,
+    byPreviousUrl: 0,
+    byFilename: 0,
+    byDisplayNameExact: 0,
+    byDisplayNameSubstring: 0,
+    skipped: 0,
+    orphans: 0,
+  };
+  const rewrites = [];
+  const orphans = [];
   let lessonsUpdated = 0;
 
   for (const lesson of lessons) {
@@ -210,9 +443,12 @@ async function main() {
     for (const field of CONTENT_FIELDS) {
       const { html, changed } = processFieldHtml(
         lesson[field],
-        urlToAsset,
-        filenameToAsset,
-        stats
+        ctx,
+        stats,
+        rewrites,
+        orphans,
+        lesson,
+        field
       );
       if (changed) {
         updates[field] = html;
@@ -222,7 +458,7 @@ async function main() {
 
     if (lessonChanged) {
       lessonsUpdated++;
-      if (!dryRun) {
+      if (isWrite) {
         const { error } = await supabase
           .from("lessons")
           .update(updates)
@@ -235,12 +471,25 @@ async function main() {
   }
 
   console.log("\n=== Summary ===");
-  console.log(`Tag rewrites:        ${stats.total}`);
-  console.log(`  By current URL:    ${stats.byUrl}`);
-  console.log(`  By previous URL:   ${stats.byPreviousUrl}`);
-  console.log(`  By filename match: ${stats.byFilename}  (replaced assets)`);
-  console.log(`  Skipped:           ${stats.skipped}`);
-  console.log(`Lessons updated:     ${lessonsUpdated}${dryRun ? " (dry run, not written)" : ""}`);
+  console.log(`Tag rewrites:                ${stats.total}`);
+  console.log(`  By current URL:            ${stats.byUrl}`);
+  console.log(`  By previous URL:           ${stats.byPreviousUrl}`);
+  console.log(`  By filename match:         ${stats.byFilename}  (replaced assets)`);
+  console.log(`  By display name (exact):   ${stats.byDisplayNameExact}`);
+  console.log(`  By display name (substr):  ${stats.byDisplayNameSubstring}`);
+  console.log(`Orphans remaining:           ${stats.orphans}`);
+  console.log(`Lessons updated:             ${lessonsUpdated}${isWrite ? "" : " (dry run, not written)"}`);
+
+  fs.writeFileSync(LOG_PATH, JSON.stringify({ stats, rewrites }, null, 2));
+  console.log(`\nRewrite log: ${LOG_PATH}`);
+
+  if (orphans.length > 0) {
+    const grouped = groupOrphansByAsset(orphans, assets);
+    fs.writeFileSync(REPORT_PATH, JSON.stringify(grouped, null, 2));
+    console.log(`Orphan report: ${REPORT_PATH}`);
+  } else {
+    if (fs.existsSync(REPORT_PATH)) fs.unlinkSync(REPORT_PATH);
+  }
 }
 
 main().catch((err) => {
