@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { BulkDeleteModal } from "@/components/bulk-delete-modal";
 import { Search, X, Trash2 } from "lucide-react";
+import { isoToLocalDateInput, isoToLocalDateDisplay } from "@/lib/access-utils";
 
 interface Teacher {
   id: string;
@@ -23,20 +24,6 @@ interface Teacher {
   enrollments: string[] | null;
   access_ends_at: string | null;
 }
-
-const formatDateOnly = (iso: string | null): string => {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return "";
-  return d.toISOString().split("T")[0];
-};
-
-const formatDateDisplay = (iso: string | null): string => {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
-};
 
 const isAccessExpiredForActive = (teacher: Teacher): boolean => {
   return (
@@ -523,7 +510,7 @@ function TeacherList() {
                       const hasDateChange = pendingAccessDateChanges.has(teacher.id);
                       const effectiveDateIso =
                         pendingAccessDate !== undefined ? pendingAccessDate : teacher.access_ends_at;
-                      const effectiveDateOnly = formatDateOnly(effectiveDateIso ?? null);
+                      const effectiveDateOnly = isoToLocalDateInput(effectiveDateIso ?? null);
                       const expired = isAccessExpiredForActive({
                         ...teacher,
                         access_ends_at: effectiveDateIso ?? null,
@@ -558,7 +545,7 @@ function TeacherList() {
                                 {hasDateChange && (
                                   <button
                                     type="button"
-                                    onClick={() => handleAccessDateChange(teacher.id, teacher.access_ends_at ? formatDateOnly(teacher.access_ends_at) : "")}
+                                    onClick={() => handleAccessDateChange(teacher.id, teacher.access_ends_at ? isoToLocalDateInput(teacher.access_ends_at) : "")}
                                     className="text-xs text-gray-400 hover:text-gray-600"
                                     aria-label="Reset to original date"
                                   >
@@ -568,11 +555,11 @@ function TeacherList() {
                               </div>
                             ) : expired ? (
                               <span className="text-sm text-red-600 font-medium">
-                                {formatDateDisplay(teacher.access_ends_at)} (expired)
+                                {isoToLocalDateDisplay(teacher.access_ends_at)} (expired)
                               </span>
                             ) : (
                               <span className={`text-sm ${teacher.access_ends_at ? "text-[#666666]" : "text-gray-400"}`}>
-                                {formatDateDisplay(teacher.access_ends_at)}
+                                {isoToLocalDateDisplay(teacher.access_ends_at)}
                               </span>
                             )}
                           </TableCell>
@@ -630,7 +617,7 @@ function TeacherList() {
                   const hasDateChange = pendingAccessDateChanges.has(teacher.id);
                   const effectiveDateIso =
                     pendingAccessDate !== undefined ? pendingAccessDate : teacher.access_ends_at;
-                  const effectiveDateOnly = formatDateOnly(effectiveDateIso ?? null);
+                  const effectiveDateOnly = isoToLocalDateInput(effectiveDateIso ?? null);
                   const expired = isAccessExpiredForActive({
                     ...teacher,
                     access_ends_at: effectiveDateIso ?? null,
@@ -709,7 +696,7 @@ function TeacherList() {
                               {hasDateChange && (
                                 <button
                                   type="button"
-                                  onClick={() => handleAccessDateChange(teacher.id, teacher.access_ends_at ? formatDateOnly(teacher.access_ends_at) : "")}
+                                  onClick={() => handleAccessDateChange(teacher.id, teacher.access_ends_at ? isoToLocalDateInput(teacher.access_ends_at) : "")}
                                   className="text-xs text-gray-400 hover:text-gray-600"
                                   aria-label="Reset to original date"
                                 >
@@ -719,11 +706,11 @@ function TeacherList() {
                             </div>
                           ) : expired ? (
                             <div className="text-red-600 font-medium">
-                              {formatDateDisplay(teacher.access_ends_at)} (expired)
+                              {isoToLocalDateDisplay(teacher.access_ends_at)} (expired)
                             </div>
                           ) : (
                             <div className={teacher.access_ends_at ? "text-[#666666]" : "text-gray-400"}>
-                              {formatDateDisplay(teacher.access_ends_at)}
+                              {isoToLocalDateDisplay(teacher.access_ends_at)}
                             </div>
                           )}
                         </div>

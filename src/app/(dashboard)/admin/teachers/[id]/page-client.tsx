@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { EnrollmentsSelect } from "@/components/enrollments-select";
+import { isoToLocalDateInput } from "@/lib/access-utils";
 
 const DISCIPLINES = [
   { value: "N/A", label: "N/A" },
@@ -434,7 +435,7 @@ export default function EditTeacherPage({
                     id="access_ends_at"
                     name="access_ends_at"
                     type="date"
-                    value={formData.access_ends_at ? formData.access_ends_at.split("T")[0] : ""}
+                    value={isoToLocalDateInput(formData.access_ends_at)}
                     onChange={handleAccessDateChange}
                     className="w-auto"
                   />
