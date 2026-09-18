@@ -660,72 +660,76 @@ export function AssetLibraryModal({
                     <X className="w-4 h-4" />
                   </button>
                 </div>
-                <div className="flex items-center gap-4">
-                  <div className="p-3 bg-white rounded">
-                    {(() => {
-                      const Icon = getFileIcon(previewAsset.file_type);
-                      return <Icon className="w-8 h-8 text-gray-600" />;
-                    })()}
-                  </div>
-                  <div className="flex-1">
-                    {editingAssetId === previewAsset.id ? (
-                      <div className="flex items-center gap-2">
-                        <Input
-                          type="text"
-                          value={editingAssetName}
-                          onChange={(e) => setEditingAssetName(e.target.value)}
-                          className="flex-1"
-                          autoFocus
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") handleRenameAsset(previewAsset);
-                            if (e.key === "Escape") {
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 bg-white rounded">
+                      {(() => {
+                        const Icon = getFileIcon(previewAsset.file_type);
+                        return <Icon className="w-8 h-8 text-gray-600" />;
+                      })()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      {editingAssetId === previewAsset.id ? (
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="text"
+                            value={editingAssetName}
+                            onChange={(e) => setEditingAssetName(e.target.value)}
+                            className="flex-1"
+                            autoFocus
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") handleRenameAsset(previewAsset);
+                              if (e.key === "Escape") {
+                                setEditingAssetId(null);
+                                setEditingAssetName("");
+                              }
+                            }}
+                          />
+                          <Button
+                            size="sm"
+                            onClick={() => handleRenameAsset(previewAsset)}
+                          >
+                            Save
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
                               setEditingAssetId(null);
                               setEditingAssetName("");
-                            }
-                          }}
-                        />
-                        <Button
-                          size="sm"
-                          onClick={() => handleRenameAsset(previewAsset)}
-                        >
-                          Save
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            setEditingAssetId(null);
-                            setEditingAssetName("");
-                          }}
-                        >
-                          Cancel
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <p className="font-medium">{previewAsset.display_name}</p>
-                        {!selectMode && (
-                          <button
-                            type="button"
-                            onClick={() => startRename(previewAsset)}
-                            className="p-1 hover:bg-gray-200 rounded"
-                            title="Rename"
+                            }}
                           >
-                            <EditIcon className="w-3 h-3" />
-                          </button>
-                        )}
-                      </div>
-                    )}
-                    <p className="text-xs text-gray-500 mt-1">
-                      {previewAsset.file_type.toUpperCase()} • {formatFileSize(previewAsset.file_size)}
-                    </p>
-                    {previewAsset.asset_categories && (
-                      <p className="text-xs text-[#0d7377] mt-1">
-                        {previewAsset.asset_categories.name}
+                            Cancel
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium truncate" title={previewAsset.display_name}>
+                            {previewAsset.display_name}
+                          </p>
+                          {!selectMode && (
+                            <button
+                              type="button"
+                              onClick={() => startRename(previewAsset)}
+                              className="p-1 hover:bg-gray-200 rounded flex-shrink-0"
+                              title="Rename"
+                            >
+                              <EditIcon className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
+                      )}
+                      <p className="text-xs text-gray-500 mt-1">
+                        {previewAsset.file_type.toUpperCase()} • {formatFileSize(previewAsset.file_size)}
                       </p>
-                    )}
+                      {previewAsset.asset_categories && (
+                        <p className="text-xs text-[#0d7377] mt-1">
+                          {previewAsset.asset_categories.name}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2 pl-[60px]">
                     {lessonId && (
                       attachedAssetIds.has(previewAsset.id) ? (
                         <Button
