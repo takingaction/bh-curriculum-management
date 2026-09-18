@@ -8,7 +8,8 @@ import { TableRow } from "@tiptap/extension-table-row";
 import { TableCellWithWidth } from "./extensions/table-cell-with-width";
 import { TableHeaderWithWidth } from "./extensions/table-header-with-width";
 import { ImageWithOptions } from "./extensions/image-with-options";
-import Link from "@tiptap/extension-link";
+import { ResourceLink } from "./extensions/resource-link";
+
 import { Paragraph } from "@tiptap/extension-paragraph";
 import InvisibleCharacters, { HardBreakNode, ParagraphNode } from "@tiptap/extension-invisible-characters";
 import { Button } from "@/components/ui/button";
@@ -115,7 +116,7 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
       TableCellWithWidth,
       TableHeaderWithWidth,
       ImageWithOptions,
-      Link.configure({
+      ResourceLink.configure({
         openOnClick: false,
         HTMLAttributes: {
           rel: "noopener noreferrer",
@@ -1793,7 +1794,11 @@ export function LessonEditor({ content, onChange, placeholder, lessonId, courseI
                           type="button"
                           onClick={() => {
                             if (linkUrl.trim() || true) {
-                              editor?.chain().focus().extendMarkRange("link").setLink({ href: resource.public_url, class: "resource-link" }).run();
+                              editor?.chain().focus().extendMarkRange("link").setLink({
+                                href: resource.public_url,
+                                "data-asset-id": resource.id,
+                                class: "resource-link",
+                              } as Parameters<NonNullable<typeof editor>["commands"]["setLink"]>[0]).run();
                             }
                             setLinkModalOpen(false);
                             setLinkUrl("");

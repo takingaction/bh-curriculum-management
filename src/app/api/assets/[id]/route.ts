@@ -16,11 +16,12 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       typeof fileSize === "number";
 
     let oldStoragePath: string | null = null;
+    let oldPublicUrl: string | null = null;
 
     if (isReplacement) {
       const { data: existing, error: fetchError } = await supabaseAdmin
         .from("assets")
-        .select("storage_path")
+        .select("storage_path, public_url")
         .eq("id", id)
         .single();
 
@@ -29,6 +30,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       }
 
       oldStoragePath = existing?.storage_path ?? null;
+      oldPublicUrl = existing?.public_url ?? null;
     }
 
     const updatePayload: Record<string, unknown> = {};
@@ -40,6 +42,9 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       updatePayload.filename = filename;
       updatePayload.file_type = fileType;
       updatePayload.file_size = fileSize;
+      if (oldPublicUrl && oldPublicUrl !== publicUrl) {
+        updatePayload.previous_public_urls = [oldPublicUrl];
+      }
     }
 
     const { data, error } = await supabaseAdmin

@@ -568,9 +568,14 @@ export default function LessonContentPage({
               setShowSpotify(true);
             } else if (anchor.classList.contains("resource-link")) {
               e.preventDefault();
-              const asset = lessonAssets.find((a) => a.public_url === href);
+              const assetId = anchor.getAttribute("data-asset-id");
+              const asset = assetId
+                ? lessonAssets.find((a) => a.id === assetId)
+                : lessonAssets.find((a) => a.public_url === href);
               if (asset) {
                 setPreviewAsset(asset);
+              } else {
+                window.open(href, "_blank", "noopener,noreferrer");
               }
             } else if (anchor.classList.contains("section-link") && href.startsWith("#")) {
               e.preventDefault();
