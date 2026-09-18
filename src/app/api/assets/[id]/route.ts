@@ -6,17 +6,59 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     const { id } = await params;
     const supabaseAdmin = await createServiceClient();
     const body = await request.json();
-    const { display_name, category_id } = body;
+    const { display_name, category_id, storagePath, publicUrl, filename, fileType, fileSize } = body;
+
+    const isReplacement =
+      typeof storagePath === "string" &&
+      typeof publicUrl === "string" &&
+      typeof filename === "string" &&
+      typeof fileType === "string" &&
+      typeof fileSize === "number";
+
+    let oldStoragePath: string | null = null;
+
+    if (isReplacement) {
+      const { data: existing, error: fetchError } = await supabaseAdmin
+        .from("assets")
+        .select("storage_path")
+        .eq("id", id)
+        .single();
+
+      if (fetchError) {
+        return NextResponse.json({ error: fetchError.message }, { status: 500 });
+      }
+
+      oldStoragePath = existing?.storage_path ?? null;
+    }
+
+    const updatePayload: Record<string, unknown> = {};
+    if (typeof display_name !== "undefined") updatePayload.display_name = display_name;
+    if (typeof category_id !== "undefined") updatePayload.category_id = category_id;
+    if (isReplacement) {
+      updatePayload.storage_path = storagePath;
+      updatePayload.public_url = publicUrl;
+      updatePayload.filename = filename;
+      updatePayload.file_type = fileType;
+      updatePayload.file_size = fileSize;
+    }
 
     const { data, error } = await supabaseAdmin
       .from("assets")
-      .update({ display_name, category_id })
+      .update(updatePayload)
       .eq("id", id)
       .select("*, asset_categories(name)")
       .single();
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    if (isReplacement && oldStoragePath && oldStoragePath !== storagePath) {
+      try {
+        await supabaseAdmin.storage.from("curriculum-assets").remove([oldStoragePath]);
+      } catch (storageError) {
+        console.error("Old storage delete error (non-fatal):", storageError);
+      }
     }
 
     return NextResponse.json({ asset: data });

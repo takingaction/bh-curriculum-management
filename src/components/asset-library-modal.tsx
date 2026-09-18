@@ -3,6 +3,10 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
+  isAllowedExtension,
+  replaceAssetFile,
+} from "@/lib/asset-replace";
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -23,6 +27,7 @@ import {
   EditIcon,
   SearchIcon,
   FolderIcon,
+  Replace,
 } from "lucide-react";
 
 interface AssetCategory {
@@ -103,6 +108,11 @@ export function AssetLibraryModal({
   const [editingAssetId, setEditingAssetId] = useState<string | null>(null);
   const [editingAssetName, setEditingAssetName] = useState("");
   const [attachedAssetIds, setAttachedAssetIds] = useState<Set<string>>(new Set());
+  const [replaceTarget, setReplaceTarget] = useState<Asset | null>(null);
+  const [replaceFile, setReplaceFile] = useState<File | null>(null);
+  const [replacing, setReplacing] = useState(false);
+  const [replaceError, setReplaceError] = useState<string | null>(null);
+  const replaceInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
 
@@ -359,6 +369,67 @@ export function AssetLibraryModal({
   const startRename = (asset: Asset) => {
     setEditingAssetId(asset.id);
     setEditingAssetName(asset.display_name);
+  };
+
+  const openReplaceDialog = (asset: Asset) => {
+    setReplaceTarget(asset);
+    setReplaceFile(null);
+    setReplaceError(null);
+  };
+
+  const closeReplaceDialog = () => {
+    if (replacing) return;
+    setReplaceTarget(null);
+    setReplaceFile(null);
+    setReplaceError(null);
+    if (replaceInputRef.current) replaceInputRef.current.value = "";
+  };
+
+  const handleReplaceFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null;
+    setReplaceError(null);
+    if (file && !isAllowedExtension(file.name)) {
+      setReplaceError("File type not allowed. Use PDF, MP4, MOV, M4A, MP3, or WAV.");
+      setReplaceFile(null);
+      return;
+    }
+    setReplaceFile(file);
+  };
+
+  const handleConfirmReplace = async () => {
+    if (!replaceTarget || !replaceFile) return;
+    setReplacing(true);
+    setReplaceError(null);
+    try {
+      const result = await replaceAssetFile({
+        assetId: replaceTarget.id,
+        file: replaceFile,
+      });
+      const updatedAsset: Asset = {
+        ...replaceTarget,
+        filename: result.asset.filename,
+        display_name: result.asset.display_name,
+        storage_path: result.asset.storage_path,
+        public_url: result.asset.public_url,
+        file_type: result.asset.file_type,
+        file_size: result.asset.file_size,
+        category_id: result.asset.category_id,
+        asset_categories: result.asset.asset_categories ?? replaceTarget.asset_categories,
+      };
+      setAssets((prev) => prev.map((a) => (a.id === updatedAsset.id ? updatedAsset : a)));
+      if (previewAsset && previewAsset.id === updatedAsset.id) {
+        setPreviewAsset(updatedAsset);
+      }
+      onAddSuccess?.();
+      setReplaceTarget(null);
+      setReplaceFile(null);
+      if (replaceInputRef.current) replaceInputRef.current.value = "";
+    } catch (err: any) {
+      console.error("Replace file failed:", err);
+      setReplaceError(err?.message || "Failed to replace file");
+    } finally {
+      setReplacing(false);
+    }
   };
 
   const handleAssetClick = (asset: Asset) => {
@@ -700,6 +771,17 @@ export function AssetLibraryModal({
                     >
                       <TrashIcon className="w-4 h-4" />
                     </Button>
+                    {!selectMode && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => openReplaceDialog(previewAsset)}
+                        title="Replace file (updates everywhere this resource is used)"
+                      >
+                        <Replace className="w-4 h-4 mr-1" />
+                        Replace File
+                      </Button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -770,6 +852,77 @@ export function AssetLibraryModal({
             </div>
           </div>
         </div>
+
+        {/* Replace File Confirmation Modal */}
+        {replaceTarget && (
+          <div className="fixed inset-0 z-[60] bg-black/50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-lg p-4 w-full max-w-md max-h-[90vh] flex flex-col">
+              <div className="flex items-center justify-between mb-3 shrink-0">
+                <h3 className="text-lg font-medium">Replace File</h3>
+                <button
+                  type="button"
+                  onClick={closeReplaceDialog}
+                  disabled={replacing}
+                  className="p-1 hover:bg-gray-100 rounded disabled:opacity-50"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="mb-3 text-sm text-gray-600">
+                Replace the file for{" "}
+                <span className="font-medium">{replaceTarget.display_name}</span>? This
+                will update the file everywhere this resource is used.
+              </div>
+              <input
+                ref={replaceInputRef}
+                type="file"
+                accept=".pdf,.mp4,.mov,.m4a,.mp3,.wav"
+                onChange={handleReplaceFileSelected}
+                className="hidden"
+              />
+              <div
+                className="border-2 border-dashed rounded-lg p-3 text-center cursor-pointer hover:border-gray-400 mb-3 shrink-0"
+                onClick={() => replaceInputRef.current?.click()}
+              >
+                {replaceFile ? (
+                  <div className="text-sm text-gray-600">
+                    <span className="font-medium break-all">{replaceFile.name}</span>
+                    <span className="text-xs text-gray-400 block mt-1">
+                      {(replaceFile.size / 1024 / 1024).toFixed(2)} MB
+                    </span>
+                    <span className="text-xs text-[#0d7377] mt-2 block">Click to change</span>
+                  </div>
+                ) : (
+                  <>
+                    <Replace className="w-6 h-6 mx-auto mb-1 text-gray-400" />
+                    <p className="text-xs text-gray-600">Click to select a replacement file</p>
+                    <p className="text-xs text-gray-400">PDF, MP4, MOV, M4A, MP3, WAV</p>
+                  </>
+                )}
+              </div>
+              {replaceError && (
+                <div className="mb-3 p-2 bg-red-50 border border-red-200 text-red-700 text-xs rounded">
+                  {replaceError}
+                </div>
+              )}
+              <div className="flex gap-2 justify-end shrink-0">
+                <Button
+                  variant="outline"
+                  onClick={closeReplaceDialog}
+                  disabled={replacing}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleConfirmReplace}
+                  disabled={!replaceFile || replacing}
+                >
+                  {replacing ? "Replacing..." : "Replace"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Upload Modal */}
         {showUploadModal && (
