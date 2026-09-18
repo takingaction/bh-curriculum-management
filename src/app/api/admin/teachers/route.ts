@@ -1,6 +1,6 @@
 import { createServiceClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
-import { DEFAULT_ACCESS_ENDS_AT, isValidIsoDate } from "@/lib/access-utils";
+import { DEFAULT_ACCESS_ENDS_AT, isValidIsoDate, localDateInputToUtcNoon, utcNoonInDaysFromNow } from "@/lib/access-utils";
 
 export async function GET() {
   try {
@@ -103,14 +103,15 @@ export async function POST(request: Request) {
     }
 
     const trialStartsAt = enrollment_status === 'trial' ? new Date().toISOString() : null;
-    const trialEndsAt = enrollment_status === 'trial' ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString() : null;
+    const trialEndsAt = enrollment_status === 'trial' ? utcNoonInDaysFromNow(14) : null;
 
     // Default access_ends_at: explicit value wins; otherwise backfill to 2027-12-31
     // when creating an active teacher. Trial/inactive leave the field null
-    // unless explicitly provided.
+    // unless explicitly provided. YYYY-MM-DD inputs from <input type="date">
+    // are normalized to noon UTC so the date renders consistently in every timezone.
     const finalAccessEndsAt =
       access_ends_at !== undefined && access_ends_at !== null
-        ? access_ends_at
+        ? localDateInputToUtcNoon(access_ends_at)
         : enrollment_status === 'active'
           ? DEFAULT_ACCESS_ENDS_AT
           : null;

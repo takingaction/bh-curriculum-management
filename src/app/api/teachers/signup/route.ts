@@ -1,5 +1,6 @@
 import { createServiceClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
+import { utcNoonInDaysFromNow } from "@/lib/access-utils";
 
 export async function POST(request: Request) {
   try {
@@ -87,7 +88,7 @@ export async function POST(request: Request) {
         enrollment_status: "trial",
         enrollments: ["ALL"],
         trial_starts_at: new Date().toISOString(),
-        trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+        trial_ends_at: utcNoonInDaysFromNow(14),
       })
       .eq("id", authData.user.id);
 

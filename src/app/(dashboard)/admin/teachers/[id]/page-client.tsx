@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { EnrollmentsSelect } from "@/components/enrollments-select";
-import { isoToLocalDateInput } from "@/lib/access-utils";
+import { isoToLocalDateInput, localDateInputToUtcNoon } from "@/lib/access-utils";
 
 const DISCIPLINES = [
   { value: "N/A", label: "N/A" },
@@ -123,7 +123,8 @@ export default function EditTeacherPage({
     const value = e.target.value;
     setFormData(prev => ({
       ...prev,
-      trial_ends_at: value ? new Date(value).toISOString() : "",
+      // noon-UTC so the date renders the same in every timezone
+      trial_ends_at: value ? localDateInputToUtcNoon(value) : "",
     }));
   };
 
@@ -131,7 +132,7 @@ export default function EditTeacherPage({
     const value = e.target.value;
     setFormData(prev => ({
       ...prev,
-      access_ends_at: value ? new Date(value).toISOString() : "",
+      access_ends_at: value ? localDateInputToUtcNoon(value) : "",
     }));
   };
 

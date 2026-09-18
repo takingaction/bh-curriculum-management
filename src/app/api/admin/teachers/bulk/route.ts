@@ -1,6 +1,6 @@
 import { createServiceClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
-import { isValidIsoDate, oneYearFromNow } from "@/lib/access-utils";
+import { isValidIsoDate, oneYearFromNow, utcNoonInDaysFromNow } from "@/lib/access-utils";
 
 export async function DELETE(request: Request) {
   try {
@@ -66,7 +66,7 @@ export async function PATCH(request: Request) {
 
         if (enrollment_status === 'trial') {
           updateData.trial_starts_at = new Date().toISOString();
-          updateData.trial_ends_at = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
+          updateData.trial_ends_at = utcNoonInDaysFromNow(14);
         } else {
           updateData.trial_starts_at = null;
           updateData.trial_ends_at = null;

@@ -1,5 +1,6 @@
 import { createServiceClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
+import { utcNoonInDaysFromNow } from "@/lib/access-utils";
 
 interface CSVRow {
   first_name: string;
@@ -140,7 +141,7 @@ export async function POST(request: Request) {
       }
 
       const trialStartsAt = enrollmentStatus === 'trial' ? new Date().toISOString() : null;
-      const trialEndsAt = enrollmentStatus === 'trial' ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString() : null;
+      const trialEndsAt = enrollmentStatus === 'trial' ? utcNoonInDaysFromNow(14) : null;
 
       // Profile already exists due to handle_new_user trigger, so UPDATE instead of INSERT
       const { error: profileError } = await supabaseAdmin

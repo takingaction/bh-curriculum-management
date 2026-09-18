@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { BulkDeleteModal } from "@/components/bulk-delete-modal";
 import { Search, X, Trash2 } from "lucide-react";
-import { isoToLocalDateInput, isoToLocalDateDisplay } from "@/lib/access-utils";
+import { isoToLocalDateInput, isoToLocalDateDisplay, localDateInputToUtcNoon } from "@/lib/access-utils";
 
 interface Teacher {
   id: string;
@@ -219,8 +219,9 @@ function TeacherList() {
   const handleAccessDateChange = (teacherId: string, date: string) => {
     setPendingAccessDateChanges((prev) => {
       const next = new Map(prev);
-      // Empty string = clear; non-empty = ISO date string from <input type="date">
-      next.set(teacherId, date === "" ? null : new Date(date).toISOString());
+      // Empty string = clear; non-empty = noon-UTC ISO so the date
+      // renders the same in every timezone (see access-utils.ts).
+      next.set(teacherId, date === "" ? null : localDateInputToUtcNoon(date));
       return next;
     });
     setGlobalAccessDate("");
@@ -234,7 +235,7 @@ function TeacherList() {
         if (date === "") {
           next.set(id, null);
         } else {
-          next.set(id, new Date(date).toISOString());
+          next.set(id, localDateInputToUtcNoon(date));
         }
       });
       return next;
