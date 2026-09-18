@@ -1175,6 +1175,7 @@ Generic numeric duration patterns are detected via regex fallback:
 - `src/components/editor/extensions/table-with-styles.ts` - Custom table with column widths
 - `src/components/editor/extensions/image-with-options.ts` - Custom image with align/width
 - `src/components/lesson-assets-panel.tsx` - Lesson assets management
+  - `CompactLessonAssets` (used on lesson view) renders all assets inline — no truncation/`+N more`. The `maxItems` prop is kept for back-compat but is no longer referenced.
 - `src/components/spotify-embed.tsx` - Draggable Spotify playlist modal (lesson view)
 - `src/components/youtube-dialog.tsx` - YouTube video popup modal (lesson content)
 - `src/app/(dashboard)/lessons/[lessonId]/page.tsx` - Student/teacher view with SpotifyEmbed from course

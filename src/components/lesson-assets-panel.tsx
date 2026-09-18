@@ -456,13 +456,10 @@ export function CompactLessonAssets({ lessonId, maxItems = 6 }: CompactLessonAss
     return <span className="text-xs text-gray-400 italic">No resources</span>;
   }
 
-  const displayAssets = assets.slice(0, maxItems);
-  const hasMore = assets.length > maxItems;
-
   return (
     <>
       <div className="space-y-0">
-        {displayAssets.map((asset) => (
+        {assets.map((asset) => (
           <CompactAssetItem
             key={asset.id}
             asset={asset}
@@ -470,9 +467,6 @@ export function CompactLessonAssets({ lessonId, maxItems = 6 }: CompactLessonAss
             onDownload={handleDownload}
           />
         ))}
-        {hasMore && (
-          <p className="text-xs text-gray-500 py-1">+{assets.length - maxItems} more</p>
-        )}
       </div>
 
       {previewAsset && (
