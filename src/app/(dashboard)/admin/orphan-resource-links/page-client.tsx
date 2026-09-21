@@ -229,7 +229,7 @@ export default function OrphanResourceLinksClient({ initialReport }: ClientProps
   const hasOrphans = report.stats.orphans > 0;
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-[#2d2d2d]">Orphan Resource Links</h1>
