@@ -1,6 +1,7 @@
 import { createServiceClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { utcNoonInDaysFromNow } from "@/lib/access-utils";
+import { sendTrialSignupNotification } from "@/lib/trial-signup-notification";
 
 export async function POST(request: Request) {
   try {
@@ -75,6 +76,8 @@ export async function POST(request: Request) {
       );
     }
 
+    const trialEndsAt = utcNoonInDaysFromNow(14);
+
     const { error: profileError } = await supabaseAdmin
       .from("profiles")
       .update({
@@ -88,7 +91,7 @@ export async function POST(request: Request) {
         enrollment_status: "trial",
         enrollments: ["ALL"],
         trial_starts_at: new Date().toISOString(),
-        trial_ends_at: utcNoonInDaysFromNow(14),
+        trial_ends_at: trialEndsAt,
       })
       .eq("id", authData.user.id);
 
@@ -99,6 +102,18 @@ export async function POST(request: Request) {
         { status: 500 }
       );
     }
+
+    // Awaited so it completes before the serverless function exits;
+    // never throws, so signup succeeds even if the email fails.
+    await sendTrialSignupNotification({
+      first_name,
+      last_name,
+      email: email.toLowerCase(),
+      primary_discipline: primary_discipline || "N/A",
+      california: california !== false,
+      district_name: district_name || null,
+      trial_ends_at: trialEndsAt,
+    });
 
     return NextResponse.json({
       success: true,
