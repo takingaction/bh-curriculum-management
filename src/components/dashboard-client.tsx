@@ -39,9 +39,16 @@ export default function DashboardClient({
   trialEndsAt = null,
   disciplinePdfs = {},
 }: DashboardClientProps) {
-  const [activeTab, setActiveTab] = useState<string>(
-    DISCIPLINE_ORDER.find((d) => courses.some((c) => c.discipline === d)) || "Music"
-  );
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    const hasCourses = (d: string) => courses.some((c) => c.discipline === d);
+    // Default to the teacher's primary discipline (stored uppercase, e.g. "DANCE")
+    // when it's set and they have courses in it; otherwise fall back to the first available.
+    const primary = DISCIPLINE_ORDER.find(
+      (d) => d.toUpperCase() === String(profile?.primary_discipline || "").toUpperCase()
+    );
+    if (primary && hasCourses(primary)) return primary;
+    return DISCIPLINE_ORDER.find(hasCourses) || "Music";
+  });
 
   const totalLessons = Object.values(lessonCounts).reduce((sum, count) => sum + count, 0);
   const availableDisciplines = DISCIPLINE_ORDER.filter((d) =>
